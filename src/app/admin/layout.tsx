@@ -86,14 +86,14 @@ export default function AdminLayout({
           <div className="flex items-center gap-3 px-2 pt-2 border-t border-surface-variant">
             <div className="w-9 h-9 rounded-full bg-surface-variant overflow-hidden relative flex-shrink-0 border border-outline-variant">
               <Image
-                src="https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?q=80&w=200&auto=format&fit=crop"
-                alt="Mariana Silva"
+                src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?q=80&w=200&auto=format&fit=crop"
+                alt="Jaifred Pastran"
                 fill
                 className="object-cover"
               />
             </div>
             <div className="text-xs">
-              <p className="font-bold text-on-surface">M. Silva</p>
+              <p className="font-bold text-on-surface">Jaifred Pastran</p>
               <p className="text-[10px] text-secondary">Head Sommelier & Admin</p>
             </div>
           </div>

@@ -64,10 +64,10 @@ const INITIAL_TASTINGS: Tasting[] = [
       "Trufas de chocolate negro 70% al Malbec"
     ],
     sommelier: {
-      name: "Mariana Silva",
-      role: "Head Sommelier",
-      bio: "Miembro de la Asociación Internacional de Sommeliers, dedicada a transmitir la mística de los vinos de montaña.",
-      avatarUrl: "https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?q=80&w=400&auto=format&fit=crop"
+      name: "Jaifred Pastran",
+      role: "Head Sommelier & Admin",
+      bio: "Miembro de la Asociación Internacional de Sommeliers, dedicado a transmitir la mística de los vinos de montaña.",
+      avatarUrl: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?q=80&w=400&auto=format&fit=crop"
     },
     status: "active",
     createdAt: "2026-08-01T12:00:00Z"
@@ -166,10 +166,10 @@ const INITIAL_TASTINGS: Tasting[] = [
       "Pan brioche artesanal con manteca de hierbas"
     ],
     sommelier: {
-      name: "Mariana Silva",
-      role: "Head Sommelier",
-      bio: "Enamorada de la pureza de las cepas blancas de montaña.",
-      avatarUrl: "https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?q=80&w=400&auto=format&fit=crop"
+      name: "Jaifred Pastran",
+      role: "Head Sommelier & Admin",
+      bio: "Enamorado de la pureza de las cepas blancas de montaña.",
+      avatarUrl: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?q=80&w=400&auto=format&fit=crop"
     },
     status: "active",
     createdAt: "2026-08-10T12:00:00Z"

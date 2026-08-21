@@ -118,7 +118,7 @@ export function CertificateGenerator({
     doc.setTextColor(27, 28, 28);
     doc.setFont("times", "italic");
     doc.setFontSize(13);
-    doc.text("Mariana Silva", 65, 225, { align: "center" });
+    doc.text("Jaifred Pastran", 65, 225, { align: "center" });
     doc.text("Alejandro Morales", 145, 225, { align: "center" });
 
     doc.setFont("helvetica", "normal");

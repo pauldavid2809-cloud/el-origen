@@ -37,7 +37,7 @@ export default function AdminReservasPage() {
         paymentStatus: "paid",
         checkinStatus: "checked_in",
         checkedInAt: "2026-08-20T18:15:00Z",
-        checkedInBy: "M. Silva",
+        checkedInBy: "Jaifred Pastran",
         createdAt: "2026-08-20T16:00:00Z",
       },
       {
