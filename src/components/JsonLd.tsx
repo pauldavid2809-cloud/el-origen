@@ -12,7 +12,7 @@ export function JsonLd() {
       "https://images.unsplash.com/photo-1506377247377-2a5b3b417ebb?q=80&w=1200&auto=format&fit=crop",
       "https://images.unsplash.com/photo-1510812431401-41d2bd2722f3?q=80&w=1200&auto=format&fit=crop"
     ],
-    "description": "Experiencias boutique de cata de vino guiadas por sommeliers en el Valle de Uco, Mendoza a 1.400 msnm. Reserva de cupos online y maridaje de autor.",
+    "description": "Experiencias boutique de cata de vino guiadas por sommeliers en Mendoza a 1.400 msnm. Reserva de cupos online y maridaje de autor.",
     "telephone": "+54-9-261-455-8822",
     "email": "experiencias@elorigen.com",
     "priceRange": "$$$$",
@@ -22,7 +22,7 @@ export function JsonLd() {
     "address": {
       "@type": "PostalAddress",
       "streetAddress": "Ruta del Vino s/n",
-      "addressLocality": "Valle de Uco",
+      "addressLocality": "Mendoza",
       "addressRegion": "Mendoza",
       "postalCode": "M5561",
       "addressCountry": "AR"

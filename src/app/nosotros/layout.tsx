@@ -1,7 +1,7 @@
 import { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "Nuestra Historia & Terroir de Altura en Valle de Uco",
+  title: "Nuestra Historia & Terroir de Altura en Mendoza",
   description:
     "Descubra la filosofía de Bodega El Origen: viñedos a 1.400 metros de altura, irrigación por deshielo puro de los Andes y vinificación de mínima intervención.",
   alternates: {

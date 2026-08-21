@@ -262,7 +262,7 @@ export default function TastingDetailPage() {
                 <span className="text-[11px] font-semibold text-on-surface-variant/60 uppercase tracking-wider block">Ubicación</span>
                 <span className="font-semibold text-on-surface flex items-center gap-1.5 truncate">
                   <span className="material-symbols-outlined text-primary text-[17px]">location_on</span>
-                  Valle de Uco, Mendoza
+                  Mendoza, Argentina
                 </span>
               </div>
             </div>

@@ -55,7 +55,7 @@ const INITIAL_TASTINGS: Tasting[] = [
         type: "Edición Limitada de Colección",
         description: "Madurez impecable, notas de trufa, cuero noble y final prolongado de más de 20 segundos.",
         aromaProfile: ["Cuero", "Trufa", "Higo seco", "Cedro"],
-        audioStory: "Una cosecha histórica en el Valle de Uco con noches frescas que preservaron una acidez vibrante."
+        audioStory: "Una cosecha histórica en Mendoza con noches frescas que preservaron una acidez vibrante."
       }
     ],
     pairings: [

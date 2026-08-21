@@ -106,7 +106,7 @@ export default function ConfirmationPage() {
     const details = encodeURIComponent(
       `Reserva confirmada (${reservation.spotsCount} personas). Código: ${reservation.code}. Presentar QR al llegar.`
     );
-    const location = encodeURIComponent("Bodega El Origen, Valle de Uco, Mendoza, Argentina");
+    const location = encodeURIComponent("Bodega El Origen, Mendoza, Argentina");
     const googleCalendarUrl = `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${title}&details=${details}&location=${location}`;
     window.open(googleCalendarUrl, "_blank");
   };

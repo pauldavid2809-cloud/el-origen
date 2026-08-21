@@ -12,7 +12,7 @@ export const translations = {
       reservar: "Reservar",
     },
     hero: {
-      eyebrow: "1.400 msnm • Valle de Uco, Mendoza",
+      eyebrow: "1.400 msnm • Mendoza, Argentina",
       titleMain: "El Terroir Donde Nace la",
       titleHighlight: "Excelencia",
       subtitle: "Catas guiadas de colección, degustación directa de barricas y maridajes de autor al pie de los Andes.",
@@ -46,7 +46,7 @@ export const translations = {
     catalog: {
       badge: "Catálogo de Experiencias",
       title: "Degustaciones & Catas de Colección",
-      subtitle: "Reserve sus cupos en línea para disfrutar añadas emblemáticas guiadas por sommeliers en nuestra bodega boutique del Valle de Uco.",
+      subtitle: "Reserve sus cupos en línea para disfrutar añadas emblemáticas guiadas por sommeliers en nuestra bodega boutique en Mendoza.",
       filterAll: "Todas las Catas",
       filterReserva: "Malbec Reserva",
       filterSunset: "Atardecer & Terrazas",
@@ -80,7 +80,7 @@ export const translations = {
     terroir: {
       badge: "Filosofía Enológica",
       title: "Vinos Moldeados por el Frío de los Andes",
-      p1: "En el Valle de Uco, a 1.400 metros de altura, la radiación solar y la marcada amplitud térmica de 20°C concentran aromas de violetas y frutas negras con una acidez vibrante y natural.",
+      p1: "A 1.400 metros de altura en Mendoza, la radiación solar y la marcada amplitud térmica de 20°C concentran aromas de violetas y frutas negras con una acidez vibrante y natural.",
       p2: "Nuestras partidas son vinificadas en piletas de hormigón y barricas de roble francés de grano fino, buscando reflejar con pureza la mineralidad de los suelos de piedra caliza.",
       cta: "Conocer la historia de la bodega",
     },
@@ -176,7 +176,7 @@ export const translations = {
     },
     footer: {
       tagline: "Crafting the source of excellence.",
-      description: "Crafting the source of excellence desde el Valle de Uco, Mendoza, Argentina.",
+      description: "Crafting the source of excellence desde Mendoza, Argentina.",
       explore: "Explorar",
       legal: "Legal",
       privacy: "Privacidad",
@@ -196,7 +196,7 @@ export const translations = {
       reservar: "Book Now",
     },
     hero: {
-      eyebrow: "1,400 MASL • Uco Valley, Mendoza",
+      eyebrow: "1,400 MASL • Mendoza, Argentina",
       titleMain: "The Terroir Where",
       titleHighlight: "Excellence is Born",
       subtitle: "Curated collection tastings, direct barrel sampling, and signature pairings at the foot of the Andes.",
@@ -230,7 +230,7 @@ export const translations = {
     catalog: {
       badge: "Experiences Catalog",
       title: "Tasting Experiences & Collection Tastings",
-      subtitle: "Book your spots online to enjoy iconic vintages guided by sommeliers at our boutique winery in the Uco Valley.",
+      subtitle: "Book your spots online to enjoy iconic vintages guided by sommeliers at our boutique winery in Mendoza.",
       filterAll: "All Tastings",
       filterReserva: "Reserve Malbec",
       filterSunset: "Sunset & Deck",
@@ -264,7 +264,7 @@ export const translations = {
     terroir: {
       badge: "Winemaking Philosophy",
       title: "Wines Shaped by the Andean Cold",
-      p1: "In the Uco Valley at 1,400 meters of altitude, high solar radiation and a 20°C thermal amplitude concentrate violet and dark fruit aromas with vibrant natural acidity.",
+      p1: "At 1,400 meters of altitude in Mendoza, high solar radiation and a 20°C thermal amplitude concentrate violet and dark fruit aromas with vibrant natural acidity.",
       p2: "Our small lots are vinified in concrete vats and fine-grain French oak barrels, seeking to purely reflect the limestone minerality of our soils.",
       cta: "Discover our winery's story",
     },
@@ -360,7 +360,7 @@ export const translations = {
     },
     footer: {
       tagline: "Crafting the source of excellence.",
-      description: "Crafting the source of excellence from Uco Valley, Mendoza, Argentina.",
+      description: "Crafting the source of excellence from Mendoza, Argentina.",
       explore: "Explore",
       legal: "Legal",
       privacy: "Privacy",

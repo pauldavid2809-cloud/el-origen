@@ -3,7 +3,7 @@ import { Metadata } from "next";
 export const metadata: Metadata = {
   title: "Catas Privadas & Eventos Corporativos en Bodega",
   description:
-    "Organice experiencias de cata privadas, agasajos ejecutivos y aniversarios con sommelier exclusivo y maridaje gourmet en Valle de Uco, Mendoza.",
+    "Organice experiencias de cata privadas, agasajos ejecutivos y aniversarios con sommelier exclusivo y maridaje gourmet en Mendoza, Argentina.",
   alternates: {
     canonical: "/privadas",
   },

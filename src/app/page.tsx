@@ -169,7 +169,7 @@ export default function HomePage() {
               <div className="relative rounded-[calc(2.5rem-0.5rem)] overflow-hidden aspect-[4/3] w-full bg-surface-container">
                 <Image
                   src="https://images.unsplash.com/photo-1506377247377-2a5b3b417ebb?q=80&w=1200&auto=format&fit=crop"
-                  alt="Viñedos El Origen en el Valle de Uco"
+                  alt="Viñedos El Origen en Mendoza"
                   fill
                   className="object-cover"
                 />

@@ -17,10 +17,10 @@ export const metadata: Metadata = {
     template: "%s | Bodega El Origen",
   },
   description:
-    "Experiencias exclusivas de cata de vino en Valle de Uco, Mendoza a 1.400 msnm. Reserva de cupos online, degustaciones guiadas por sommeliers, maridaje de autor y tickets QR.",
+    "Experiencias exclusivas de cata de vino en Mendoza a 1.400 msnm. Reserva de cupos online, degustaciones guiadas por sommeliers, maridaje de autor y tickets QR.",
   keywords: [
     "vino mendoza",
-    "catas de vino valle de uco",
+    "catas de vino mendoza",
     "wine tasting mendoza",
     "bodega boutique mendoza",
     "malbec reserva degustacion",
@@ -56,7 +56,7 @@ export const metadata: Metadata = {
         url: "https://images.unsplash.com/photo-1506377247377-2a5b3b417ebb?q=80&w=1200&auto=format&fit=crop",
         width: 1200,
         height: 630,
-        alt: "Viñedos de altura Bodega El Origen en Valle de Uco, Mendoza",
+        alt: "Viñedos de altura Bodega El Origen en Mendoza",
       },
     ],
     locale: "es_AR",
@@ -66,7 +66,7 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     title: "El Origen | Boutique Wine Tasting Experience en Mendoza",
     description:
-      "Catas guiadas de colección, barricas de roble y maridajes de autor al pie de la cordillera en Valle de Uco.",
+      "Catas guiadas de colección, barricas de roble y maridajes de autor al pie de la cordillera en Mendoza.",
     images: ["https://images.unsplash.com/photo-1506377247377-2a5b3b417ebb?q=80&w=1200&auto=format&fit=crop"],
   },
   robots: {
@@ -82,7 +82,7 @@ export const metadata: Metadata = {
   },
   other: {
     "geo.region": "AR-M",
-    "geo.placename": "Valle de Uco, Mendoza",
+    "geo.placename": "Mendoza, Argentina",
     "geo.position": "-33.5684;-69.0423",
     "ICBM": "-33.5684, -69.0423",
   },
