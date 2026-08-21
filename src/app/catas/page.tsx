@@ -6,13 +6,29 @@ import { Footer } from "@/components/Footer";
 import { TerroirDivider } from "@/components/TerroirDivider";
 import { TastingCard } from "@/components/TastingCard";
 import { Tasting } from "@/types";
+import { translations, Language } from "@/lib/i18n";
 
 export default function CatasCatalogPage() {
+  const [lang, setLang] = useState<Language>("es");
   const [tastings, setTastings] = useState<Tasting[]>([]);
   const [filteredTastings, setFilteredTastings] = useState<Tasting[]>([]);
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const saved = localStorage.getItem("el_origen_lang") as Language | null;
+    if (saved === "en" || saved === "es") {
+      setLang(saved);
+    }
+  }, []);
+
+  const handleLanguageChange = (newLang: Language) => {
+    setLang(newLang);
+    localStorage.setItem("el_origen_lang", newLang);
+  };
+
+  const t = translations[lang];
 
   useEffect(() => {
     async function loadTastings() {
@@ -49,23 +65,30 @@ export default function CatasCatalogPage() {
     setFilteredTastings(result);
   }, [categoryFilter, searchQuery, tastings]);
 
+  const categories = [
+    { id: "all", label: t.catalog.filterAll },
+    { id: "reserva", label: t.catalog.filterReserva },
+    { id: "atardecer", label: t.catalog.filterSunset },
+    { id: "blancos", label: t.catalog.filterWhites },
+  ];
+
   return (
     <div className="bg-background text-on-background min-h-screen flex flex-col selection:bg-primary/10 selection:text-primary">
-      <Navbar />
+      <Navbar currentLang={lang} onLanguageChange={handleLanguageChange} />
 
       <main className="flex-grow py-16 sm:py-24 px-5 sm:px-8 lg:px-12 max-w-[1320px] mx-auto w-full">
         {/* Header */}
         <div className="text-center max-w-3xl mx-auto mb-16">
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-black/[0.03] border border-black/[0.06] mb-4">
             <span className="text-[10px] font-semibold uppercase tracking-[0.2em] text-primary">
-              Catálogo de Experiencias
+              {t.catalog.badge}
             </span>
           </div>
           <h1 className="font-serif text-4xl sm:text-5xl md:text-6xl font-semibold text-on-surface tracking-tight mb-5">
-            Degustaciones & Catas de Colección
+            {t.catalog.title}
           </h1>
           <p className="text-[14px] sm:text-base text-on-surface-variant/80 max-w-xl mx-auto leading-relaxed">
-            Reserve sus cupos en línea para disfrutar añadas emblemáticas guiadas por sommeliers en nuestra bodega boutique del Valle de Uco.
+            {t.catalog.subtitle}
           </p>
         </div>
 
@@ -73,12 +96,7 @@ export default function CatasCatalogPage() {
         <div className="flex flex-col md:flex-row gap-4 items-center justify-between mb-12 p-2 rounded-2xl sm:rounded-full bg-black/[0.02] border border-black/[0.05]">
           {/* Category Pills */}
           <div className="flex flex-wrap gap-1.5 w-full md:w-auto">
-            {[
-              { id: "all", label: "Todas las Catas" },
-              { id: "reserva", label: "Malbec Reserva" },
-              { id: "atardecer", label: "Atardecer & Terrazas" },
-              { id: "blancos", label: "Blancos de Altura" },
-            ].map((cat) => (
+            {categories.map((cat) => (
               <button
                 key={cat.id}
                 onClick={() => setCategoryFilter(cat.id)}
@@ -99,7 +117,7 @@ export default function CatasCatalogPage() {
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Buscar por cepa o fecha..."
+              placeholder={t.catalog.searchPlaceholder}
               className="w-full bg-white border border-black/[0.06] rounded-full pl-9 pr-4 py-2 text-[12px] text-on-surface focus:border-primary focus:outline-none transition-colors"
             />
             <span className="material-symbols-outlined absolute left-3 top-2.5 text-on-surface-variant/50 text-[16px]">
@@ -112,13 +130,13 @@ export default function CatasCatalogPage() {
         {loading ? (
           <div className="flex items-center justify-center py-24 text-on-surface-variant/60 text-xs">
             <span className="material-symbols-outlined animate-spin text-xl mr-2">progress_activity</span>
-            Cargando catálogo...
+            {t.catalog.loading}
           </div>
         ) : filteredTastings.length === 0 ? (
           <div className="text-center py-20 bg-white rounded-3xl border border-black/[0.05] p-8">
             <span className="material-symbols-outlined text-4xl text-primary/40 mb-3">wine_bar</span>
-            <h3 className="font-serif text-xl font-semibold text-on-surface mb-1">No se encontraron catas</h3>
-            <p className="text-[13px] text-on-surface-variant/70 mb-4">Pruebe ajustando los filtros de búsqueda.</p>
+            <h3 className="font-serif text-xl font-semibold text-on-surface mb-1">{t.catalog.noResultsTitle}</h3>
+            <p className="text-[13px] text-on-surface-variant/70 mb-4">{t.catalog.noResultsSubtitle}</p>
             <button
               onClick={() => {
                 setCategoryFilter("all");
@@ -126,13 +144,13 @@ export default function CatasCatalogPage() {
               }}
               className="text-[12px] font-semibold text-primary underline"
             >
-              Restablecer filtros
+              {t.catalog.resetFilters}
             </button>
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8">
             {filteredTastings.map((tasting) => (
-              <TastingCard key={tasting.id} tasting={tasting} />
+              <TastingCard key={tasting.id} tasting={tasting} currentLang={lang} />
             ))}
           </div>
         )}
@@ -144,17 +162,17 @@ export default function CatasCatalogPage() {
           <div className="bg-white rounded-[calc(2.5rem-0.625rem)] p-8 sm:p-12 flex flex-col md:flex-row items-center justify-between gap-8">
             <div className="space-y-2 text-center md:text-left">
               <h3 className="font-serif text-2xl sm:text-3xl font-semibold text-on-surface tracking-tight">
-                ¿Buscas una cata privada para tu empresa o grupo?
+                {t.catalog.privateTitle}
               </h3>
               <p className="text-[13px] sm:text-sm text-on-surface-variant/80 max-w-xl">
-                Diseñamos experiencias a medida para viajes corporativos, aniversarios y agasajos exclusivos con sommelier y traslado privado.
+                {t.catalog.privateSubtitle}
               </p>
             </div>
             <a
               href="/privadas"
               className="group inline-flex items-center gap-3 bg-primary-container hover:bg-primary text-white text-[12px] font-semibold pl-5 pr-2 py-2 rounded-full transition-all duration-300 shadow-sm flex-shrink-0"
             >
-              <span>Solicitar Cata Privada</span>
+              <span>{t.catalog.privateCta}</span>
               <span className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center transition-transform group-hover:translate-x-0.5">
                 <span className="material-symbols-outlined text-[16px]">arrow_forward</span>
               </span>
@@ -163,7 +181,7 @@ export default function CatasCatalogPage() {
         </div>
       </main>
 
-      <Footer />
+      <Footer currentLang={lang} />
     </div>
   );
 }

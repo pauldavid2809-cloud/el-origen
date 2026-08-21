@@ -1,13 +1,40 @@
 import React from "react";
 import Link from "next/link";
 import { Tasting } from "@/types";
+import { Language, translations } from "@/lib/i18n";
 
 interface TastingCardProps {
   tasting: Tasting;
+  currentLang?: Language;
 }
 
-export function TastingCard({ tasting }: TastingCardProps) {
+export function TastingCard({ tasting, currentLang = "es" }: TastingCardProps) {
   const isSoldOut = tasting.availableSpots <= 0 || tasting.status === "sold_out";
+  const t = translations[currentLang];
+
+  const categoryLabel =
+    currentLang === "en"
+      ? tasting.category === "reserva"
+        ? "Cellar Reserve"
+        : tasting.category === "atardecer"
+        ? "Sunset Experience"
+        : "Tasting"
+      : tasting.category === "reserva"
+      ? "Reserva de Cava"
+      : tasting.category === "atardecer"
+      ? "Sunset Experience"
+      : "Degustación";
+
+  const spotsText =
+    currentLang === "en"
+      ? `${tasting.availableSpots} spots available`
+      : `${tasting.availableSpots} cupos disponibles`;
+
+  const ctaText = isSoldOut
+    ? t.tastings.soldOut
+    : currentLang === "en"
+    ? "Book Experience"
+    : "Reservar Experiencia";
 
   return (
     /* Outer Shell (Double-Bezel Architecture) */
@@ -25,11 +52,7 @@ export function TastingCard({ tasting }: TastingCardProps) {
           {/* Eyebrow Category */}
           <div className="absolute top-4 left-4">
             <span className="text-[10px] font-semibold text-white bg-black/40 backdrop-blur-md px-3 py-1 rounded-full uppercase tracking-wider">
-              {tasting.category === "reserva"
-                ? "Reserva de Cava"
-                : tasting.category === "atardecer"
-                ? "Sunset Experience"
-                : "Degustación"}
+              {categoryLabel}
             </span>
           </div>
 
@@ -67,11 +90,11 @@ export function TastingCard({ tasting }: TastingCardProps) {
           {/* Spots Remaining Indicator */}
           <div className="flex items-center justify-between mb-5">
             {isSoldOut ? (
-              <span className="text-[11px] font-semibold text-error/80">Sin disponibilidad</span>
+              <span className="text-[11px] font-semibold text-error/80">{t.tastings.soldOut}</span>
             ) : (
               <span className="text-[11px] font-medium text-on-surface-variant/70 flex items-center gap-2">
                 <span className="w-2 h-2 rounded-full bg-emerald-600 animate-pulse-soft" />
-                {tasting.availableSpots} cupos disponibles
+                {spotsText}
               </span>
             )}
           </div>
@@ -85,7 +108,7 @@ export function TastingCard({ tasting }: TastingCardProps) {
                 : "bg-primary-container text-white hover:bg-primary active:scale-[0.98] shadow-sm"
             }`}
           >
-            <span>{isSoldOut ? "Agotado" : "Reservar Experiencia"}</span>
+            <span>{ctaText}</span>
             {!isSoldOut && (
               <span className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center transition-transform duration-300 group-hover:translate-x-0.5 group-hover:-translate-y-[0.5px]">
                 <span className="material-symbols-outlined text-[16px]">arrow_forward</span>

@@ -1,30 +1,49 @@
-import React from "react";
+"use client";
+
+import React, { useState, useEffect } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
 import { TerroirDivider } from "@/components/TerroirDivider";
+import { translations, Language } from "@/lib/i18n";
 
 export default function NosotrosPage() {
+  const [lang, setLang] = useState<Language>("es");
+
+  useEffect(() => {
+    const saved = localStorage.getItem("el_origen_lang") as Language | null;
+    if (saved === "en" || saved === "es") {
+      setLang(saved);
+    }
+  }, []);
+
+  const handleLanguageChange = (newLang: Language) => {
+    setLang(newLang);
+    localStorage.setItem("el_origen_lang", newLang);
+  };
+
+  const t = translations[lang];
+
   return (
     <div className="bg-background text-on-background min-h-screen flex flex-col selection:bg-primary/10 selection:text-primary">
-      <Navbar />
+      <Navbar currentLang={lang} onLanguageChange={handleLanguageChange} />
 
       <main className="flex-grow">
         {/* Header Hero */}
         <section className="pt-20 sm:pt-28 pb-20 sm:pb-28 px-5 sm:px-8 lg:px-12 text-center max-w-4xl mx-auto">
           <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-black/[0.03] border border-black/[0.06] mb-6">
             <span className="text-[10px] font-semibold uppercase tracking-[0.2em] text-primary">
-              Nuestra Historia
+              {t.winery.badge}
             </span>
           </div>
 
           <h1 className="font-serif text-4xl sm:text-6xl md:text-7xl font-semibold text-on-surface tracking-tight leading-[1.08] mb-6 text-balance">
-            El Terroir Donde Nace la <span className="italic text-primary font-normal">Excelencia</span>
+            {t.winery.titleMain} <span className="italic text-primary font-normal">{t.winery.titleHighlight}</span>
           </h1>
 
           <p className="text-[15px] sm:text-lg text-on-surface-variant/80 max-w-2xl mx-auto leading-relaxed text-balance">
-            Enclavados al pie de los Andes a 1.400 metros de altura, cultivamos vides que desafían el clima extremo para crear vinos de pureza inigualable.
+            {t.winery.subtitle}
           </p>
         </section>
 
@@ -45,19 +64,19 @@ export default function NosotrosPage() {
 
             <div className="lg:col-span-6 space-y-5">
               <span className="text-[10px] font-semibold uppercase tracking-[0.2em] text-primary block">
-                01 • Clima de Altura
+                {t.winery.section1Badge}
               </span>
 
               <h2 className="font-serif text-3xl sm:text-4xl font-semibold text-on-surface tracking-tight leading-tight">
-                Amplitud Térmica & Deshielo Puro
+                {t.winery.section1Title}
               </h2>
 
               <p className="text-[14px] sm:text-base text-on-surface-variant/80 leading-relaxed font-normal">
-                Nuestras uvas reciben más de 300 días de sol al año y noches gélidas de montaña. Esta oscilación térmica de hasta 20°C permite una maduración lenta de los polifenoles, preservando una acidez fresca y aromas florales sumamente expresivos.
+                {t.winery.section1P1}
               </p>
 
               <p className="text-[14px] sm:text-base text-on-surface-variant/80 leading-relaxed font-normal">
-                El riego proviene exclusivamente del deshielo cordillerano, filtrado naturalmente a través de sedimentos de piedra caliza y grava aluvial.
+                {t.winery.section1P2}
               </p>
             </div>
           </div>
@@ -79,40 +98,40 @@ export default function NosotrosPage() {
 
             <div className="lg:col-span-6 lg:order-1 space-y-5">
               <span className="text-[10px] font-semibold uppercase tracking-[0.2em] text-primary block">
-                02 • Enología Minimalista
+                {t.winery.section2Badge}
               </span>
 
               <h2 className="font-serif text-3xl sm:text-4xl font-semibold text-on-surface tracking-tight leading-tight">
-                Acompañar, No Intervenir
+                {t.winery.section2Title}
               </h2>
 
               <p className="text-[14px] sm:text-base text-on-surface-variant/80 leading-relaxed font-normal">
-                En El Origen creemos que el carácter del vino se define en la viña. En la bodega, utilizamos piletas de hormigón sin epoxi para preservar la identidad mineral, y barricas de roble francés de grano fino para aportar una textura sedosa sin opacar la fruta.
+                {t.winery.section2P1}
               </p>
 
               <p className="text-[14px] sm:text-base text-on-surface-variant/80 leading-relaxed font-normal">
-                Cada partida es vinificada por microparcelas, respetando las particularidades de cada rincón de nuestra finca.
+                {t.winery.section2P2}
               </p>
             </div>
           </div>
         </section>
 
         {/* CTA Banner */}
-        <section className="py-24 px-5 sm:px-8 lg:px-12 max-w-[1320px] mx-auto w-full text-center">
+        <section className="py-20 sm:py-28 px-5 sm:px-8 lg:px-12 max-w-[1320px] mx-auto w-full text-center">
           <div className="p-2 sm:p-2.5 rounded-[2.5rem] bg-black/[0.02] border border-black/[0.05]">
-            <div className="bg-white rounded-[calc(2.5rem-0.625rem)] p-10 sm:p-16 space-y-4">
-              <h2 className="font-serif text-3xl sm:text-4xl font-semibold text-on-surface">
-                Ven a Vivir la Experiencia en Primera Persona
+            <div className="bg-white rounded-[calc(2.5rem-0.625rem)] p-8 sm:p-14 max-w-3xl mx-auto space-y-5">
+              <h2 className="font-serif text-3xl sm:text-4xl font-semibold text-on-surface tracking-tight">
+                {t.winery.ctaTitle}
               </h2>
-              <p className="text-[13px] sm:text-base text-on-surface-variant/80 max-w-lg mx-auto">
-                Grupos reducidos, atención personalizada de sommeliers y degustación directa de barricas.
+              <p className="text-[14px] sm:text-base text-on-surface-variant/80 max-w-xl mx-auto">
+                {t.winery.ctaSubtitle}
               </p>
-              <div className="pt-4">
+              <div className="pt-3">
                 <Link
                   href="/catas"
                   className="group inline-flex items-center gap-3 bg-primary-container hover:bg-primary text-white text-[13px] font-semibold pl-6 pr-2 py-2 rounded-full transition-all duration-300 shadow-sm"
                 >
-                  <span>Ver Próximas Catas</span>
+                  <span>{t.winery.ctaButton}</span>
                   <span className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center transition-transform group-hover:translate-x-0.5">
                     <span className="material-symbols-outlined text-[16px]">arrow_forward</span>
                   </span>
@@ -123,7 +142,7 @@ export default function NosotrosPage() {
         </section>
       </main>
 
-      <Footer />
+      <Footer currentLang={lang} />
     </div>
   );
 }

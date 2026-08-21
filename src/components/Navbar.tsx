@@ -23,9 +23,18 @@ export function Navbar({ currentLang = "es", onLanguageChange }: NavbarProps) {
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
 
+  useEffect(() => {
+    if (currentLang) {
+      setLang(currentLang);
+    }
+  }, [currentLang]);
+
   const handleLangToggle = () => {
     const nextLang = lang === "es" ? "en" : "es";
     setLang(nextLang);
+    try {
+      localStorage.setItem("el_origen_lang", nextLang);
+    } catch {}
     if (onLanguageChange) onLanguageChange(nextLang);
   };
 

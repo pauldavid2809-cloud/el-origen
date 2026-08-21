@@ -1,8 +1,15 @@
 import React from "react";
 import Link from "next/link";
 import Image from "next/image";
+import { Language, translations } from "@/lib/i18n";
 
-export function Footer() {
+interface FooterProps {
+  currentLang?: Language;
+}
+
+export function Footer({ currentLang = "es" }: FooterProps) {
+  const t = translations[currentLang];
+
   return (
     <footer className="border-t border-outline-variant/40 mt-auto">
       <div className="w-full px-5 sm:px-8 lg:px-12 max-w-[1320px] mx-auto py-16 sm:py-20">
@@ -18,26 +25,42 @@ export function Footer() {
               </span>
             </Link>
             <p className="text-[13px] text-on-surface-variant/70 leading-relaxed max-w-[280px]">
-              Crafting the source of excellence desde el Valle de Uco, Mendoza, Argentina.
+              {t.footer.description}
             </p>
           </div>
 
           {/* Links */}
           <div className="flex flex-col sm:flex-row gap-8 sm:gap-12">
             <div className="space-y-3">
-              <span className="text-[11px] font-semibold text-on-surface-variant/50 uppercase tracking-wider">Explorar</span>
+              <span className="text-[11px] font-semibold text-on-surface-variant/50 uppercase tracking-wider">
+                {t.footer.explore}
+              </span>
               <nav className="flex flex-col gap-2">
-                <Link href="/nosotros" className="text-[13px] text-on-surface-variant/80 hover:text-primary transition-colors duration-300">La Bodega</Link>
-                <Link href="/catas" className="text-[13px] text-on-surface-variant/80 hover:text-primary transition-colors duration-300">Experiencias</Link>
-                <Link href="/privadas" className="text-[13px] text-on-surface-variant/80 hover:text-primary transition-colors duration-300">Eventos Privados</Link>
+                <Link href="/nosotros" className="text-[13px] text-on-surface-variant/80 hover:text-primary transition-colors duration-300">
+                  {t.nav.bodega}
+                </Link>
+                <Link href="/catas" className="text-[13px] text-on-surface-variant/80 hover:text-primary transition-colors duration-300">
+                  {t.nav.experiencias}
+                </Link>
+                <Link href="/privadas" className="text-[13px] text-on-surface-variant/80 hover:text-primary transition-colors duration-300">
+                  {t.nav.privadas}
+                </Link>
               </nav>
             </div>
             <div className="space-y-3">
-              <span className="text-[11px] font-semibold text-on-surface-variant/50 uppercase tracking-wider">Legal</span>
+              <span className="text-[11px] font-semibold text-on-surface-variant/50 uppercase tracking-wider">
+                {t.footer.legal}
+              </span>
               <nav className="flex flex-col gap-2">
-                <Link href="#" className="text-[13px] text-on-surface-variant/80 hover:text-primary transition-colors duration-300">Privacidad</Link>
-                <Link href="#" className="text-[13px] text-on-surface-variant/80 hover:text-primary transition-colors duration-300">Términos</Link>
-                <Link href="#" className="text-[13px] text-on-surface-variant/80 hover:text-primary transition-colors duration-300">Sostenibilidad</Link>
+                <Link href="#" className="text-[13px] text-on-surface-variant/80 hover:text-primary transition-colors duration-300">
+                  {t.footer.privacy}
+                </Link>
+                <Link href="#" className="text-[13px] text-on-surface-variant/80 hover:text-primary transition-colors duration-300">
+                  {t.footer.terms}
+                </Link>
+                <Link href="#" className="text-[13px] text-on-surface-variant/80 hover:text-primary transition-colors duration-300">
+                  {t.footer.sustainability}
+                </Link>
               </nav>
             </div>
           </div>
@@ -46,9 +69,9 @@ export function Footer() {
           <div className="space-y-4 md:text-right">
             <div className="flex gap-2 md:justify-end">
               {[
-                { href: "mailto:experiencias@elorigen.com", icon: "mail", label: "Correo" },
+                { href: "mailto:experiencias@elorigen.com", icon: "mail", label: "Email" },
                 { href: "https://wa.me/5492614558822", icon: "chat", label: "WhatsApp" },
-                { href: "https://maps.google.com", icon: "location_on", label: "Ubicación" },
+                { href: "https://maps.google.com", icon: "location_on", label: "Maps" },
               ].map((s) => (
                 <a
                   key={s.icon}
@@ -63,7 +86,7 @@ export function Footer() {
               ))}
             </div>
             <p className="text-[11px] text-on-surface-variant/40">
-              © 2026 El Origen Wine Experience
+              {t.footer.copyright}
             </p>
           </div>
         </div>
