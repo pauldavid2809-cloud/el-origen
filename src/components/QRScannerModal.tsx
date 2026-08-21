@@ -57,33 +57,40 @@ export function QRScannerModal({ isOpen, onClose, onCheckInSuccess }: QRScannerM
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
-      <div className="bg-surface border border-surface-variant rounded-2xl max-w-md w-full p-6 soft-shadow relative animate-fade-in-up">
+    <div
+      onClick={onClose}
+      className="fixed inset-0 z-50 bg-black/50 backdrop-blur-md flex items-center justify-center p-4 animate-fade-in"
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        className="bg-white border border-outline-variant/40 rounded-2xl max-w-md w-full p-6 sm:p-7 mockup-shadow relative animate-scale-in"
+      >
         {/* Close Button */}
         <button
           onClick={onClose}
-          className="absolute top-4 right-4 text-secondary hover:text-primary transition-colors"
+          className="absolute top-4 right-4 text-on-surface-variant/60 hover:text-primary transition-colors duration-200 p-1 rounded-full hover:bg-surface-container"
+          aria-label="Cerrar"
         >
-          <span className="material-symbols-outlined text-2xl">close</span>
+          <span className="material-symbols-outlined text-[20px]">close</span>
         </button>
 
         {/* Header */}
         <div className="flex items-center gap-3 mb-6">
-          <div className="w-10 h-10 rounded-full bg-primary-container text-white flex items-center justify-center">
-            <span className="material-symbols-outlined text-xl">qr_code_scanner</span>
+          <div className="w-10 h-10 rounded-full bg-primary-container text-white flex items-center justify-center flex-shrink-0">
+            <span className="material-symbols-outlined text-[20px]">qr_code_scanner</span>
           </div>
           <div>
-            <h3 className="font-serif text-xl font-bold text-on-surface">
+            <h3 className="font-serif text-lg font-semibold text-on-surface">
               Escáner de Check-in
             </h3>
-            <p className="text-xs text-secondary">Control de acceso y validación de cupos</p>
+            <p className="text-[12px] text-on-surface-variant/70">Validación de entradas y control de acceso</p>
           </div>
         </div>
 
         {/* Input Form */}
         <form onSubmit={handleVerify} className="space-y-4">
           <div>
-            <label className="block text-xs uppercase font-bold tracking-wider text-secondary mb-1.5">
+            <label className="block text-[11px] font-semibold text-on-surface-variant/70 mb-1.5 uppercase tracking-wider">
               Código de Ticket o Token
             </label>
             <div className="relative">
@@ -92,16 +99,16 @@ export function QRScannerModal({ isOpen, onClose, onCheckInSuccess }: QRScannerM
                 value={tokenInput}
                 onChange={(e) => setTokenInput(e.target.value)}
                 placeholder="Ej: #EO-8492A o token UUID..."
-                className="w-full bg-surface-container-low border border-surface-variant rounded-xl p-3 text-sm font-mono text-on-surface focus:border-primary focus:outline-none uppercase"
+                className="w-full bg-surface-container-low border border-outline-variant/40 rounded-xl p-3 text-[13px] font-mono text-on-surface focus:border-primary focus:outline-none uppercase transition-colors"
                 autoFocus
               />
               {tokenInput && (
                 <button
                   type="button"
                   onClick={() => setTokenInput("")}
-                  className="absolute right-3 top-3 text-secondary hover:text-on-surface"
+                  className="absolute right-3 top-3 text-on-surface-variant/50 hover:text-on-surface transition-colors"
                 >
-                  <span className="material-symbols-outlined text-sm">cancel</span>
+                  <span className="material-symbols-outlined text-[16px]">cancel</span>
                 </button>
               )}
             </div>
@@ -111,7 +118,7 @@ export function QRScannerModal({ isOpen, onClose, onCheckInSuccess }: QRScannerM
             <button
               type="submit"
               disabled={loading || !tokenInput.trim()}
-              className="flex-1 bg-primary-container text-white text-xs font-bold uppercase tracking-wider py-3 rounded-xl hover:bg-primary transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+              className="flex-1 bg-primary-container text-white text-[12px] font-semibold py-3 rounded-xl hover:bg-primary transition-all duration-200 ease-out active:scale-[0.98] disabled:opacity-50 flex items-center justify-center gap-2"
             >
               {loading ? (
                 <>
@@ -129,17 +136,17 @@ export function QRScannerModal({ isOpen, onClose, onCheckInSuccess }: QRScannerM
         </form>
 
         {/* Demo Fast Tags */}
-        <div className="mt-4 pt-4 border-t border-surface-variant">
-          <p className="text-[10px] uppercase font-bold text-secondary tracking-wider mb-2">
-            Códigos de prueba en bodega:
+        <div className="mt-4 pt-4 border-t border-outline-variant/30">
+          <p className="text-[10px] font-medium text-on-surface-variant/60 mb-2">
+            Códigos de prueba:
           </p>
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap gap-1.5">
             {["#EO-8492A", "#EO-7193B", "#EO-6204C"].map((c) => (
               <button
                 key={c}
                 type="button"
                 onClick={() => handleQuickDemoCode(c)}
-                className="text-[11px] font-mono bg-surface-container hover:bg-surface-variant text-primary px-2.5 py-1 rounded-md border border-outline-variant"
+                className="text-[11px] font-mono bg-surface-container hover:bg-primary-fixed/40 text-primary px-2.5 py-1 rounded-lg border border-outline-variant/30 transition-all duration-150 active:scale-95"
               >
                 {c}
               </button>
@@ -150,23 +157,23 @@ export function QRScannerModal({ isOpen, onClose, onCheckInSuccess }: QRScannerM
         {/* Result Display */}
         {result && (
           <div
-            className={`mt-6 p-4 rounded-xl border animate-fade-in-up ${
+            className={`mt-5 p-4 rounded-xl border animate-fade-in ${
               result.success
-                ? "bg-emerald-50 border-emerald-300 text-emerald-950"
-                : "bg-red-50 border-red-300 text-red-950"
+                ? "bg-emerald-50/80 border-emerald-300 text-emerald-950"
+                : "bg-red-50/80 border-red-300 text-red-950"
             }`}
           >
-            <div className="flex items-center gap-2 mb-2 font-bold text-sm">
-              <span className="material-symbols-outlined">
+            <div className="flex items-center gap-2 mb-1.5 font-semibold text-[13px]">
+              <span className="material-symbols-outlined text-[18px]">
                 {result.success ? "check_circle" : "error"}
               </span>
               <span>{result.success ? "¡Entrada Válida!" : "Alerta de Ingreso"}</span>
             </div>
 
-            <p className="text-xs leading-relaxed mb-3">{result.message}</p>
+            <p className="text-[12px] leading-relaxed mb-2.5">{result.message}</p>
 
             {result.reservation && (
-              <div className="bg-white/80 rounded-lg p-3 text-xs space-y-1 text-on-surface">
+              <div className="bg-white/90 rounded-lg p-3 text-[12px] space-y-1 text-on-surface">
                 <p>
                   <strong>Asistente:</strong> {result.reservation.customerName}
                 </p>
