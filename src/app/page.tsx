@@ -7,6 +7,7 @@ import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
 import { TerroirDivider } from "@/components/TerroirDivider";
 import { TastingCard } from "@/components/TastingCard";
+import { PartnersSection } from "@/components/PartnersSection";
 import { Tasting } from "@/types";
 import { translations, Language } from "@/lib/i18n";
 
@@ -243,6 +244,11 @@ export default function HomePage() {
             </div>
           </div>
         </section>
+
+        {/* ─── GASTRONOMIC ALLIES / PARTNERS SECTION ─── */}
+        <PartnersSection currentLang={lang} />
+
+        <TerroirDivider className="max-w-[1320px] mx-auto px-5" />
 
         {/* ─── FAQ ACCORDION SECTION ─── */}
         <section className="py-20 sm:py-28 px-5 sm:px-8 lg:px-12 max-w-4xl mx-auto w-full">
