@@ -101,7 +101,7 @@ export default function VerifyTicketPage() {
           {/* Badge */}
           <div
             className={`p-4 rounded-xl text-center mb-6 border ${
-              isChecked
+              isCheckedIn
                 ? "bg-emerald-50 border-emerald-300 text-emerald-950"
                 : success
                 ? "bg-blue-50 border-blue-300 text-blue-950"
@@ -109,10 +109,10 @@ export default function VerifyTicketPage() {
             }`}
           >
             <span className="material-symbols-outlined text-3xl mb-1">
-              {isChecked ? "how_to_reg" : success ? "check_circle" : "warning"}
+              {isCheckedIn ? "how_to_reg" : success ? "check_circle" : "warning"}
             </span>
             <h2 className="font-serif text-lg font-bold">
-              {isChecked
+              {isCheckedIn
                 ? "Check-in Realizado"
                 : success
                 ? "Entrada Válida"
@@ -176,7 +176,7 @@ export default function VerifyTicketPage() {
               )}
 
               {/* Action Button */}
-              {!isChecked && success && (
+              {!isCheckedIn && success && (
                 <div className="pt-4">
                   <button
                     onClick={handlePerformCheckIn}
@@ -198,7 +198,7 @@ export default function VerifyTicketPage() {
                 </div>
               )}
 
-              {isChecked && (
+              {isCheckedIn && (
                 <div className="pt-2 text-center text-secondary">
                   <p className="text-[11px]">
                     Ingreso registrado a las {new Date(reservation.checkedInAt || "").toLocaleTimeString("es-CL")} hs.
