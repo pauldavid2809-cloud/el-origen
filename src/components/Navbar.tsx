@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { translations, Language } from "@/lib/i18n";
@@ -13,8 +13,15 @@ interface NavbarProps {
 export function Navbar({ currentLang = "es", onLanguageChange }: NavbarProps) {
   const [lang, setLang] = useState<Language>(currentLang);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [scrolled, setScrolled] = useState(false);
 
   const t = translations[lang].nav;
+
+  useEffect(() => {
+    const handleScroll = () => setScrolled(window.scrollY > 20);
+    window.addEventListener("scroll", handleScroll, { passive: true });
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, []);
 
   const handleLangToggle = () => {
     const nextLang = lang === "es" ? "en" : "es";
@@ -22,162 +29,141 @@ export function Navbar({ currentLang = "es", onLanguageChange }: NavbarProps) {
     if (onLanguageChange) onLanguageChange(nextLang);
   };
 
+  const navLinks = [
+    { href: "/nosotros", label: t.bodega },
+    { href: "/catas", label: t.experiencias, active: true },
+    { href: "/privadas", label: t.privadas },
+    { href: "/#terroir", label: t.terroir },
+    { href: "/#contacto", label: t.contacto },
+  ];
+
   return (
-    <header className="bg-surface/95 backdrop-blur-md border-b border-surface-variant sticky top-0 z-50 transition-all">
-      <div className="flex justify-between items-center w-full px-4 sm:px-8 lg:px-16 py-3.5 max-w-container-max mx-auto">
-        {/* Brand Logo & Name */}
-        <Link href="/" className="flex items-center gap-3 group">
-          <div className="relative w-9 h-9 flex-shrink-0">
-            <Image
-              src="/images/logo-color.png"
-              alt="El Origen Logo"
-              fill
-              className="object-contain transition-transform group-hover:scale-105"
-              priority
-            />
-          </div>
-          <span className="font-serif text-2xl md:text-3xl font-bold text-primary tracking-tight">
-            El Origen
-          </span>
-        </Link>
-
-        {/* Desktop Navigation */}
-        <nav className="hidden lg:flex items-center gap-8">
-          <Link
-            href="/nosotros"
-            className="text-xs uppercase tracking-widest font-semibold text-secondary hover:text-primary transition-colors hover:opacity-90"
-          >
-            {t.bodega}
-          </Link>
-          <Link
-            href="/catas"
-            className="text-xs uppercase tracking-widest font-semibold text-primary border-b-2 border-primary pb-0.5"
-          >
-            {t.experiencias}
-          </Link>
-          <Link
-            href="/privadas"
-            className="text-xs uppercase tracking-widest font-semibold text-secondary hover:text-primary transition-colors hover:opacity-90"
-          >
-            {t.privadas}
-          </Link>
-          <Link
-            href="/#terroir"
-            className="text-xs uppercase tracking-widest font-semibold text-secondary hover:text-primary transition-colors hover:opacity-90"
-          >
-            {t.terroir}
-          </Link>
-          <Link
-            href="/#contacto"
-            className="text-xs uppercase tracking-widest font-semibold text-secondary hover:text-primary transition-colors hover:opacity-90"
-          >
-            {t.contacto}
-          </Link>
-          <Link
-            href="/admin"
-            className="text-xs uppercase tracking-widest font-semibold text-tertiary-container hover:text-tertiary transition-colors flex items-center gap-1 bg-surface-container px-2.5 py-1 rounded-md"
-          >
-            <span className="material-symbols-outlined text-[14px]">lock</span>
-            {t.admin}
-          </Link>
-        </nav>
-
-        {/* Right Action: Language Switcher & CTA */}
-        <div className="hidden sm:flex items-center gap-4">
-          <button
-            onClick={handleLangToggle}
-            className="text-xs font-semibold uppercase tracking-wider px-2.5 py-1 rounded border border-outline-variant text-secondary hover:text-primary hover:border-primary transition-all flex items-center gap-1"
-            title="Cambiar idioma / Switch language"
-          >
-            <span className="material-symbols-outlined text-[14px]">language</span>
-            {lang.toUpperCase()}
-          </button>
-
-          <Link
-            href="/catas"
-            className="bg-primary-container text-white text-xs font-bold uppercase tracking-wider px-6 py-2.5 rounded-xl hover:bg-primary transition-all shadow-sm active:scale-95"
-          >
-            {t.reservar}
-          </Link>
-        </div>
-
-        {/* Mobile Menu Button */}
-        <div className="flex sm:hidden items-center gap-2">
-          <button
-            onClick={handleLangToggle}
-            className="text-xs font-bold uppercase px-2 py-1 rounded border border-outline-variant text-secondary"
-          >
-            {lang.toUpperCase()}
-          </button>
-          <button
-            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-            className="p-2 text-primary focus:outline-none"
-            aria-label="Menu"
-          >
-            <span className="material-symbols-outlined text-2xl">
-              {mobileMenuOpen ? "close" : "menu"}
+    <>
+      <header
+        className={`fixed top-0 left-0 right-0 z-50 transition-all duration-500 ease-out-expo ${
+          scrolled
+            ? "glass border-b border-outline-variant/40 py-3"
+            : "bg-transparent py-5"
+        }`}
+      >
+        <div className="flex justify-between items-center w-full px-5 sm:px-8 lg:px-12 max-w-[1320px] mx-auto">
+          {/* Brand */}
+          <Link href="/" className="flex items-center gap-2.5 group">
+            <div className="relative w-8 h-8 flex-shrink-0 transition-transform duration-500 ease-out-expo group-hover:scale-105">
+              <Image
+                src="/images/logo-color.png"
+                alt="El Origen"
+                fill
+                className="object-contain"
+                priority
+              />
+            </div>
+            <span className="font-serif text-[22px] font-semibold text-primary tracking-tight">
+              El Origen
             </span>
-          </button>
-        </div>
-      </div>
-
-      {/* Mobile Drawer */}
-      {mobileMenuOpen && (
-        <div className="sm:hidden bg-surface border-b border-surface-variant px-6 py-6 space-y-4 animate-fade-in-up">
-          <Link
-            href="/nosotros"
-            onClick={() => setMobileMenuOpen(false)}
-            className="block text-sm uppercase tracking-wider font-semibold text-secondary hover:text-primary py-2"
-          >
-            {t.bodega}
-          </Link>
-          <Link
-            href="/catas"
-            onClick={() => setMobileMenuOpen(false)}
-            className="block text-sm uppercase tracking-wider font-semibold text-primary py-2"
-          >
-            {t.experiencias}
-          </Link>
-          <Link
-            href="/privadas"
-            onClick={() => setMobileMenuOpen(false)}
-            className="block text-sm uppercase tracking-wider font-semibold text-secondary hover:text-primary py-2"
-          >
-            {t.privadas}
-          </Link>
-          <Link
-            href="/#terroir"
-            onClick={() => setMobileMenuOpen(false)}
-            className="block text-sm uppercase tracking-wider font-semibold text-secondary hover:text-primary py-2"
-          >
-            {t.terroir}
-          </Link>
-          <Link
-            href="/#contacto"
-            onClick={() => setMobileMenuOpen(false)}
-            className="block text-sm uppercase tracking-wider font-semibold text-secondary hover:text-primary py-2"
-          >
-            {t.contacto}
-          </Link>
-          <Link
-            href="/admin"
-            onClick={() => setMobileMenuOpen(false)}
-            className="block text-sm uppercase tracking-wider font-semibold text-tertiary-container py-2"
-          >
-            {t.admin}
           </Link>
 
-          <div className="pt-4 border-t border-surface-variant">
+          {/* Desktop Nav */}
+          <nav className="hidden lg:flex items-center gap-7">
+            {navLinks.map((link) => (
+              <Link
+                key={link.href}
+                href={link.href}
+                className={`text-[13px] font-medium transition-colors duration-300 relative py-1 ${
+                  link.active
+                    ? "text-primary"
+                    : "text-on-surface-variant hover:text-primary"
+                } after:absolute after:bottom-0 after:left-0 after:h-[1.5px] after:bg-primary after:transition-all after:duration-500 after:ease-out-expo ${
+                  link.active ? "after:w-full" : "after:w-0 hover:after:w-full"
+                }`}
+              >
+                {link.label}
+              </Link>
+            ))}
+            <Link
+              href="/admin"
+              className="text-[13px] font-medium text-on-surface-variant/60 hover:text-primary transition-colors duration-300 flex items-center gap-1"
+            >
+              <span className="material-symbols-outlined text-[14px]">lock</span>
+              {t.admin}
+            </Link>
+          </nav>
+
+          {/* Right Actions */}
+          <div className="hidden sm:flex items-center gap-3">
+            <button
+              onClick={handleLangToggle}
+              className="text-[12px] font-semibold text-on-surface-variant/70 hover:text-primary bg-surface-container/60 hover:bg-surface-container px-3 py-1.5 rounded-full transition-all duration-300"
+            >
+              {lang === "es" ? "EN" : "ES"}
+            </button>
             <Link
               href="/catas"
-              onClick={() => setMobileMenuOpen(false)}
-              className="w-full block text-center bg-primary-container text-white text-xs font-bold uppercase tracking-wider py-3 rounded-xl hover:bg-primary transition-all"
+              className="text-[12px] font-semibold text-white bg-primary-container hover:bg-primary px-5 py-2.5 rounded-full transition-all duration-300 ease-out-expo active:scale-[0.97]"
             >
               {t.reservar}
             </Link>
           </div>
+
+          {/* Mobile Toggle */}
+          <div className="flex lg:hidden items-center gap-2">
+            <button
+              onClick={handleLangToggle}
+              className="text-[11px] font-semibold text-on-surface-variant/70 bg-surface-container/60 px-2.5 py-1 rounded-full"
+            >
+              {lang === "es" ? "EN" : "ES"}
+            </button>
+            <button
+              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+              className="p-2 text-primary"
+              aria-label="Menu"
+            >
+              <span className="material-symbols-outlined text-[22px]">
+                {mobileMenuOpen ? "close" : "menu"}
+              </span>
+            </button>
+          </div>
+        </div>
+      </header>
+
+      {/* Mobile Fullscreen Overlay */}
+      {mobileMenuOpen && (
+        <div className="fixed inset-0 z-40 bg-surface/98 backdrop-blur-xl flex flex-col justify-center items-center animate-fade-in">
+          <nav className="flex flex-col items-center gap-6 stagger-children">
+            {navLinks.map((link) => (
+              <Link
+                key={link.href}
+                href={link.href}
+                onClick={() => setMobileMenuOpen(false)}
+                className={`font-serif text-3xl font-semibold tracking-tight transition-colors duration-300 ${
+                  link.active ? "text-primary" : "text-on-surface/70 hover:text-primary"
+                }`}
+              >
+                {link.label}
+              </Link>
+            ))}
+            <Link
+              href="/admin"
+              onClick={() => setMobileMenuOpen(false)}
+              className="text-sm font-medium text-on-surface-variant/50 mt-4"
+            >
+              {t.admin}
+            </Link>
+            <div className="mt-6 pt-6 border-t border-outline-variant/30 w-48 flex justify-center">
+              <Link
+                href="/catas"
+                onClick={() => setMobileMenuOpen(false)}
+                className="text-[13px] font-semibold text-white bg-primary-container hover:bg-primary px-8 py-3 rounded-full transition-all duration-300"
+              >
+                {t.reservar}
+              </Link>
+            </div>
+          </nav>
         </div>
       )}
-    </header>
+
+      {/* Spacer for fixed header */}
+      <div className="h-[72px]" />
+    </>
   );
 }
