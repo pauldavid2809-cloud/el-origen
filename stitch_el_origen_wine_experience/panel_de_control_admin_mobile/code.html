@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Admin Dashboard - Mobile</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+        tailwind.config = {
+          darkMode: "class",
+          theme: {
+            extend: {
+              "colors": {
+                      "surface-tint": "#9d3c63",
+                      "on-tertiary-fixed": "#241a00",
+                      "tertiary-container": "#cca730",
+                      "surface": "#fcf9f8",
+                      "secondary-fixed": "#e5e2de",
+                      "on-secondary-fixed-variant": "#474744",
+                      "tertiary-fixed": "#ffe088",
+                      "surface-container": "#f0eded",
+                      "error": "#ba1a1a",
+                      "error-container": "#ffdad6",
+                      "on-tertiary-container": "#4f3e00",
+                      "primary-fixed": "#ffd9e3",
+                      "on-secondary-container": "#636260",
+                      "surface-bright": "#fcf9f8",
+                      "inverse-on-surface": "#f3f0f0",
+                      "on-primary": "#ffffff",
+                      "primary-fixed-dim": "#ffb0ca",
+                      "surface-container-high": "#eae7e7",
+                      "outline-variant": "#d9c0c6",
+                      "secondary": "#5f5e5b",
+                      "on-secondary-fixed": "#1c1c1a",
+                      "inverse-primary": "#ffb0ca",
+                      "on-surface-variant": "#544247",
+                      "surface-container-low": "#f6f3f2",
+                      "on-secondary": "#ffffff",
+                      "on-error-container": "#93000a",
+                      "tertiary": "#735c00",
+                      "background": "#fcf9f8",
+                      "inverse-surface": "#303030",
+                      "on-error": "#ffffff",
+                      "secondary-container": "#e2dfdb",
+                      "on-background": "#1b1c1c",
+                      "surface-dim": "#dcd9d9",
+                      "on-primary-fixed-variant": "#7f244c",
+                      "on-tertiary": "#ffffff",
+                      "surface-container-highest": "#e4e2e1",
+                      "primary-container": "#7a2048",
+                      "tertiary-fixed-dim": "#e9c349",
+                      "outline": "#877277",
+                      "surface-variant": "#e4e2e1",
+                      "on-tertiary-fixed-variant": "#574500",
+                      "surface-container-lowest": "#ffffff",
+                      "on-primary-fixed": "#3e001f",
+                      "secondary-fixed-dim": "#c8c6c2",
+                      "on-surface": "#1b1c1c",
+                      "primary": "#5c0531",
+                      "on-primary-container": "#ff8cb6"
+              },
+              "borderRadius": {
+                      "DEFAULT": "0.25rem",
+                      "lg": "0.5rem",
+                      "xl": "0.75rem",
+                      "full": "9999px"
+              },
+              "spacing": {
+                      "gutter": "24px",
+                      "margin-mobile": "20px",
+                      "container-max": "1280px",
+                      "unit": "8px",
+                      "margin-desktop": "64px"
+              },
+              "fontFamily": {
+                      "headline-sm": [
+                              "Playfair Display"
+                      ],
+                      "body-md": [
+                              "Manrope"
+                      ],
+                      "display-lg-mobile": [
+                              "Playfair Display"
+                      ],
+                      "display-lg": [
+                              "Playfair Display"
+                      ],
+                      "label-caps": [
+                              "Manrope"
+                      ],
+                      "headline-md": [
+                              "Playfair Display"
+                      ],
+                      "body-lg": [
+                              "Manrope"
+                      ]
+              },
+              "fontSize": {
+                      "headline-sm": [
+                              "24px",
+                              {
+                                      "lineHeight": "32px",
+                                      "fontWeight": "600"
+                              }
+                      ],
+                      "body-md": [
+                              "16px",
+                              {
+                                      "lineHeight": "24px",
+                                      "fontWeight": "400"
+                              }
+                      ],
+                      "display-lg-mobile": [
+                              "40px",
+                              {
+                                      "lineHeight": "48px",
+                                      "letterSpacing": "-0.01em",
+                                      "fontWeight": "700"
+                              }
+                      ],
+                      "display-lg": [
+                              "64px",
+                              {
+                                      "lineHeight": "72px",
+                                      "letterSpacing": "-0.02em",
+                                      "fontWeight": "700"
+                              }
+                      ],
+                      "label-caps": [
+                              "12px",
+                              {
+                                      "lineHeight": "16px",
+                                      "letterSpacing": "0.1em",
+                                      "fontWeight": "700"
+                              }
+                      ],
+                      "headline-md": [
+                              "32px",
+                              {
+                                      "lineHeight": "40px",
+                                      "fontWeight": "600"
+                              }
+                      ],
+                      "body-lg": [
+                              "18px",
+                              {
+                                      "lineHeight": "28px",
+                                      "fontWeight": "400"
+                              }
+                      ]
+              }
+      },
+          },
+        }
+    </script>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&amp;family=Manrope:wght@400;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<style>
+        body { font-family: 'Manrope', sans-serif; background-color: #fcf9f8; }
+        h1, h2, h3, .font-headline { font-family: 'Playfair Display', serif; }
+        
+        .material-symbols-outlined {
+          font-variation-settings:
+          'FILL' 0,
+          'wght' 400,
+          'GRAD' 0,
+          'opsz' 24
+        }
+    </style>
+</head>
+<body class="bg-background text-on-background pb-20 md:pb-0 h-screen flex flex-col md:flex-row overflow-hidden">
+<!-- Top App Bar for Mobile -->
+<header class="md:hidden flex justify-between items-center w-full px-margin-mobile py-4 max-w-container-max mx-auto bg-surface dark:bg-on-background shadow-sm z-10 sticky top-0">
+<div class="font-headline-sm text-headline-sm font-bold text-primary dark:text-primary-fixed tracking-tight">El Origen</div>
+<button class="text-primary hover:opacity-90 transition-opacity">
+<span class="material-symbols-outlined">menu</span>
+</button>
+</header>
+<!-- Side Navigation (Hidden on Mobile, Visible on md+) -->
+<nav class="hidden md:flex flex-col h-screen p-4 gap-4 bg-surface-container-low dark:bg-on-background border-r border-outline-variant shadow-sm docked left-0 w-64 z-20 sticky top-0 shrink-0">
+<div class="px-4 py-4 mb-4">
+<h1 class="font-headline-sm text-headline-sm text-primary dark:text-primary-fixed">Admin Panel</h1>
+<p class="font-body-md text-body-md text-secondary">Gestión El Origen</p>
+</div>
+<a class="flex items-center gap-3 bg-primary-container dark:bg-primary text-on-primary-container dark:text-on-primary rounded-lg px-4 py-3 font-bold translate-x-1 transition-transform" href="#">
+<span class="material-symbols-outlined" data-weight="fill" style="font-variation-settings: 'FILL' 1;">dashboard</span>
+<span class="font-label-caps text-label-caps">Dashboard</span>
+</a>
+<a class="flex items-center gap-3 text-secondary dark:text-secondary-fixed-dim hover:bg-surface-variant dark:hover:bg-secondary rounded-lg px-4 py-3 transition-all hover:bg-surface-container-high dark:hover:bg-secondary-container" href="#">
+<span class="material-symbols-outlined">calendar_month</span>
+<span class="font-label-caps text-label-caps">Eventos</span>
+</a>
+<a class="flex items-center gap-3 text-secondary dark:text-secondary-fixed-dim hover:bg-surface-variant dark:hover:bg-secondary rounded-lg px-4 py-3 transition-all hover:bg-surface-container-high dark:hover:bg-secondary-container" href="#">
+<span class="material-symbols-outlined">group</span>
+<span class="font-label-caps text-label-caps">Asistentes</span>
+</a>
+<a class="flex items-center gap-3 text-secondary dark:text-secondary-fixed-dim hover:bg-surface-variant dark:hover:bg-secondary rounded-lg px-4 py-3 transition-all hover:bg-surface-container-high dark:hover:bg-secondary-container" href="#">
+<span class="material-symbols-outlined">analytics</span>
+<span class="font-label-caps text-label-caps">Reportes</span>
+</a>
+<div class="mt-auto px-4 py-2 flex items-center gap-3 border-t border-outline-variant pt-4">
+<img class="w-8 h-8 rounded-full object-cover" data-alt="A small circular profile picture of an administrative user in a professional setting, well-lit, shallow depth of field, warm tones matching the brand aesthetic." src="https://lh3.googleusercontent.com/aida-public/AB6AXuBu8uHUuejAGOe285Kh7UikGK-UJ8Y-LnMDPEjrWbLR1-8RpQ2WBkx83OU-JvVNemfI0Vngg05AIsYvunWw0m_IVRnCvY3SiIaF3yi2Hr6wiXSFcWJoR-2zeJiHk0wOL6Z5QsPIOef-fB2dsOvQhJURfe5Q1xk8K_BHq7k4UnWvI4q0Bobnk40-RVjOWXqZgW6v9ATxfvirl3tRhfnPziBI2SnbPCZokugOlEqfMUHXkXdd5-Wpxvg1uQ"/>
+<span class="font-label-caps text-label-caps text-on-surface">Admin User</span>
+</div>
+</nav>
+<!-- Main Content Area -->
+<main class="flex-1 overflow-y-auto px-margin-mobile md:px-margin-desktop py-6">
+<div class="max-w-container-max mx-auto space-y-8">
+<header class="mb-6 hidden md:block">
+<h1 class="font-display-lg-mobile md:font-display-lg text-primary">Dashboard Resumen</h1>
+</header>
+<header class="mb-6 md:hidden">
+<h1 class="font-headline-md text-headline-md text-primary">Resumen</h1>
+</header>
+<!-- Summary Cards Stack -->
+<section class="grid grid-cols-1 md:grid-cols-2 gap-4">
+<!-- Card 1 -->
+<div class="bg-surface-lowest border border-surface-dim rounded-lg p-6 shadow-sm flex flex-col justify-between relative overflow-hidden group">
+<div class="absolute -bottom-4 -right-4 opacity-5 pointer-events-none transition-transform group-hover:scale-110">
+<span class="material-symbols-outlined text-[100px] text-primary">local_activity</span>
+</div>
+<div class="flex items-center justify-between mb-4 relative z-10">
+<h2 class="font-label-caps text-label-caps text-secondary uppercase tracking-widest">Total Cupos Vendidos</h2>
+<span class="material-symbols-outlined text-primary bg-primary-fixed p-2 rounded-full">local_activity</span>
+</div>
+<div class="relative z-10">
+<p class="font-display-lg-mobile text-on-background">342</p>
+<p class="font-body-md text-body-md text-surface-tint mt-1 flex items-center gap-1">
+<span class="material-symbols-outlined text-sm">trending_up</span> +12% este mes
+                        </p>
+</div>
+</div>
+<!-- Card 2 -->
+<div class="bg-surface-lowest border border-surface-dim rounded-lg p-6 shadow-sm flex flex-col justify-between relative overflow-hidden group">
+<div class="absolute -bottom-4 -right-4 opacity-5 pointer-events-none transition-transform group-hover:scale-110">
+<span class="material-symbols-outlined text-[100px] text-primary">payments</span>
+</div>
+<div class="flex items-center justify-between mb-4 relative z-10">
+<h2 class="font-label-caps text-label-caps text-secondary uppercase tracking-widest">Ingresos del Mes</h2>
+<span class="material-symbols-outlined text-primary bg-primary-fixed p-2 rounded-full">payments</span>
+</div>
+<div class="relative z-10">
+<p class="font-display-lg-mobile text-on-background">$12,450</p>
+<p class="font-body-md text-body-md text-surface-tint mt-1 flex items-center gap-1">
+<span class="material-symbols-outlined text-sm">trending_up</span> +5% vs mes anterior
+                        </p>
+</div>
+</div>
+</section>
+<!-- Custom Terroir Divider -->
+<div class="w-full flex items-center justify-center py-4 opacity-30">
+<div class="h-px bg-outline flex-1"></div>
+<span class="material-symbols-outlined mx-4 text-primary">landscape</span>
+<div class="h-px bg-outline flex-1"></div>
+</div>
+<!-- Scrollable Lists -->
+<section class="grid grid-cols-1 md:grid-cols-2 gap-8">
+<!-- Próximas Catas -->
+<div class="bg-surface-container-lowest border border-surface-dim rounded-lg p-4 md:p-6">
+<h3 class="font-headline-sm text-headline-sm text-primary mb-4 border-b border-surface-variant pb-2">Próximas Catas</h3>
+<ul class="space-y-4">
+<li class="flex items-start gap-4 p-3 hover:bg-surface-container-low transition-colors rounded-lg cursor-pointer">
+<div class="bg-surface-variant text-on-surface-variant p-2 rounded-lg text-center min-w-[60px]">
+<span class="block font-label-caps text-label-caps font-bold">OCT</span>
+<span class="block font-headline-sm text-headline-sm leading-none">15</span>
+</div>
+<div>
+<h4 class="font-body-lg text-body-lg text-on-background font-bold">Cata de Altura - Malbec</h4>
+<p class="font-body-md text-body-md text-secondary">Bodega Principal • 18:00 hs</p>
+<div class="mt-2 flex gap-2">
+<span class="bg-primary-fixed text-on-primary-fixed px-2 py-1 rounded font-label-caps text-label-caps text-[10px]">20/24 Cupos</span>
+</div>
+</div>
+</li>
+<li class="flex items-start gap-4 p-3 hover:bg-surface-container-low transition-colors rounded-lg cursor-pointer">
+<div class="bg-surface-variant text-on-surface-variant p-2 rounded-lg text-center min-w-[60px]">
+<span class="block font-label-caps text-label-caps font-bold">OCT</span>
+<span class="block font-headline-sm text-headline-sm leading-none">22</span>
+</div>
+<div>
+<h4 class="font-body-lg text-body-lg text-on-background font-bold">Experiencia Blend de Terroirs</h4>
+<p class="font-body-md text-body-md text-secondary">Sala de Barricas • 19:30 hs</p>
+<div class="mt-2 flex gap-2">
+<span class="bg-tertiary-fixed text-on-tertiary-fixed px-2 py-1 rounded font-label-caps text-label-caps text-[10px]">Agotado</span>
+</div>
+</div>
+</li>
+</ul>
+<button class="w-full mt-4 py-2 text-primary font-label-caps text-label-caps tracking-widest hover:bg-primary-fixed transition-colors rounded-lg">VER TODOS LOS EVENTOS</button>
+</div>
+<!-- Asistentes Recientes -->
+<div class="bg-surface-container-lowest border border-surface-dim rounded-lg p-4 md:p-6">
+<h3 class="font-headline-sm text-headline-sm text-primary mb-4 border-b border-surface-variant pb-2">Asistentes Recientes</h3>
+<ul class="space-y-3">
+<li class="flex items-center justify-between p-2 hover:bg-surface-container-low rounded-lg transition-colors cursor-pointer">
+<div class="flex items-center gap-3">
+<img class="w-10 h-10 rounded-full object-cover border-2 border-surface" data-alt="Close up portrait of a sophisticated woman smiling slightly, soft indoor lighting, warm earthy tones, elegant setting." src="https://lh3.googleusercontent.com/aida-public/AB6AXuD07TIn42cX5ATqrM1EhwWyYOkXx3E-lxmFYyMWUXx-kKP91c9tfREZDxBLme_KFu68_IhYBqQHfETm2Gn49a_uKKEQqs-6Brt_NECb-NgSDyf19Ui9gwpaJ5AzgQFeUXBOzxvta16UcHxv5XG2Mgu2GOI1NSzd_t9B3q6fj5ZkUFsC3syJ0F8uZLgF6mN-sxT3ZkYVZCm_KNsAciDUXJ0lhqnn2sISkfWmza1IHFNlm_sQddMnwJk3lA"/>
+<div>
+<p class="font-body-md text-body-md font-bold text-on-background">Sofía Laurent</p>
+<p class="font-label-caps text-label-caps text-secondary text-[10px]">Cata de Altura</p>
+</div>
+</div>
+<span class="material-symbols-outlined text-secondary text-sm">chevron_right</span>
+</li>
+<li class="flex items-center justify-between p-2 hover:bg-surface-container-low rounded-lg transition-colors cursor-pointer">
+<div class="flex items-center gap-3">
+<img class="w-10 h-10 rounded-full object-cover border-2 border-surface" data-alt="Portrait of a middle aged man with a short beard, wearing a casual blazer, warm lighting, elegant tasting room background." src="https://lh3.googleusercontent.com/aida-public/AB6AXuBm16E4cPCZeAfd0PTPYRP1NJY3wfLSS5PPZpsEg-VZTiOR2HuJguGqGri-H1HO5qjS1yjIwujIF24mJR_iXhZ2LwkrVezcKO9ZSqrXLNutFsMQePayJpws2HsZGFFNTduc1lemyTixbSs6go2NbjJlf2tkxbBSXIJR2JPid6SxxMdLL1YNlQPWAJZyRW-7akOG2JnfP7uGv1utykT83hKq4AcP8pr3XDrIoFJhxIjRq3wWxTKB21Nyew"/>
+<div>
+<p class="font-body-md text-body-md font-bold text-on-background">Martín Quiroga</p>
+<p class="font-label-caps text-label-caps text-secondary text-[10px]">Blend de Terroirs</p>
+</div>
+</div>
+<span class="material-symbols-outlined text-secondary text-sm">chevron_right</span>
+</li>
+<li class="flex items-center justify-between p-2 hover:bg-surface-container-low rounded-lg transition-colors cursor-pointer">
+<div class="flex items-center gap-3">
+<div class="w-10 h-10 rounded-full bg-secondary-fixed flex items-center justify-center text-on-secondary-fixed font-bold">
+                                    AL
+                                </div>
+<div>
+<p class="font-body-md text-body-md font-bold text-on-background">Ana López</p>
+<p class="font-label-caps text-label-caps text-secondary text-[10px]">Cata Privada</p>
+</div>
+</div>
+<span class="material-symbols-outlined text-secondary text-sm">chevron_right</span>
+</li>
+</ul>
+</div>
+</section>
+</div>
+</main>
+<!-- Bottom Navigation Bar for Mobile -->
+<nav class="md:hidden fixed bottom-0 w-full bg-surface-container-highest border-t border-outline-variant py-2 px-4 flex justify-around items-center z-50">
+<a class="flex flex-col items-center gap-1 text-primary p-2" href="#">
+<span class="material-symbols-outlined" data-weight="fill" style="font-variation-settings: 'FILL' 1;">dashboard</span>
+<span class="font-label-caps text-label-caps text-[10px]">Inicio</span>
+</a>
+<a class="flex flex-col items-center gap-1 text-on-surface-variant p-2" href="#">
+<span class="material-symbols-outlined">calendar_month</span>
+<span class="font-label-caps text-label-caps text-[10px]">Eventos</span>
+</a>
+<a class="flex flex-col items-center gap-1 text-on-surface-variant p-2" href="#">
+<span class="material-symbols-outlined">group</span>
+<span class="font-label-caps text-label-caps text-[10px]">Clientes</span>
+</a>
+<a class="flex flex-col items-center gap-1 text-on-surface-variant p-2" href="#">
+<span class="material-symbols-outlined">settings</span>
+<span class="font-label-caps text-label-caps text-[10px]">Ajustes</span>
+</a>
+</nav>
+</body></html>

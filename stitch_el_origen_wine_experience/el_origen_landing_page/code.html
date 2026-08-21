@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+
+<html class="scroll-smooth" lang="es"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>El Origen | Boutique Wine Tasting</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;700&amp;family=Playfair+Display:wght@600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "on-background": "#1b1c1c",
+                        "surface-variant": "#e4e2e1",
+                        "surface": "#fcf9f8",
+                        "on-primary": "#ffffff",
+                        "primary": "#5c0531",
+                        "surface-container-lowest": "#ffffff",
+                        "surface-container-highest": "#e4e2e1",
+                        "on-secondary": "#ffffff",
+                        "background": "#fcf9f8",
+                        "on-tertiary-container": "#4f3e00",
+                        "inverse-on-surface": "#f3f0f0",
+                        "secondary-container": "#e2dfdb",
+                        "surface-container-high": "#eae7e7",
+                        "surface-bright": "#fcf9f8",
+                        "inverse-primary": "#ffb0ca",
+                        "surface-dim": "#dcd9d9",
+                        "primary-fixed-dim": "#ffb0ca",
+                        "tertiary-container": "#cca730",
+                        "on-tertiary-fixed": "#241a00",
+                        "secondary": "#5f5e5b",
+                        "primary-fixed": "#ffd9e3",
+                        "secondary-fixed": "#e5e2de",
+                        "on-error": "#ffffff",
+                        "on-secondary-fixed-variant": "#474744",
+                        "on-secondary-fixed": "#1c1c1a",
+                        "on-secondary-container": "#636260",
+                        "on-surface-variant": "#544247",
+                        "tertiary-fixed": "#ffe088",
+                        "on-primary-container": "#ff8cb6",
+                        "inverse-surface": "#303030",
+                        "surface-tint": "#9d3c63",
+                        "on-primary-fixed-variant": "#7f244c",
+                        "on-tertiary-fixed-variant": "#574500",
+                        "on-surface": "#1b1c1c",
+                        "tertiary-fixed-dim": "#e9c349",
+                        "outline-variant": "#d9c0c6",
+                        "outline": "#877277",
+                        "error-container": "#ffdad6",
+                        "surface-container-low": "#f6f3f2",
+                        "primary-container": "#7a2048",
+                        "surface-container": "#f0eded",
+                        "secondary-fixed-dim": "#c8c6c2",
+                        "on-tertiary": "#ffffff",
+                        "error": "#ba1a1a",
+                        "on-primary-fixed": "#3e001f",
+                        "tertiary": "#735c00",
+                        "on-error-container": "#93000a"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "full": "9999px"
+                    },
+                    "spacing": {
+                        "unit": "8px",
+                        "margin-mobile": "20px",
+                        "container-max": "1280px",
+                        "margin-desktop": "64px",
+                        "gutter": "24px"
+                    },
+                    "fontFamily": {
+                        "headline-sm": ["Playfair Display"],
+                        "label-caps": ["Manrope"],
+                        "body-md": ["Manrope"],
+                        "body-lg": ["Manrope"],
+                        "display-lg-mobile": ["Playfair Display"],
+                        "display-lg": ["Playfair Display"],
+                        "headline-md": ["Playfair Display"]
+                    },
+                    "fontSize": {
+                        "headline-sm": ["24px", { "lineHeight": "32px", "fontWeight": "600" }],
+                        "label-caps": ["12px", { "lineHeight": "16px", "letterSpacing": "0.1em", "fontWeight": "700" }],
+                        "body-md": ["16px", { "lineHeight": "24px", "fontWeight": "400" }],
+                        "body-lg": ["18px", { "lineHeight": "28px", "fontWeight": "400" }],
+                        "display-lg-mobile": ["40px", { "lineHeight": "48px", "letterSpacing": "-0.01em", "fontWeight": "700" }],
+                        "display-lg": ["64px", { "lineHeight": "72px", "letterSpacing": "-0.02em", "fontWeight": "700" }],
+                        "headline-md": ["32px", { "lineHeight": "40px", "fontWeight": "600" }]
+                    }
+                },
+            },
+        }
+    </script>
+<style>
+        .mountain-bg {
+            background-image: url("data:image/svg+xml,%3Csvg width='100%25' height='100%25' viewBox='0 0 1440 320' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath fill='%237a2048' fill-opacity='0.03' d='M0,160L48,176C96,192,192,224,288,213.3C384,203,480,149,576,149.3C672,149,768,203,864,229.3C960,256,1056,256,1152,245.3C1248,235,1344,213,1392,202.7L1440,192L1440,320L1392,320C1344,320,1248,320,1152,320C1056,320,960,320,864,320C768,320,672,320,576,320C480,320,384,320,288,320C192,320,96,320,48,320L0,320Z'%3E%3C/path%3E%3C/svg%3E");
+            background-position: bottom;
+            background-repeat: no-repeat;
+            background-size: cover;
+        }
+        .soft-shadow {
+            box-shadow: 0 10px 40px -10px rgba(122, 32, 72, 0.08);
+        }
+    </style>
+</head>
+<body class="bg-background text-on-background font-body-md antialiased min-h-screen flex flex-col">
+<!-- TopAppBar -->
+<header class="bg-surface dark:bg-on-background border-b border-surface-variant dark:border-outline-variant docked full-width top-0 sticky z-50">
+<div class="flex justify-between items-center w-full px-margin-mobile md:px-margin-desktop py-4 max-w-container-max mx-auto">
+<div class="font-headline-md text-headline-md font-bold text-primary dark:text-primary-fixed tracking-tight">El Origen</div>
+<nav class="hidden md:flex gap-8 items-center">
+<a class="font-label-caps text-label-caps text-secondary dark:text-secondary-fixed-dim hover:text-primary dark:hover:text-primary-fixed transition-colors hover:opacity-90" href="#">La Bodega</a>
+<a class="font-label-caps text-label-caps text-primary dark:text-primary-fixed border-b-2 border-primary dark:border-primary-fixed pb-1 hover:opacity-90" href="#experiencias">Experiencias</a>
+<a class="font-label-caps text-label-caps text-secondary dark:text-secondary-fixed-dim hover:text-primary dark:hover:text-primary-fixed transition-colors hover:opacity-90" href="#">Terroir</a>
+<a class="font-label-caps text-label-caps text-secondary dark:text-secondary-fixed-dim hover:text-primary dark:hover:text-primary-fixed transition-colors hover:opacity-90" href="#">Contacto</a>
+</nav>
+<button class="bg-primary-container text-on-primary-container font-label-caps text-label-caps px-6 py-2 rounded-xl hover:opacity-90 transition-opacity Active:scale-95 transition-transform duration-150">Reservar</button>
+</div>
+</header>
+<main class="flex-grow">
+<!-- Hero Section -->
+<section class="relative min-h-[80vh] flex flex-col items-center justify-center text-center px-margin-mobile md:px-margin-desktop mountain-bg overflow-hidden py-24">
+<div class="max-w-3xl mx-auto z-10 flex flex-col items-center gap-8">
+<img alt="El Origen Logo" class="w-64 md:w-80 h-auto object-contain mb-4" src="https://lh3.googleusercontent.com/aida-public/AB6AXuByQvVRG04EZYlJG4M1KiOKkqbUov38d9-ep7v3qSkfqQ4Bl0BkIhgne4eAN7ts3nzb36iEmbMhGwiFNGg3Q-JlXE-_pJ4yM1f_LolXwhpnf9wPm5kGEmWhVixSFM0fLvVPe8560d9Q5HKiTZx7gFSZCWcinhEuFQoICCUZLdMvXaXpojEnEG7QTqGk9O2QR3SJJ_7bpayKvIAEto1fzuiHTqGlBe00BNMoKvufhfAskpwL5mlIGu9TmFpQlBXWunbCIXY"/>
+<h1 class="font-display-lg-mobile md:font-display-lg text-on-surface">
+                    Una experiencia de cata única en el corazón de la montaña
+                </h1>
+<div class="flex flex-col sm:flex-row gap-4 mt-8 w-full sm:w-auto">
+<a class="bg-primary-container text-on-primary text-center font-label-caps text-label-caps py-4 px-8 rounded-[12px] hover:opacity-90 transition-opacity min-w-[200px]" href="#proximas-catas">
+                        Reservar mi cupo
+                    </a>
+<a class="bg-transparent border border-primary-container text-primary-container text-center font-label-caps text-label-caps py-4 px-8 rounded-[12px] hover:bg-surface-variant transition-colors min-w-[200px]" href="#proximas-catas">
+                        Ver próximas catas
+                    </a>
+</div>
+</div>
+</section>
+<!-- Terroir Divider -->
+<div class="w-full flex justify-center py-12 opacity-30">
+<svg fill="none" height="24" viewbox="0 0 200 24" width="200" xmlns="http://www.w3.org/2000/svg">
+<path d="M0 12H70L85 4L100 20L115 8L130 12H200" stroke="#7A2048" stroke-linejoin="round" stroke-width="1.5"></path>
+</svg>
+</div>
+<!-- Próximas Catas Section -->
+<section class="py-24 px-margin-mobile md:px-margin-desktop max-w-container-max mx-auto" id="proximas-catas">
+<div class="text-center mb-16">
+<h2 class="font-headline-md text-headline-md text-on-background mb-4">Próximas Catas</h2>
+<p class="font-body-lg text-body-lg text-on-surface-variant max-w-2xl mx-auto">Descubra nuestras exclusivas experiencias de degustación guiadas por sommeliers expertos en un entorno inigualable.</p>
+</div>
+<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+<!-- Card 1 -->
+<article class="bg-surface-container-lowest rounded-xl border border-surface-variant soft-shadow overflow-hidden flex flex-col transition-transform hover:-translate-y-1 duration-300">
+<div class="bg-cover bg-center w-full h-48" data-alt="A close up shot of a crystal wine glass being filled with rich, dark red wine. The setting is a rustic yet elegant wooden tasting table. Soft, warm, low-key lighting highlights the ruby tones of the liquid and creates deep, sophisticated shadows in the background, matching a premium boutique winery aesthetic." style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuDJQOHj9G1mmA3GYBZiwewzaEwD4rI9GcFhw5Y-nE-_ei9mrG2yRtUqObpcb8e_xLD5t3q9Wtq1zsTkryjdLM4gJUgjGIoZFfW6YEatBoXRBqcwmedDFmyshse889RB6TwITJu18-mrJXFAu5WHnn5ceGijsHEZTMuNltGqcw0ArgiaoINVwcoHnM7VQZyw0wUvxO5GPLz-8IhKOp_DfN4Mr9BkLTGmtuZe6GE2asj0qtDgH_klWfmuHw')"></div>
+<div class="p-6 flex flex-col flex-grow">
+<div class="flex justify-between items-start mb-4">
+<h3 class="font-headline-sm text-headline-sm text-on-background">Cata Malbec Reserva</h3>
+<span class="bg-surface-container text-on-surface-variant font-label-caps text-label-caps px-2 py-1 rounded">24 OCT</span>
+</div>
+<p class="font-body-md text-body-md text-on-surface-variant mb-6 flex-grow">Un recorrido profundo por nuestras mejores añadas de Malbec, maridado con quesos artesanales de la región.</p>
+<div class="flex flex-col gap-4 mt-auto">
+<div class="flex justify-between items-center text-sm">
+<span class="flex items-center gap-1 text-on-surface-variant">
+<span class="material-symbols-outlined text-[18px]">schedule</span> 18:00 - 20:30
+                                </span>
+<span class="font-headline-sm text-[18px] text-primary-container">$45.000</span>
+</div>
+<div class="flex justify-between items-center">
+<span class="font-label-caps text-label-caps text-primary-container bg-primary-fixed-dim bg-opacity-20 px-2 py-1 rounded">8 cupos restantes</span>
+</div>
+<button class="w-full bg-primary-container text-on-primary font-label-caps text-label-caps py-3 rounded-[12px] hover:opacity-90 transition-opacity mt-2">Reservar y pagar</button>
+</div>
+</div>
+</article>
+<!-- Card 2 -->
+<article class="bg-surface-container-lowest rounded-xl border border-surface-variant soft-shadow overflow-hidden flex flex-col transition-transform hover:-translate-y-1 duration-300">
+<div class="bg-cover bg-center w-full h-48" data-alt="A beautiful wide shot of a lush green vineyard stretching towards distant, majestic mountains during golden hour. The warm sunlight casts long shadows across the neat rows of grapevines. The sky is painted in soft hues of pink and orange, evoking a serene and exclusive boutique wine estate atmosphere." style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuCYDDWCMDxL0K9-Qt8b8RMw10W19ywsI3cb0Y7FXlH8FniwOECNtSPMVKJyS-WLDwh9KkVfkEliyr_2e3WEE5iP5C0PJhNTcJr3oQ210Pn41-NX1pZ6xniD4VSQRiqwpjgfrPcpu0qCnOnIh8eziyUjvkoAeSP18JgFP152SxsmJrQXMAOodqhXGEWXSqI0sN8_wUIgwDq0D4g_q75W1kAgR8rgUL-NM7yH0y5ji98YkDUy5v1931fX2Q')"></div>
+<div class="p-6 flex flex-col flex-grow">
+<div class="flex justify-between items-start mb-4">
+<h3 class="font-headline-sm text-headline-sm text-on-background">Atardecer en el Viñedo</h3>
+<span class="bg-surface-container text-on-surface-variant font-label-caps text-label-caps px-2 py-1 rounded">28 OCT</span>
+</div>
+<p class="font-body-md text-body-md text-on-surface-variant mb-6 flex-grow">Degustación al aire libre de nuestra línea joven mientras el sol se esconde tras la cordillera.</p>
+<div class="flex flex-col gap-4 mt-auto">
+<div class="flex justify-between items-center text-sm">
+<span class="flex items-center gap-1 text-on-surface-variant">
+<span class="material-symbols-outlined text-[18px]">schedule</span> 17:30 - 19:30
+                                </span>
+<span class="font-headline-sm text-[18px] text-primary-container">$35.000</span>
+</div>
+<div class="flex justify-between items-center">
+<span class="font-label-caps text-label-caps text-primary-container bg-primary-fixed-dim bg-opacity-20 px-2 py-1 rounded">4 cupos restantes</span>
+</div>
+<button class="w-full bg-primary-container text-on-primary font-label-caps text-label-caps py-3 rounded-[12px] hover:opacity-90 transition-opacity mt-2">Reservar y pagar</button>
+</div>
+</div>
+</article>
+<!-- Card 3 -->
+<article class="bg-surface-container-lowest rounded-xl border border-surface-variant soft-shadow overflow-hidden flex flex-col transition-transform hover:-translate-y-1 duration-300">
+<div class="bg-cover bg-center w-full h-48" data-alt="An elegant, softly lit shot of a sommelier pouring white wine into a glass. The scene focuses on the interaction between the crystal clear wine and the refined glassware. In the background, out of focus, are elegant oak barrels in a cool, stone-walled cellar, representing high-end craftsmanship." style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuDf5QbER39FZJ_jxgpwxjvtk-joOHv56IbjUCNzsPNE80cWZlxKjsdLGsfNpYj5kzAxaXoNI34vDbiBPDowOKN8AuuKipwlxPXz3ewfFnV3ZXTmFiDpwu4PSmi37aoEgMzY1T1yRk7uJLuwtUjuh_Ffv1KJlLqpQ1aNCBgmE61o5fx-lOpdhZqikTYgZV2yQ8ZRZfE8OEJtoEzB7Sftr76Rsr_qoFzNarNmDer3bSrebhp4L0cOCxtbjg')"></div>
+<div class="p-6 flex flex-col flex-grow">
+<div class="flex justify-between items-start mb-4">
+<h3 class="font-headline-sm text-headline-sm text-on-background">Blancos de Altura</h3>
+<span class="bg-surface-container text-on-surface-variant font-label-caps text-label-caps px-2 py-1 rounded">02 NOV</span>
+</div>
+<p class="font-body-md text-body-md text-on-surface-variant mb-6 flex-grow">Exploración de cepas blancas cultivadas a gran altitud, destacando su acidez vibrante y notas minerales.</p>
+<div class="flex flex-col gap-4 mt-auto">
+<div class="flex justify-between items-center text-sm">
+<span class="flex items-center gap-1 text-on-surface-variant">
+<span class="material-symbols-outlined text-[18px]">schedule</span> 11:00 - 13:00
+                                </span>
+<span class="font-headline-sm text-[18px] text-primary-container">$40.000</span>
+</div>
+<div class="flex justify-between items-center">
+<span class="font-label-caps text-label-caps text-primary-container bg-primary-fixed-dim bg-opacity-20 px-2 py-1 rounded">12 cupos restantes</span>
+</div>
+<button class="w-full bg-primary-container text-on-primary font-label-caps text-label-caps py-3 rounded-[12px] hover:opacity-90 transition-opacity mt-2">Reservar y pagar</button>
+</div>
+</div>
+</article>
+</div>
+</section>
+<!-- Sobre El Origen Section -->
+<section class="py-24 px-margin-mobile md:px-margin-desktop bg-surface-container-low">
+<div class="max-w-container-max mx-auto flex flex-col lg:flex-row items-center gap-16">
+<div class="lg:w-1/2">
+<img class="w-full h-auto rounded-xl soft-shadow object-cover aspect-[4/3]" data-alt="A sweeping, cinematic view of a traditional, elegant stone wine cellar. Rows of large, ancient oak barrels line the arched corridors. The lighting is moody, warm, and highly professional, creating a sense of history, heritage, and the meticulous craft of winemaking in a premium, secluded mountain estate." src="https://lh3.googleusercontent.com/aida-public/AB6AXuA9Fho_wkVOO8Chc9OwjGnzGHYFDRbhxf4I09Km8rLEGi_EGoOhAd9zZBOEBfC6aYyR76yh8jHH6bmFD8wqvLrlKhCx6lOnDR5cPAqbYEhqakCOFldLrknR42j0V-2sBO0pVKb2suM98oxkWiV8VllhSNzomHhhROTkNaQ0ymn7OvTKU9OTQRO55sf6q9t9nS3a3YI36kbDoga-itmyTv8VoXoVN16Sx4wS6EJSZBBZUi-UNKIwX2bUEA"/>
+</div>
+<div class="lg:w-1/2 flex flex-col gap-6">
+<h2 class="font-headline-md text-headline-md text-on-background">El Origen del Sabor</h2>
+<p class="font-body-lg text-body-lg text-on-surface-variant">
+                        Nuestra historia nace en lo alto de la montaña, donde la tierra árida y el clima extremo forjan un carácter indomable en cada vid. En El Origen, creemos que el vino no se hace, se acompaña.
+                    </p>
+<p class="font-body-md text-body-md text-on-surface-variant">
+                        Cada botella es un testimonio silencioso del terroir, un reflejo de la dedicación de manos expertas que trabajan en armonía con la naturaleza. Le invitamos a descubrir el secreto que aguarda en cada copa.
+                    </p>
+<div class="mt-4">
+<a class="font-label-caps text-label-caps text-primary-container tracking-widest hover:opacity-80 transition-opacity flex items-center gap-2" href="#">
+                            Conocer la bodega <span class="material-symbols-outlined text-[16px]">arrow_forward</span>
+</a>
+</div>
+</div>
+</div>
+</section>
+</main>
+<!-- Footer -->
+<footer class="bg-surface-container-highest dark:bg-inverse-surface border-t border-outline-variant full-width mt-auto">
+<div class="flex flex-col md:flex-row justify-between items-center w-full px-margin-mobile md:px-margin-desktop py-12 max-w-container-max mx-auto gap-8">
+<div class="flex flex-col items-center md:items-start gap-4">
+<div class="font-headline-sm text-headline-sm font-semibold text-primary dark:text-primary-fixed">El Origen</div>
+<p class="font-body-md text-body-md text-on-surface-variant text-center md:text-left max-w-xs">
+                     Crafting the source of excellence.<br/>
+                     Ruta del Vino s/n, Mendoza.
+                 </p>
+</div>
+<nav class="flex flex-wrap justify-center gap-6">
+<a class="font-label-caps text-label-caps text-on-surface-variant dark:text-surface-variant hover:text-primary dark:hover:text-primary-fixed underline transition-colors focus:ring-2 focus:ring-primary outline-none" href="#">Privacidad</a>
+<a class="font-label-caps text-label-caps text-on-surface-variant dark:text-surface-variant hover:text-primary dark:hover:text-primary-fixed underline transition-colors focus:ring-2 focus:ring-primary outline-none" href="#">Términos</a>
+<a class="font-label-caps text-label-caps text-on-surface-variant dark:text-surface-variant hover:text-primary dark:hover:text-primary-fixed underline transition-colors focus:ring-2 focus:ring-primary outline-none" href="#">Prensa</a>
+<a class="font-label-caps text-label-caps text-on-surface-variant dark:text-surface-variant hover:text-primary dark:hover:text-primary-fixed underline transition-colors focus:ring-2 focus:ring-primary outline-none" href="#">Sostenibilidad</a>
+</nav>
+<div class="flex flex-col items-center md:items-end gap-2 text-on-surface-variant">
+<div class="flex gap-4">
+<a class="hover:text-primary-container transition-colors" href="#"><span class="material-symbols-outlined">mail</span></a>
+<a class="hover:text-primary-container transition-colors" href="#"><span class="material-symbols-outlined">call</span></a>
+<a class="hover:text-primary-container transition-colors" href="#"><span class="material-symbols-outlined">location_on</span></a>
+</div>
+<p class="font-body-md text-body-md text-sm mt-2 text-center md:text-right">© 2024 El Origen. Crafting the source of excellence.</p>
+</div>
+</div>
+</footer>
+</body></html>

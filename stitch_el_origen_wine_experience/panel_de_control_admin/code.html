@@ -1,0 +1,377 @@
+<!DOCTYPE html>
+
+<html lang="es"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Admin Dashboard - El Origen</title>
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700&amp;family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                    "on-background": "#1b1c1c",
+                    "surface-variant": "#e4e2e1",
+                    "surface": "#fcf9f8",
+                    "on-primary": "#ffffff",
+                    "primary": "#5c0531",
+                    "surface-container-lowest": "#ffffff",
+                    "surface-container-highest": "#e4e2e1",
+                    "on-secondary": "#ffffff",
+                    "background": "#fcf9f8",
+                    "on-tertiary-container": "#4f3e00",
+                    "inverse-on-surface": "#f3f0f0",
+                    "secondary-container": "#e2dfdb",
+                    "surface-container-high": "#eae7e7",
+                    "surface-bright": "#fcf9f8",
+                    "inverse-primary": "#ffb0ca",
+                    "surface-dim": "#dcd9d9",
+                    "primary-fixed-dim": "#ffb0ca",
+                    "tertiary-container": "#cca730",
+                    "on-tertiary-fixed": "#241a00",
+                    "secondary": "#5f5e5b",
+                    "primary-fixed": "#ffd9e3",
+                    "secondary-fixed": "#e5e2de",
+                    "on-error": "#ffffff",
+                    "on-secondary-fixed-variant": "#474744",
+                    "on-secondary-fixed": "#1c1c1a",
+                    "on-secondary-container": "#636260",
+                    "on-surface-variant": "#544247",
+                    "tertiary-fixed": "#ffe088",
+                    "on-primary-container": "#ff8cb6",
+                    "inverse-surface": "#303030",
+                    "surface-tint": "#9d3c63",
+                    "on-primary-fixed-variant": "#7f244c",
+                    "on-tertiary-fixed-variant": "#574500",
+                    "on-surface": "#1b1c1c",
+                    "tertiary-fixed-dim": "#e9c349",
+                    "outline-variant": "#d9c0c6",
+                    "outline": "#877277",
+                    "error-container": "#ffdad6",
+                    "surface-container-low": "#f6f3f2",
+                    "primary-container": "#7a2048",
+                    "surface-container": "#f0eded",
+                    "secondary-fixed-dim": "#c8c6c2",
+                    "on-tertiary": "#ffffff",
+                    "error": "#ba1a1a",
+                    "on-primary-fixed": "#3e001f",
+                    "tertiary": "#735c00",
+                    "on-error-container": "#93000a"
+            },
+            "borderRadius": {
+                    "DEFAULT": "0.25rem",
+                    "lg": "0.5rem",
+                    "xl": "0.75rem",
+                    "full": "9999px"
+            },
+            "spacing": {
+                    "unit": "8px",
+                    "margin-mobile": "20px",
+                    "container-max": "1280px",
+                    "margin-desktop": "64px",
+                    "gutter": "24px"
+            },
+            "fontFamily": {
+                    "headline-sm": [
+                            "Playfair Display"
+                    ],
+                    "label-caps": [
+                            "Manrope"
+                    ],
+                    "body-md": [
+                            "Manrope"
+                    ],
+                    "body-lg": [
+                            "Manrope"
+                    ],
+                    "display-lg-mobile": [
+                            "Playfair Display"
+                    ],
+                    "display-lg": [
+                            "Playfair Display"
+                    ],
+                    "headline-md": [
+                            "Playfair Display"
+                    ]
+            },
+            "fontSize": {
+                    "headline-sm": [
+                            "24px",
+                            {
+                                    "lineHeight": "32px",
+                                    "fontWeight": "600"
+                            }
+                    ],
+                    "label-caps": [
+                            "12px",
+                            {
+                                    "lineHeight": "16px",
+                                    "letterSpacing": "0.1em",
+                                    "fontWeight": "700"
+                            }
+                    ],
+                    "body-md": [
+                            "16px",
+                            {
+                                    "lineHeight": "24px",
+                                    "fontWeight": "400"
+                            }
+                    ],
+                    "body-lg": [
+                            "18px",
+                            {
+                                    "lineHeight": "28px",
+                                    "fontWeight": "400"
+                            }
+                    ],
+                    "display-lg-mobile": [
+                            "40px",
+                            {
+                                    "lineHeight": "48px",
+                                    "letterSpacing": "-0.01em",
+                                    "fontWeight": "700"
+                            }
+                    ],
+                    "display-lg": [
+                            "64px",
+                            {
+                                    "lineHeight": "72px",
+                                    "letterSpacing": "-0.02em",
+                                    "fontWeight": "700"
+                            }
+                    ],
+                    "headline-md": [
+                            "32px",
+                            {
+                                    "lineHeight": "40px",
+                                    "fontWeight": "600"
+                            }
+                    ]
+            }
+          },
+        },
+      }
+    </script>
+<style>
+        .mountain-divider {
+            position: relative;
+            height: 1px;
+            background: theme('colors.outline-variant');
+            margin: 2rem 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .mountain-divider::after {
+            content: '';
+            position: absolute;
+            width: 40px;
+            height: 20px;
+            background: theme('colors.surface');
+            mask: url('data:image/svg+xml;utf8,<svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 5L2 20H22L12 5Z" fill="currentColor"/></svg>') center/contain no-repeat;
+            -webkit-mask: url('data:image/svg+xml;utf8,<svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 5L2 20H22L12 5Z" fill="currentColor"/></svg>') center/contain no-repeat;
+            background-color: theme('colors.primary');
+        }
+    </style>
+</head>
+<body class="bg-background text-on-background font-body-md h-screen flex overflow-hidden">
+<aside class="hidden lg:flex flex-col h-screen p-4 gap-4 bg-surface-container-low border-r border-outline-variant shadow-sm w-64 flex-shrink-0 z-20 relative">
+<div class="px-4 py-6 mb-4">
+<h1 class="font-headline-sm text-headline-sm text-primary">Admin Panel</h1>
+<p class="font-body-md text-body-md text-secondary mt-1">Gestión El Origen</p>
+</div>
+<nav class="flex-1 space-y-2">
+<a class="flex items-center gap-3 bg-primary-container text-on-primary-container rounded-lg px-4 py-3 font-bold translate-x-1 transition-transform" href="#">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">dashboard</span>
+<span class="font-label-caps text-label-caps">Dashboard</span>
+</a>
+<a class="flex items-center gap-3 text-secondary hover:bg-surface-variant rounded-lg px-4 py-3 transition-all hover:bg-surface-container-high" href="#">
+<span class="material-symbols-outlined">calendar_month</span>
+<span class="font-label-caps text-label-caps">Eventos</span>
+</a>
+<a class="flex items-center gap-3 text-secondary hover:bg-surface-variant rounded-lg px-4 py-3 transition-all hover:bg-surface-container-high" href="#">
+<span class="material-symbols-outlined">group</span>
+<span class="font-label-caps text-label-caps">Asistentes</span>
+</a>
+<a class="flex items-center gap-3 text-secondary hover:bg-surface-variant rounded-lg px-4 py-3 transition-all hover:bg-surface-container-high" href="#">
+<span class="material-symbols-outlined">analytics</span>
+<span class="font-label-caps text-label-caps">Reportes</span>
+</a>
+</nav>
+<div class="mt-auto border-t border-outline-variant pt-4 px-4 flex items-center gap-3">
+<div class="w-10 h-10 rounded-full bg-surface-variant overflow-hidden">
+<img alt="Admin Profile" class="w-full h-full object-cover" data-alt="A close-up portrait of a professional sommelier in a dimly lit, elegant wine cellar, warm ambient lighting highlighting facial features, sophisticated and modern aesthetic." src="https://lh3.googleusercontent.com/aida-public/AB6AXuBttnceM92BUJ1W7-euKksRpp8b3hewJxJr1yox4D19uzEZKS9io-cWjO7MJCmxQE1k8g_RTGa_aIxKN-1xG6cFegcNSUHAyZbtxFQZok98NrisnMR3jCDK93mhMmts1n2GUYgk04KMkaIK0HCy5l-OloDDkbB3Gh67taaQTbQxMXPGh6r5XD0Mofi0NEEbpMt2FPYYLL5GZQ8GbcdNb4nE8MF5bTisSGKu1xdpv5vMsWLHV3sbXLIlVA"/>
+</div>
+<div>
+<p class="font-label-caps text-label-caps text-on-surface">M. Silva</p>
+<p class="text-xs text-secondary">Administrador</p>
+</div>
+</div>
+</aside>
+<main class="flex-1 flex flex-col h-screen overflow-y-auto bg-background relative">
+<div class="absolute inset-0 pointer-events-none opacity-[0.02]" style="background-image: radial-gradient(theme('colors.primary') 1px, transparent 1px); background-size: 20px 20px;"></div>
+<header class="w-full px-margin-mobile md:px-margin-desktop py-8 flex justify-between items-end relative z-10">
+<div>
+<p class="font-label-caps text-label-caps text-secondary mb-2 tracking-widest uppercase">Resumen Mensual</p>
+<h2 class="font-headline-md text-headline-md font-bold text-on-surface">Panorama General</h2>
+</div>
+<div class="flex gap-4">
+<button class="flex items-center gap-2 px-4 py-2 bg-surface text-primary border border-outline-variant rounded-lg font-label-caps text-label-caps hover:bg-surface-variant transition-colors shadow-sm">
+<span class="material-symbols-outlined text-sm">download</span>
+                    Exportar
+                </button>
+</div>
+</header>
+<div class="px-margin-mobile md:px-margin-desktop pb-12 flex-1 relative z-10">
+<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-12 gap-gutter">
+<div class="lg:col-span-4 bg-surface rounded-xl p-6 border border-surface-variant shadow-[0_8px_30px_rgba(92,5,49,0.04)] relative overflow-hidden group">
+<div class="absolute top-0 right-0 w-32 h-32 bg-primary/5 rounded-bl-full -mr-8 -mt-8 transition-transform group-hover:scale-110"></div>
+<div class="relative z-10">
+<div class="flex items-center gap-2 mb-4 text-on-surface-variant">
+<span class="material-symbols-outlined">confirmation_number</span>
+<h3 class="font-label-caps text-label-caps">Total Cupos Vendidos</h3>
+</div>
+<div class="flex items-baseline gap-3">
+<span class="font-display-lg text-display-lg text-primary">124</span>
+<span class="text-sm font-bold text-tertiary-container flex items-center">
+<span class="material-symbols-outlined text-sm">trending_up</span> +12%
+                            </span>
+</div>
+<p class="font-body-md text-body-md text-secondary mt-2">Mes actual (Noviembre)</p>
+</div>
+</div>
+<div class="lg:col-span-4 bg-surface rounded-xl p-6 border border-surface-variant shadow-[0_8px_30px_rgba(92,5,49,0.04)] relative overflow-hidden group">
+<div class="absolute top-0 right-0 w-32 h-32 bg-tertiary/5 rounded-bl-full -mr-8 -mt-8 transition-transform group-hover:scale-110"></div>
+<div class="relative z-10">
+<div class="flex items-center gap-2 mb-4 text-on-surface-variant">
+<span class="material-symbols-outlined">payments</span>
+<h3 class="font-label-caps text-label-caps">Ingresos del Mes</h3>
+</div>
+<div class="flex items-baseline gap-3">
+<span class="font-display-lg text-display-lg text-on-surface">$4,500</span>
+<span class="text-sm font-bold text-tertiary-container flex items-center">
+<span class="material-symbols-outlined text-sm">trending_up</span> +8%
+                            </span>
+</div>
+<p class="font-body-md text-body-md text-secondary mt-2">Ingresos netos estimados</p>
+</div>
+</div>
+<div class="lg:col-span-4 rounded-xl overflow-hidden relative shadow-[0_8px_30px_rgba(92,5,49,0.08)] min-h-[200px]">
+<div class="absolute inset-0 bg-primary/40 z-10 mix-blend-multiply"></div>
+<div class="absolute inset-0 bg-cover bg-center" data-alt="A sweeping aerial view of lush, green vineyard rows stretching across a valley towards a majestic mountain peak under a clear, bright blue sky, cinematic and high-contrast editorial photography style." style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuDfCxIaTyW5Rl0dCg6WQsjUeDpgoJKBwKKGMW6biSBfUiFgUql3zvSEH5SJsSQcNvugnI6hkVZMDvTe0dp6Tn1oUeV9Ng_lcQwA8MqWpTUJKks48V7oqakcQecJH2PCWwWkmJrNsPPNClSEt8-NHOoBKi8rRrrgxiXzJFTAmq_sfKwr1iYtJNyLqgy0gmjLgRftGVh_U2MTN6YWECltQAD1Dc1j46QxjurnwhnuEEEiJzzohE82KWEzXg')"></div>
+<div class="relative z-20 h-full p-6 flex flex-col justify-end text-on-primary">
+<h3 class="font-headline-sm text-headline-sm mb-1">Cosecha 2024</h3>
+<p class="font-body-md text-body-md opacity-90">Preparativos en curso</p>
+</div>
+</div>
+<div class="lg:col-span-12 mt-4">
+<div class="mountain-divider"></div>
+</div>
+<div class="lg:col-span-5 bg-surface rounded-xl p-6 border border-surface-variant shadow-[0_8px_30px_rgba(92,5,49,0.04)]">
+<div class="flex justify-between items-center mb-6">
+<h3 class="font-headline-sm text-headline-sm text-on-surface">Próximas Catas</h3>
+<a class="font-label-caps text-label-caps text-primary hover:underline" href="#">Ver todas</a>
+</div>
+<div class="space-y-6">
+<div>
+<div class="flex justify-between text-sm mb-2">
+<span class="font-bold text-on-surface">Cata de Altura - Terroir Norte</span>
+<span class="text-secondary">Mañana, 18:00</span>
+</div>
+<div class="flex items-center gap-4">
+<div class="flex-1 h-2 bg-surface-variant rounded-full overflow-hidden">
+<div class="h-full bg-primary rounded-full" style="width: 85%;"></div>
+</div>
+<span class="font-label-caps text-label-caps text-primary">17/20</span>
+</div>
+</div>
+<div>
+<div class="flex justify-between text-sm mb-2">
+<span class="font-bold text-on-surface">Experiencia Origen Reserva</span>
+<span class="text-secondary">24 Nov, 19:30</span>
+</div>
+<div class="flex items-center gap-4">
+<div class="flex-1 h-2 bg-surface-variant rounded-full overflow-hidden">
+<div class="h-full bg-primary rounded-full" style="width: 100%;"></div>
+</div>
+<span class="font-label-caps text-label-caps text-on-surface-variant">Completo</span>
+</div>
+</div>
+<div>
+<div class="flex justify-between text-sm mb-2">
+<span class="font-bold text-on-surface">Degustación de Vinos Blancos</span>
+<span class="text-secondary">28 Nov, 17:00</span>
+</div>
+<div class="flex items-center gap-4">
+<div class="flex-1 h-2 bg-surface-variant rounded-full overflow-hidden">
+<div class="h-full bg-primary/40 rounded-full" style="width: 40%;"></div>
+</div>
+<span class="font-label-caps text-label-caps text-secondary">8/20</span>
+</div>
+</div>
+</div>
+</div>
+<div class="lg:col-span-7 bg-surface rounded-xl border border-surface-variant shadow-[0_8px_30px_rgba(92,5,49,0.04)] overflow-hidden flex flex-col">
+<div class="p-6 border-b border-surface-variant flex justify-between items-center bg-surface-container-lowest">
+<h3 class="font-headline-sm text-headline-sm text-on-surface">Lista de Asistentes Recientes</h3>
+<button class="text-secondary hover:text-primary transition-colors">
+<span class="material-symbols-outlined">filter_list</span>
+</button>
+</div>
+<div class="overflow-x-auto">
+<table class="w-full text-left border-collapse">
+<thead>
+<tr class="bg-surface-container-low border-b border-surface-variant">
+<th class="px-6 py-4 font-label-caps text-label-caps text-secondary">Nombre</th>
+<th class="px-6 py-4 font-label-caps text-label-caps text-secondary">Evento</th>
+<th class="px-6 py-4 font-label-caps text-label-caps text-secondary">Fecha Compra</th>
+<th class="px-6 py-4 font-label-caps text-label-caps text-secondary">Estado</th>
+</tr>
+</thead>
+<tbody class="text-sm">
+<tr class="border-b border-surface-variant hover:bg-surface-container-lowest transition-colors">
+<td class="px-6 py-4 font-bold text-on-surface">Carlos Mendoza</td>
+<td class="px-6 py-4 text-secondary">Cata de Altura</td>
+<td class="px-6 py-4 text-secondary">Hace 2 horas</td>
+<td class="px-6 py-4">
+<span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-bold bg-[#e8f5e9] text-[#2e7d32]">Confirmado</span>
+</td>
+</tr>
+<tr class="border-b border-surface-variant hover:bg-surface-container-lowest transition-colors">
+<td class="px-6 py-4 font-bold text-on-surface">Lucía Ferreyra</td>
+<td class="px-6 py-4 text-secondary">Experiencia Origen</td>
+<td class="px-6 py-4 text-secondary">Hoy, 10:30</td>
+<td class="px-6 py-4">
+<span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-bold bg-[#e8f5e9] text-[#2e7d32]">Confirmado</span>
+</td>
+</tr>
+<tr class="border-b border-surface-variant hover:bg-surface-container-lowest transition-colors">
+<td class="px-6 py-4 font-bold text-on-surface">Martín Rossi</td>
+<td class="px-6 py-4 text-secondary">Degustación Blancos</td>
+<td class="px-6 py-4 text-secondary">Ayer</td>
+<td class="px-6 py-4">
+<span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-bold bg-primary-fixed text-primary-fixed-dim">Pendiente</span>
+</td>
+</tr>
+<tr class="hover:bg-surface-container-lowest transition-colors">
+<td class="px-6 py-4 font-bold text-on-surface">Ana P. Giménez</td>
+<td class="px-6 py-4 text-secondary">Cata de Altura</td>
+<td class="px-6 py-4 text-secondary">Ayer</td>
+<td class="px-6 py-4">
+<span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-bold bg-[#e8f5e9] text-[#2e7d32]">Confirmado</span>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+</div>
+</div>
+</main>
+</body></html>

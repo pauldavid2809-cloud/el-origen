@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+
+<html class="light" lang="es"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>El Origen - Automatización de Notificaciones</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;700&amp;family=Playfair+Display:wght@600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "on-background": "#1b1c1c",
+                        "surface-variant": "#e4e2e1",
+                        "surface": "#fcf9f8",
+                        "on-primary": "#ffffff",
+                        "primary": "#5c0531",
+                        "surface-container-lowest": "#ffffff",
+                        "surface-container-highest": "#e4e2e1",
+                        "on-secondary": "#ffffff",
+                        "background": "#fcf9f8",
+                        "on-tertiary-container": "#4f3e00",
+                        "inverse-on-surface": "#f3f0f0",
+                        "secondary-container": "#e2dfdb",
+                        "surface-container-high": "#eae7e7",
+                        "surface-bright": "#fcf9f8",
+                        "inverse-primary": "#ffb0ca",
+                        "surface-dim": "#dcd9d9",
+                        "primary-fixed-dim": "#ffb0ca",
+                        "tertiary-container": "#cca730",
+                        "on-tertiary-fixed": "#241a00",
+                        "secondary": "#5f5e5b",
+                        "primary-fixed": "#ffd9e3",
+                        "secondary-fixed": "#e5e2de",
+                        "on-error": "#ffffff",
+                        "on-secondary-fixed-variant": "#474744",
+                        "on-secondary-fixed": "#1c1c1a",
+                        "on-secondary-container": "#636260",
+                        "on-surface-variant": "#544247",
+                        "tertiary-fixed": "#ffe088",
+                        "on-primary-container": "#ff8cb6",
+                        "inverse-surface": "#303030",
+                        "surface-tint": "#9d3c63",
+                        "on-primary-fixed-variant": "#7f244c",
+                        "on-tertiary-fixed-variant": "#574500",
+                        "on-surface": "#1b1c1c",
+                        "tertiary-fixed-dim": "#e9c349",
+                        "outline-variant": "#d9c0c6",
+                        "outline": "#877277",
+                        "error-container": "#ffdad6",
+                        "surface-container-low": "#f6f3f2",
+                        "primary-container": "#7a2048",
+                        "surface-container": "#f0eded",
+                        "secondary-fixed-dim": "#c8c6c2",
+                        "on-tertiary": "#ffffff",
+                        "error": "#ba1a1a",
+                        "on-primary-fixed": "#3e001f",
+                        "tertiary": "#735c00",
+                        "on-error-container": "#93000a"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "full": "9999px"
+                    },
+                    "spacing": {
+                        "unit": "8px",
+                        "margin-mobile": "20px",
+                        "container-max": "1280px",
+                        "margin-desktop": "64px",
+                        "gutter": "24px"
+                    },
+                    "fontFamily": {
+                        "headline-sm": ["Playfair Display"],
+                        "label-caps": ["Manrope"],
+                        "body-md": ["Manrope"],
+                        "body-lg": ["Manrope"],
+                        "display-lg-mobile": ["Playfair Display"],
+                        "display-lg": ["Playfair Display"],
+                        "headline-md": ["Playfair Display"]
+                    },
+                    "fontSize": {
+                        "headline-sm": ["24px", { "lineHeight": "32px", "fontWeight": "600" }],
+                        "label-caps": ["12px", { "lineHeight": "16px", "letterSpacing": "0.1em", "fontWeight": "700" }],
+                        "body-md": ["16px", { "lineHeight": "24px", "fontWeight": "400" }],
+                        "body-lg": ["18px", { "lineHeight": "28px", "fontWeight": "400" }],
+                        "display-lg-mobile": ["40px", { "lineHeight": "48px", "letterSpacing": "-0.01em", "fontWeight": "700" }],
+                        "display-lg": ["64px", { "lineHeight": "72px", "letterSpacing": "-0.02em", "fontWeight": "700" }],
+                        "headline-md": ["32px", { "lineHeight": "40px", "fontWeight": "600" }]
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .fill-icon {
+            font-variation-settings: 'FILL' 1;
+        }
+        
+        .mockup-shadow {
+            box-shadow: 0 20px 40px -10px rgba(122, 32, 72, 0.1), 0 10px 20px -5px rgba(122, 32, 72, 0.05);
+        }
+        
+        .notification-shadow {
+            box-shadow: 0 10px 25px -5px rgba(122, 32, 72, 0.08);
+        }
+    </style>
+</head>
+<body class="bg-background text-on-background font-body-md antialiased min-h-screen flex flex-col">
+<!-- TopAppBar -->
+<header class="bg-surface dark:bg-on-background border-b border-surface-variant dark:border-outline-variant docked full-width top-0 z-50 sticky">
+<div class="flex justify-between items-center w-full px-margin-mobile md:px-margin-desktop py-4 max-w-container-max mx-auto">
+<a class="font-headline-md text-headline-md font-bold text-primary dark:text-primary-fixed tracking-tight hover:opacity-90 transition-opacity" href="#">
+                El Origen
+            </a>
+<nav aria-label="Navegación principal" class="hidden md:flex gap-8 items-center">
+<a class="text-secondary dark:text-secondary-fixed-dim hover:text-primary dark:hover:text-primary-fixed transition-colors font-label-caps text-label-caps hover:opacity-90 transition-opacity" href="#">
+                    La Bodega
+                </a>
+<a class="text-secondary dark:text-secondary-fixed-dim hover:text-primary dark:hover:text-primary-fixed transition-colors font-label-caps text-label-caps hover:opacity-90 transition-opacity" href="#">
+                    Experiencias
+                </a>
+<a class="text-secondary dark:text-secondary-fixed-dim hover:text-primary dark:hover:text-primary-fixed transition-colors font-label-caps text-label-caps hover:opacity-90 transition-opacity" href="#">
+                    Terroir
+                </a>
+<a class="text-primary dark:text-primary-fixed border-b-2 border-primary dark:border-primary-fixed pb-1 font-label-caps text-label-caps hover:opacity-90 transition-opacity" href="#">
+                    Contacto
+                </a>
+</nav>
+<button class="bg-primary-container text-on-primary-container px-6 py-2 rounded-xl font-label-caps text-label-caps hover:opacity-90 transition-opacity hidden md:block">
+                Reservar
+            </button>
+<button class="md:hidden text-primary">
+<span class="material-symbols-outlined">menu</span>
+</button>
+</div>
+</header>
+<!-- Main Content -->
+<main class="flex-grow flex items-center justify-center py-20 px-4 sm:px-6 lg:px-8 bg-surface-container-low">
+<div class="max-w-container-max mx-auto w-full flex flex-col lg:flex-row items-center gap-16 lg:gap-24">
+<!-- Text Content -->
+<div class="lg:w-1/3 text-center lg:text-left space-y-6">
+<h1 class="font-display-lg-mobile md:font-display-lg text-display-lg-mobile md:text-display-lg text-primary">
+                    Conecta con tus clientes
+                </h1>
+<p class="font-body-lg text-body-lg text-on-surface-variant max-w-md mx-auto lg:mx-0">
+                    Nuestras notificaciones automatizadas aseguran que cada experiencia en El Origen sea fluida y memorable, desde la reserva hasta el brindis.
+                </p>
+<div class="pt-4">
+<button class="bg-primary text-on-primary px-8 py-3 rounded-xl font-label-caps text-label-caps hover:bg-surface-tint transition-colors">
+                        Descubrir Más
+                    </button>
+</div>
+</div>
+<!-- Visual Mockup Area -->
+<div class="lg:w-2/3 relative h-[600px] w-full flex justify-center items-center">
+<!-- Phone Silhouette 1 (Back left) -->
+<div class="absolute left-0 lg:left-10 top-10 w-[240px] h-[500px] bg-surface rounded-[2.5rem] border-[8px] border-surface-variant mockup-shadow opacity-70 transform -rotate-6 scale-90 hidden md:block">
+<!-- Screen inner -->
+<div class="w-full h-full bg-surface-container-lowest rounded-[2rem] overflow-hidden relative">
+<!-- Top bar -->
+<div class="w-full h-6 bg-surface-container-highest flex justify-center items-center">
+<div class="w-20 h-4 bg-surface-variant rounded-full mt-2"></div>
+</div>
+</div>
+</div>
+<!-- Phone Silhouette 2 (Back right) -->
+<div class="absolute right-0 lg:right-10 top-20 w-[240px] h-[500px] bg-surface rounded-[2.5rem] border-[8px] border-surface-variant mockup-shadow opacity-70 transform rotate-6 scale-90 hidden md:block">
+<!-- Screen inner -->
+<div class="w-full h-full bg-surface-container-lowest rounded-[2rem] overflow-hidden relative">
+<!-- Top bar -->
+<div class="w-full h-6 bg-surface-container-highest flex justify-center items-center">
+<div class="w-20 h-4 bg-surface-variant rounded-full mt-2"></div>
+</div>
+</div>
+</div>
+<!-- Main Phone Silhouette (Center Front) -->
+<div class="relative z-10 w-[280px] sm:w-[320px] h-[580px] bg-surface rounded-[3rem] border-[10px] border-surface-variant mockup-shadow flex flex-col overflow-hidden">
+<!-- Notch area -->
+<div class="absolute top-0 inset-x-0 h-7 flex justify-center z-20">
+<div class="w-32 h-6 bg-surface-variant rounded-b-2xl"></div>
+</div>
+<!-- Screen Content -->
+<div class="flex-grow bg-surface-container-lowest p-4 pt-12 flex flex-col gap-6 relative">
+<!-- Header / Branding area in phone -->
+<div class="flex items-center justify-center pb-4 border-b border-surface-variant mb-2">
+<span class="font-headline-sm text-headline-sm font-bold text-primary">El Origen</span>
+</div>
+<!-- Notification 1: WhatsApp Booking Confirmation -->
+<div class="bg-surface rounded-2xl p-4 notification-shadow border border-surface-variant transform -translate-x-2 relative animate-fade-in-up" style="animation-delay: 0.2s;">
+<div class="flex items-center gap-3 mb-2">
+<div class="w-8 h-8 rounded-full bg-primary-container flex items-center justify-center text-on-primary-container">
+<span class="material-symbols-outlined text-[18px]">forum</span>
+</div>
+<div class="flex flex-col">
+<span class="font-label-caps text-[10px] text-secondary">WhatsApp • Hace 5 min</span>
+<span class="font-bold text-sm text-on-surface">El Origen Bodega</span>
+</div>
+</div>
+<p class="font-body-md text-sm text-on-surface-variant">
+                                ¡Reserva confirmada! Te esperamos el sábado 15 para tu experiencia Terroir.
+                            </p>
+</div>
+<!-- Notification 2: Reminder -->
+<div class="bg-surface rounded-2xl p-4 notification-shadow border border-surface-variant transform translate-x-4 relative animate-fade-in-up" style="animation-delay: 0.5s;">
+<div class="flex items-center gap-3 mb-2">
+<div class="w-8 h-8 rounded-full bg-secondary-container flex items-center justify-center text-on-secondary-container">
+<span class="material-symbols-outlined text-[18px]">notifications_active</span>
+</div>
+<div class="flex flex-col">
+<span class="font-label-caps text-[10px] text-secondary">Recordatorio • Ahora</span>
+<span class="font-bold text-sm text-on-surface">Tu cata de vinos</span>
+</div>
+</div>
+<p class="font-body-md text-sm text-on-surface-variant">
+                                ¡Hola! Te esperamos mañana para tu cata a las 6 PM.
+                            </p>
+</div>
+<!-- Notification 3: Internal Sales -->
+<div class="bg-surface rounded-2xl p-4 notification-shadow border border-primary/20 transform -translate-x-1 relative mt-auto animate-fade-in-up" style="animation-delay: 0.8s;">
+<div class="flex items-center gap-3 mb-2">
+<div class="w-8 h-8 rounded-full bg-tertiary-container flex items-center justify-center text-on-tertiary-container">
+<span class="material-symbols-outlined text-[18px]">mail</span>
+</div>
+<div class="flex flex-col">
+<span class="font-label-caps text-[10px] text-secondary">Admin • Nueva Venta</span>
+<span class="font-bold text-sm text-on-surface">Sistema de Reservas</span>
+</div>
+</div>
+<p class="font-body-md text-sm text-on-surface-variant">
+                                Nueva venta: 2 cupos para Cata Malbec Premium.
+                            </p>
+</div>
+</div>
+</div>
+</div>
+</div>
+</main>
+<!-- Footer -->
+<footer class="bg-surface-container-highest dark:bg-inverse-surface border-t border-outline-variant full-width mt-auto">
+<div class="flex flex-col md:flex-row justify-between items-center w-full px-margin-mobile md:px-margin-desktop py-12 max-w-container-max mx-auto">
+<div class="font-headline-sm text-headline-sm font-semibold text-primary dark:text-primary-fixed mb-6 md:mb-0">
+                El Origen
+            </div>
+<div class="flex flex-wrap justify-center gap-6 mb-6 md:mb-0">
+<a class="text-on-surface-variant dark:text-surface-variant hover:text-primary dark:hover:text-primary-fixed underline focus:ring-2 focus:ring-primary font-body-md text-body-md" href="#">
+                    Privacidad
+                </a>
+<a class="text-on-surface-variant dark:text-surface-variant hover:text-primary dark:hover:text-primary-fixed underline focus:ring-2 focus:ring-primary font-body-md text-body-md" href="#">
+                    Términos
+                </a>
+<a class="text-on-surface-variant dark:text-surface-variant hover:text-primary dark:hover:text-primary-fixed underline focus:ring-2 focus:ring-primary font-body-md text-body-md" href="#">
+                    Prensa
+                </a>
+<a class="text-on-surface-variant dark:text-surface-variant hover:text-primary dark:hover:text-primary-fixed underline focus:ring-2 focus:ring-primary font-body-md text-body-md" href="#">
+                    Sostenibilidad
+                </a>
+</div>
+<div class="font-body-md text-body-md text-on-surface-variant text-center md:text-right">
+                © 2024 El Origen. Crafting the source of excellence.
+            </div>
+</div>
+</footer>
+<style>
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(20px) var(--tw-translate-x, translateX(0));
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0) var(--tw-translate-x, translateX(0));
+            }
+        }
+        .animate-fade-in-up {
+            animation: fadeInUp 0.6s ease-out forwards;
+            opacity: 0;
+        }
+    </style>
+</body></html>

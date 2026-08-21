@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+
+<html lang="es"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>El Origen - Boutique Wine Tasting</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;700&amp;family=Playfair+Display:wght@600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "surface-tint": "#9d3c63",
+                        "on-tertiary-fixed": "#241a00",
+                        "tertiary-container": "#cca730",
+                        "surface": "#fcf9f8",
+                        "secondary-fixed": "#e5e2de",
+                        "on-secondary-fixed-variant": "#474744",
+                        "tertiary-fixed": "#ffe088",
+                        "surface-container": "#f0eded",
+                        "error": "#ba1a1a",
+                        "error-container": "#ffdad6",
+                        "on-tertiary-container": "#4f3e00",
+                        "primary-fixed": "#ffd9e3",
+                        "on-secondary-container": "#636260",
+                        "surface-bright": "#fcf9f8",
+                        "inverse-on-surface": "#f3f0f0",
+                        "on-primary": "#ffffff",
+                        "primary-fixed-dim": "#ffb0ca",
+                        "surface-container-high": "#eae7e7",
+                        "outline-variant": "#d9c0c6",
+                        "secondary": "#5f5e5b",
+                        "on-secondary-fixed": "#1c1c1a",
+                        "inverse-primary": "#ffb0ca",
+                        "on-surface-variant": "#544247",
+                        "surface-container-low": "#f6f3f2",
+                        "on-secondary": "#ffffff",
+                        "on-error-container": "#93000a",
+                        "tertiary": "#735c00",
+                        "background": "#fcf9f8",
+                        "inverse-surface": "#303030",
+                        "on-error": "#ffffff",
+                        "secondary-container": "#e2dfdb",
+                        "on-background": "#1b1c1c",
+                        "surface-dim": "#dcd9d9",
+                        "on-primary-fixed-variant": "#7f244c",
+                        "on-tertiary": "#ffffff",
+                        "surface-container-highest": "#e4e2e1",
+                        "primary-container": "#7a2048",
+                        "tertiary-fixed-dim": "#e9c349",
+                        "outline": "#877277",
+                        "surface-variant": "#e4e2e1",
+                        "on-tertiary-fixed-variant": "#574500",
+                        "surface-container-lowest": "#ffffff",
+                        "on-primary-fixed": "#3e001f",
+                        "secondary-fixed-dim": "#c8c6c2",
+                        "on-surface": "#1b1c1c",
+                        "primary": "#5c0531",
+                        "on-primary-container": "#ff8cb6"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "full": "9999px"
+                    },
+                    "spacing": {
+                        "gutter": "24px",
+                        "margin-mobile": "20px",
+                        "container-max": "1280px",
+                        "unit": "8px",
+                        "margin-desktop": "64px"
+                    },
+                    "fontFamily": {
+                        "headline-sm": ["Playfair Display"],
+                        "body-md": ["Manrope"],
+                        "display-lg-mobile": ["Playfair Display"],
+                        "display-lg": ["Playfair Display"],
+                        "label-caps": ["Manrope"],
+                        "headline-md": ["Playfair Display"],
+                        "body-lg": ["Manrope"]
+                    },
+                    "fontSize": {
+                        "headline-sm": ["24px", { "lineHeight": "32px", "fontWeight": "600" }],
+                        "body-md": ["16px", { "lineHeight": "24px", "fontWeight": "400" }],
+                        "display-lg-mobile": ["40px", { "lineHeight": "48px", "letterSpacing": "-0.01em", "fontWeight": "700" }],
+                        "display-lg": ["64px", { "lineHeight": "72px", "letterSpacing": "-0.02em", "fontWeight": "700" }],
+                        "label-caps": ["12px", { "lineHeight": "16px", "letterSpacing": "0.1em", "fontWeight": "700" }],
+                        "headline-md": ["32px", { "lineHeight": "40px", "fontWeight": "600" }],
+                        "body-lg": ["18px", { "lineHeight": "28px", "fontWeight": "400" }]
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .material-symbols-outlined[data-weight="fill"] {
+            font-variation-settings: 'FILL' 1;
+        }
+        
+        .terroir-divider {
+            position: relative;
+            height: 1px;
+            background-color: theme('colors.outline-variant');
+            margin: theme('spacing.12') 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .terroir-divider::after {
+            content: "";
+            position: absolute;
+            width: 32px;
+            height: 16px;
+            background-color: theme('colors.surface');
+            background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 12" fill="none" stroke="%23877277" stroke-width="1.5"><path d="M2 10L8 2L12 7L16 3L22 10"/></svg>');
+            background-repeat: no-repeat;
+            background-position: center;
+        }
+    </style>
+</head>
+<body class="bg-surface text-on-surface font-body-md antialiased overflow-x-hidden">
+<!-- TopAppBar -->
+<header class="fixed top-0 w-full z-50 bg-surface border-b border-surface-variant flex justify-between items-center px-margin-mobile py-4 max-w-container-max mx-auto shadow-sm">
+<a class="font-headline-md text-headline-md font-bold text-primary tracking-tight" href="#">El Origen</a>
+<button class="md:hidden text-primary">
+<span class="material-symbols-outlined">menu</span>
+</button>
+<nav class="hidden md:flex gap-8 items-center">
+<a class="font-label-caps text-label-caps text-secondary hover:text-primary transition-colors" href="#">La Bodega</a>
+<a class="font-label-caps text-label-caps text-secondary hover:text-primary transition-colors" href="#">Experiencias</a>
+<a class="font-label-caps text-label-caps text-secondary hover:text-primary transition-colors" href="#">Terroir</a>
+<a class="font-label-caps text-label-caps text-secondary hover:text-primary transition-colors" href="#">Contacto</a>
+<button class="bg-primary-container text-on-primary-container font-label-caps text-label-caps px-6 py-3 rounded-xl hover:opacity-90 transition-opacity">Reservar</button>
+</nav>
+</header>
+<main class="pt-[72px]">
+<!-- Hero Section -->
+<section class="min-h-[80vh] flex flex-col items-center justify-center px-margin-mobile text-center relative mt-12 mb-24">
+<!-- Mountain subtle watermark -->
+<div class="absolute inset-0 pointer-events-none opacity-5 flex items-center justify-center">
+<svg class="w-full max-w-lg text-primary" fill="none" stroke="currentColor" stroke-width="0.5" viewbox="0 0 240 120" xmlns="http://www.w3.org/2000/svg">
+<path d="M10 110 L60 30 L100 80 L160 20 L230 110"></path>
+</svg>
+</div>
+<div class="z-10 flex flex-col items-center">
+<img alt="El Origen Logo" class="w-48 h-auto mb-8 rounded-lg shadow-sm" data-alt="A refined, minimalist logo for 'El Origen' featuring an elegant mountain peak motif intertwined with a wine glass silhouette. The logo is displayed in a deep burgundy color against a pristine cream background. The design is sophisticated, organic, and perfectly suited for a premium boutique winery." src="https://lh3.googleusercontent.com/aida-public/AB6AXuC80FMmn7Z22ENlZg2ms7BlFXvlQagkwjZz_Qqpb5I-oElN36xdLaX_S75t9OPEr5r2u2ANYc440P0A3LfkDmMm3sLRtSAoB49hHF_wSBQxWDt92AwyavsXc_QshqI2OPgjZDs6nyduWHIPEqJRxWL0ziLfdOuWt-olhE8UcZJYsPH979Qhr2oJjNKehWH0llHUVrwkB37Clke08eIx9n47rAP6BCoqJF7n5PtgDyseNGxQUAbPHuIqjF1F8qzhr-o0kJQ"/>
+<h1 class="font-display-lg-mobile text-display-lg-mobile text-on-surface mb-6 max-w-sm">Descubre la esencia de la montaña.</h1>
+<p class="font-body-lg text-body-lg text-on-surface-variant mb-10 max-w-md">Una experiencia de cata exclusiva donde el terroir cobra vida en cada copa.</p>
+<button class="bg-primary-container text-on-primary font-label-caps text-label-caps px-8 py-4 rounded-xl hover:opacity-90 transition-opacity w-full max-w-xs">Reservar mi cupo</button>
+</div>
+</section>
+<!-- Terroir Divider -->
+<div class="px-margin-mobile">
+<div class="terroir-divider"></div>
+</div>
+<!-- Próximas Catas -->
+<section class="px-margin-mobile py-16">
+<h2 class="font-headline-md text-headline-md text-center text-primary mb-12">Próximas Catas</h2>
+<div class="flex flex-col gap-6">
+<!-- Event Card 1 -->
+<div class="bg-surface-container-lowest border border-surface-variant rounded-lg p-6 shadow-[0_4px_20px_rgba(122,32,72,0.05)]">
+<div class="flex justify-between items-start mb-4">
+<div>
+<span class="font-label-caps text-label-caps text-primary block mb-1">Octubre 15 • 18:00</span>
+<h3 class="font-headline-sm text-headline-sm text-on-surface">Cata de Altura</h3>
+</div>
+<span class="bg-secondary-container text-on-secondary-container font-label-caps text-label-caps px-3 py-1 rounded-full">Tannat</span>
+</div>
+<p class="font-body-md text-body-md text-on-surface-variant mb-6">Exploración profunda de nuestros tintos de mayor altitud, maridados con quesos locales.</p>
+<button class="text-primary font-label-caps text-label-caps tracking-widest hover:opacity-80 transition-opacity flex items-center gap-2">
+                        Reservar <span class="material-symbols-outlined text-sm">arrow_forward</span>
+</button>
+</div>
+<!-- Event Card 2 -->
+<div class="bg-surface-container-lowest border border-surface-variant rounded-lg p-6 shadow-[0_4px_20px_rgba(122,32,72,0.05)]">
+<div class="flex justify-between items-start mb-4">
+<div>
+<span class="font-label-caps text-label-caps text-primary block mb-1">Octubre 22 • 19:00</span>
+<h3 class="font-headline-sm text-headline-sm text-on-surface">Atardecer Blanco</h3>
+</div>
+<span class="bg-secondary-container text-on-secondary-container font-label-caps text-label-caps px-3 py-1 rounded-full">Fresco</span>
+</div>
+<p class="font-body-md text-body-md text-on-surface-variant mb-6">Una tarde relajada degustando nuestras selecciones de blancos frescos mientras cae el sol.</p>
+<button class="text-primary font-label-caps text-label-caps tracking-widest hover:opacity-80 transition-opacity flex items-center gap-2">
+                        Reservar <span class="material-symbols-outlined text-sm">arrow_forward</span>
+</button>
+</div>
+</div>
+<div class="text-center mt-10">
+<button class="text-primary font-label-caps text-label-caps border border-primary px-6 py-3 rounded-xl hover:bg-primary-container hover:text-on-primary-container transition-colors">Ver todas las fechas</button>
+</div>
+</section>
+<!-- Terroir Divider -->
+<div class="px-margin-mobile">
+<div class="terroir-divider"></div>
+</div>
+<!-- Sobre El Origen -->
+<section class="px-margin-mobile py-16 mb-16">
+<h2 class="font-headline-md text-headline-md text-primary mb-8 text-center">Nuestra Historia</h2>
+<div class="flex flex-col gap-8">
+<div class="rounded-lg overflow-hidden shadow-[0_8px_30px_rgba(122,32,72,0.1)]">
+<img alt="Vineyard at sunset" class="w-full h-auto object-cover aspect-[4/5]" data-alt="A breathtaking view of a high-altitude vineyard nestled in rugged mountains. The sun is setting, casting a warm golden-hour glow over the neatly aligned rows of grapevines. In the foreground, hands holding a glass of deep ruby red wine gently swirl the liquid, reflecting the soft light. The mood is serene, intimate, and deeply connected to nature." src="https://lh3.googleusercontent.com/aida-public/AB6AXuDx8Q11GkdutFolnbtuK0E4Ja7Javk9-V99E7opgzjD0rCEs99lffSt556j2Tyf2UtonSe_759aH8MlX3joG_IFx0kN-q7Z6QzwHskMGhSxZ5z15hDOA3oezD3dyE8Uf50_X00MDTzIcH65UIEaQ1KoaiORVu6PFJhP54ht0VkBkH0SUWSXmBPQPGb21w5LL6wzFGfoEK7FIlUWzrl1l-97x_34W35IHOzLudp_aeSgbyJsQGPLXxeUF_IjdmhfkzBJzRs"/>
+</div>
+<div class="text-center px-4">
+<p class="font-body-lg text-body-lg text-on-surface-variant mb-6 leading-relaxed">
+                        Nacimos de la convicción de que el mejor vino es aquel que respeta su entorno. En las faldas de la montaña, cultivamos con paciencia para embotellar la esencia misma de nuestra tierra.
+                    </p>
+<button class="text-primary font-label-caps text-label-caps tracking-widest hover:opacity-80 transition-opacity">
+                        Leer más
+                    </button>
+</div>
+</div>
+</section>
+</main>
+<!-- Footer -->
+<footer class="bg-surface-container-highest border-t border-outline-variant px-margin-mobile py-12 flex flex-col items-center gap-8">
+<a class="font-headline-sm text-headline-sm font-semibold text-primary" href="#">El Origen</a>
+<nav class="flex flex-col items-center gap-4 text-center">
+<a class="font-label-caps text-label-caps text-on-surface-variant hover:text-primary transition-colors" href="#">Privacidad</a>
+<a class="font-label-caps text-label-caps text-on-surface-variant hover:text-primary transition-colors" href="#">Términos</a>
+<a class="font-label-caps text-label-caps text-on-surface-variant hover:text-primary transition-colors" href="#">Prensa</a>
+<a class="font-label-caps text-label-caps text-on-surface-variant hover:text-primary transition-colors" href="#">Sostenibilidad</a>
+</nav>
+<div class="flex gap-6 mt-4 text-secondary">
+<a aria-label="Instagram" class="hover:text-primary transition-colors" href="#"><span class="material-symbols-outlined">photo_camera</span></a>
+<a aria-label="Location" class="hover:text-primary transition-colors" href="#"><span class="material-symbols-outlined">pin_drop</span></a>
+<a aria-label="Email" class="hover:text-primary transition-colors" href="#"><span class="material-symbols-outlined">mail</span></a>
+</div>
+<p class="font-body-md text-body-md text-on-surface-variant text-sm mt-4 text-center">
+            © 2024 El Origen. Crafting the source of excellence.
+        </p>
+</footer>
+</body></html>

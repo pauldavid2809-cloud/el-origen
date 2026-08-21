@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+
+<html class="light" lang="es"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Reserva Confirmada - El Origen</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;700&amp;family=Playfair+Display:wght@600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "surface-tint": "#9d3c63",
+                        "on-tertiary-fixed": "#241a00",
+                        "tertiary-container": "#cca730",
+                        "surface": "#fcf9f8",
+                        "secondary-fixed": "#e5e2de",
+                        "on-secondary-fixed-variant": "#474744",
+                        "tertiary-fixed": "#ffe088",
+                        "surface-container": "#f0eded",
+                        "error": "#ba1a1a",
+                        "error-container": "#ffdad6",
+                        "on-tertiary-container": "#4f3e00",
+                        "primary-fixed": "#ffd9e3",
+                        "on-secondary-container": "#636260",
+                        "surface-bright": "#fcf9f8",
+                        "inverse-on-surface": "#f3f0f0",
+                        "on-primary": "#ffffff",
+                        "primary-fixed-dim": "#ffb0ca",
+                        "surface-container-high": "#eae7e7",
+                        "outline-variant": "#d9c0c6",
+                        "secondary": "#5f5e5b",
+                        "on-secondary-fixed": "#1c1c1a",
+                        "inverse-primary": "#ffb0ca",
+                        "on-surface-variant": "#544247",
+                        "surface-container-low": "#f6f3f2",
+                        "on-secondary": "#ffffff",
+                        "on-error-container": "#93000a",
+                        "tertiary": "#735c00",
+                        "background": "#fcf9f8",
+                        "inverse-surface": "#303030",
+                        "on-error": "#ffffff",
+                        "secondary-container": "#e2dfdb",
+                        "on-background": "#1b1c1c",
+                        "surface-dim": "#dcd9d9",
+                        "on-primary-fixed-variant": "#7f244c",
+                        "on-tertiary": "#ffffff",
+                        "surface-container-highest": "#e4e2e1",
+                        "primary-container": "#7a2048",
+                        "tertiary-fixed-dim": "#e9c349",
+                        "outline": "#877277",
+                        "surface-variant": "#e4e2e1",
+                        "on-tertiary-fixed-variant": "#574500",
+                        "surface-container-lowest": "#ffffff",
+                        "on-primary-fixed": "#3e001f",
+                        "secondary-fixed-dim": "#c8c6c2",
+                        "on-surface": "#1b1c1c",
+                        "primary": "#5c0531",
+                        "on-primary-container": "#ff8cb6"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "full": "9999px"
+                    },
+                    "spacing": {
+                        "gutter": "24px",
+                        "margin-mobile": "20px",
+                        "container-max": "1280px",
+                        "unit": "8px",
+                        "margin-desktop": "64px"
+                    },
+                    "fontFamily": {
+                        "headline-sm": ["Playfair Display"],
+                        "body-md": ["Manrope"],
+                        "display-lg-mobile": ["Playfair Display"],
+                        "display-lg": ["Playfair Display"],
+                        "label-caps": ["Manrope"],
+                        "headline-md": ["Playfair Display"],
+                        "body-lg": ["Manrope"]
+                    },
+                    "fontSize": {
+                        "headline-sm": ["24px", { "lineHeight": "32px", "fontWeight": "600" }],
+                        "body-md": ["16px", { "lineHeight": "24px", "fontWeight": "400" }],
+                        "display-lg-mobile": ["40px", { "lineHeight": "48px", "letterSpacing": "-0.01em", "fontWeight": "700" }],
+                        "display-lg": ["64px", { "lineHeight": "72px", "letterSpacing": "-0.02em", "fontWeight": "700" }],
+                        "label-caps": ["12px", { "lineHeight": "16px", "letterSpacing": "0.1em", "fontWeight": "700" }],
+                        "headline-md": ["32px", { "lineHeight": "40px", "fontWeight": "600" }],
+                        "body-lg": ["18px", { "lineHeight": "28px", "fontWeight": "400" }]
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+        body { background-color: #fcf9f8; }
+        .shadow-warm { box-shadow: 0 10px 25px -5px rgba(122, 32, 72, 0.05), 0 8px 10px -6px rgba(122, 32, 72, 0.05); }
+    </style>
+</head>
+<body class="bg-background text-on-background min-h-screen flex flex-col items-center justify-center p-margin-mobile">
+<!-- Top Navigation Hidden as this is a linear transactional success screen -->
+<main class="w-full max-w-md mx-auto flex flex-col items-center gap-8 py-12">
+<!-- Header Section -->
+<div class="text-center space-y-4">
+<div class="inline-flex items-center justify-center w-16 h-16 rounded-full bg-primary-container text-on-primary-container mb-2">
+<span class="material-symbols-outlined text-4xl" data-icon="check_circle">check_circle</span>
+</div>
+<h1 class="font-display-lg-mobile text-display-lg-mobile text-primary">¡Reserva Confirmada!</h1>
+<p class="font-body-lg text-body-lg text-on-surface-variant max-w-xs mx-auto">
+                Tu lugar en El Origen está asegurado. Te esperamos para una experiencia inolvidable.
+            </p>
+</div>
+<!-- Ticket Card -->
+<div class="bg-surface-container-lowest rounded-xl p-6 shadow-warm border border-surface-variant w-full relative overflow-hidden">
+<!-- Decorative Mountain Line Motif Top -->
+<div class="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-transparent via-primary-container to-transparent opacity-20"></div>
+<div class="space-y-6">
+<!-- Experience Details -->
+<div class="text-center space-y-2 border-b border-surface-variant pb-6">
+<h2 class="font-headline-sm text-headline-sm text-primary">Cata Terroir de Altura</h2>
+<p class="font-label-caps text-label-caps text-secondary tracking-widest uppercase">ID de Reserva: #ORG-8924</p>
+</div>
+<!-- Summary Grid -->
+<div class="grid grid-cols-2 gap-y-6 gap-x-4">
+<div>
+<p class="font-label-caps text-label-caps text-secondary mb-1">Fecha</p>
+<p class="font-body-md text-body-md text-on-surface font-semibold">15 Oct 2024</p>
+</div>
+<div>
+<p class="font-label-caps text-label-caps text-secondary mb-1">Hora</p>
+<p class="font-body-md text-body-md text-on-surface font-semibold">16:30 hrs</p>
+</div>
+<div>
+<p class="font-label-caps text-label-caps text-secondary mb-1">Personas</p>
+<p class="font-body-md text-body-md text-on-surface font-semibold">2 Adultos</p>
+</div>
+<div>
+<p class="font-label-caps text-label-caps text-secondary mb-1">Ubicación</p>
+<p class="font-body-md text-body-md text-on-surface font-semibold">Sala Principal</p>
+</div>
+</div>
+<!-- Terroir Divider -->
+<div class="relative py-4 flex items-center justify-center">
+<div class="absolute inset-0 flex items-center">
+<div class="w-full border-t border-dashed border-outline-variant"></div>
+</div>
+<div class="relative bg-surface-container-lowest px-4">
+<span class="material-symbols-outlined text-outline" data-icon="landscape">landscape</span>
+</div>
+</div>
+<!-- QR Code -->
+<div class="flex flex-col items-center space-y-3 pt-2">
+<img class="w-48 h-48 object-contain" data-alt="A clean, minimalist QR code image centered on a crisp white background. The QR code features sharp black modules and square alignment markers. The overall aesthetic is functional, modern, and high-contrast, fitting seamlessly into a premium mobile ticketing interface." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCr8XbVw5L8lkL1ErLjpHdZwV8GtwH_cR6HRxmC9VMfoH2czxzOWPc9HUJZLIHn_vm_JYD-wHD1EzlPK-naZi6jTb5S0bJ7AGsxg8wyLTwbClsLXYxQpYKKvl_HTtQU2HW1pxSAi5J_K-whV6Xf-uol0Q5fgdDi2nJ6EWO63tdqf4lXDG60UqoFKvDVmJ2dn8Q279Oz0qm5vq39qTIVPIODlYXsNJMiH2KsjSvIM-P1yG_2ehy5I3-8Mw"/>
+<p class="font-label-caps text-label-caps text-secondary text-center">Muestra este código al llegar</p>
+</div>
+</div>
+<!-- Decorative Mountain Line Motif Bottom -->
+<div class="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-transparent via-primary-container to-transparent opacity-20"></div>
+</div>
+<!-- Action Buttons -->
+<div class="w-full flex flex-col gap-4 mt-4">
+<button class="w-full bg-primary-container text-on-primary font-body-md text-body-md font-bold py-4 rounded-xl hover:opacity-90 transition-opacity flex items-center justify-center gap-2">
+<span class="material-symbols-outlined" data-icon="download">download</span>
+                Guardar ticket
+            </button>
+<button class="w-full bg-transparent border border-primary text-primary font-body-md text-body-md font-bold py-4 rounded-xl hover:bg-surface-variant transition-colors flex items-center justify-center gap-2">
+<span class="material-symbols-outlined" data-icon="home">home</span>
+                Volver al inicio
+            </button>
+</div>
+</main>
+</body></html>
