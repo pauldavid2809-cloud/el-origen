@@ -191,11 +191,13 @@ export function SensoryWheel({
                 {COLOR_PALETTE.map((c) => (
                   <button
                     key={c.name}
+                    type="button"
                     onClick={() => setVisual({ ...visual, color: c.name })}
-                    className={`flex items-center gap-3 p-3.5 rounded-2xl border text-left text-[12px] font-medium transition-all duration-200 active:scale-[0.97] ${
+                    aria-pressed={visual.color === c.name}
+                    className={`flex items-center gap-2.5 p-3 rounded-xl border text-left transition-all duration-200 active:scale-[0.97] focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:outline-none ${
                       visual.color === c.name
-                        ? "border-primary bg-primary-fixed/20 shadow-sm font-semibold"
-                        : "border-black/[0.06] bg-white hover:border-black/[0.15]"
+                        ? "bg-white border-primary shadow-sm font-semibold text-primary"
+                        : "bg-surface-container-low border-black/[0.05] hover:bg-white text-on-surface-variant/80"
                     }`}
                   >
                     <span
@@ -282,8 +284,10 @@ export function SensoryWheel({
                       return (
                         <button
                           key={aroma}
+                          type="button"
                           onClick={() => toggleAroma(aroma)}
-                          className={`px-3.5 py-1.5 rounded-full text-[12px] font-medium border transition-all duration-200 active:scale-[0.96] ${
+                          aria-pressed={isSelected}
+                          className={`px-3.5 py-1.5 rounded-full text-[12px] font-medium border transition-all duration-200 active:scale-[0.96] focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:outline-none ${
                             isSelected ? `${fam.activeColor} shadow-sm` : `${fam.color} hover:bg-white`
                           }`}
                         >
