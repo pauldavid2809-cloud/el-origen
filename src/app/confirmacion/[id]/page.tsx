@@ -29,7 +29,6 @@ export default function ConfirmationPage() {
         if (data.reservation) {
           setReservation(data.reservation);
         } else {
-          // Fallback mock reservation for immediate view
           setReservation({
             id: reservationId || "res-demo",
             token: token || "tok-demo-1234",
@@ -64,29 +63,29 @@ export default function ConfirmationPage() {
   const handleDownloadTicketPDF = () => {
     if (!reservation) return;
     const doc = new jsPDF();
-    doc.setFillColor(252, 249, 248);
+    doc.setFillColor(250, 248, 247);
     doc.rect(0, 0, 210, 297, "F");
 
-    doc.setTextColor(122, 32, 72);
+    doc.setTextColor(92, 5, 49);
     doc.setFont("times", "bold");
     doc.setFontSize(22);
     doc.text("EL ORIGEN — PASE DE ENTRADA", 105, 30, { align: "center" });
 
     doc.setFont("helvetica", "normal");
     doc.setFontSize(10);
-    doc.setTextColor(95, 94, 91);
+    doc.setTextColor(107, 105, 102);
     doc.text("Boutique Wine Tasting • Mendoza, Argentina", 105, 38, { align: "center" });
 
-    doc.setDrawColor(217, 192, 198);
+    doc.setDrawColor(221, 210, 213);
     doc.setLineWidth(0.5);
-    doc.line(20, 46, 190, 46);
+    doc.line(25, 46, 185, 46);
 
     doc.setFontSize(16);
     doc.setTextColor(92, 5, 49);
     doc.text(reservation.tastingTitle, 105, 60, { align: "center" });
 
     doc.setFontSize(11);
-    doc.setTextColor(27, 28, 28);
+    doc.setTextColor(26, 26, 26);
     doc.text(`Titular: ${reservation.customerName}`, 30, 80);
     doc.text(`Fecha: ${reservation.tastingDate}`, 30, 92);
     doc.text(`Horario: ${reservation.tastingTime}`, 30, 104);
@@ -94,7 +93,7 @@ export default function ConfirmationPage() {
     doc.text(`Código: ${reservation.code}`, 30, 128);
 
     doc.setFontSize(9);
-    doc.setTextColor(95, 94, 91);
+    doc.setTextColor(107, 105, 102);
     doc.text("Presente este ticket o código QR en el ingreso a la bodega.", 105, 170, { align: "center" });
     doc.text(`Token de Verificación: ${reservation.token}`, 105, 178, { align: "center" });
 
@@ -115,9 +114,9 @@ export default function ConfirmationPage() {
   if (loading || !reservation) {
     return (
       <div className="bg-surface min-h-screen flex items-center justify-center p-4">
-        <div className="text-center text-secondary">
-          <span className="material-symbols-outlined animate-spin text-3xl mb-2">progress_activity</span>
-          <p className="text-xs uppercase tracking-widest">Cargando confirmación...</p>
+        <div className="text-center text-on-surface-variant/60 text-xs">
+          <span className="material-symbols-outlined animate-spin text-2xl mb-2">progress_activity</span>
+          <p className="font-semibold uppercase tracking-widest">Cargando confirmación...</p>
         </div>
       </div>
     );
@@ -128,125 +127,118 @@ export default function ConfirmationPage() {
     : `https://elorigen.com/verificar/${reservation.token || reservation.id}`;
 
   return (
-    <div className="bg-surface text-on-background min-h-screen flex flex-col justify-center items-center p-4 sm:p-6 py-12">
+    <div className="bg-background text-on-background min-h-screen flex flex-col justify-center items-center p-5 sm:p-8 py-16 selection:bg-primary/10 selection:text-primary">
       <main className="w-full max-w-lg mx-auto animate-fade-in-up">
-        {/* Header/Logo Area */}
+        {/* Header */}
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center mb-3">
-            <span
-              className="material-symbols-outlined text-primary text-5xl"
-              style={{ fontVariationSettings: "'FILL' 1" }}
-            >
+          <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-primary/10 text-primary mb-3">
+            <span className="material-symbols-outlined text-2xl" style={{ fontVariationSettings: "'FILL' 1" }}>
               wine_bar
             </span>
           </div>
-          <h1 className="font-serif text-3xl sm:text-4xl font-bold text-primary tracking-tight">
+          <h1 className="font-serif text-3xl sm:text-4xl font-semibold text-primary tracking-tight">
             ¡Reserva Confirmada!
           </h1>
-          <p className="text-sm text-secondary mt-1">
+          <p className="text-[13px] text-on-surface-variant/70 mt-1">
             Tu lugar en la experiencia está asegurado.
           </p>
         </div>
 
-        {/* Ticket Card (Stitch Exact Reproduction) */}
-        <div className="bg-surface-container-lowest border border-surface-variant rounded-2xl shadow-md p-6 sm:p-8 relative overflow-hidden">
-          {/* Decorative Mountain Watermark */}
-          <div className="absolute -bottom-10 left-0 w-full opacity-5 pointer-events-none">
-            <svg className="w-full h-32 fill-primary" preserveAspectRatio="none" viewBox="0 0 100 20">
-              <path d="M0,20 L15,10 L30,15 L50,0 L70,12 L85,8 L100,20 Z" />
-            </svg>
-          </div>
-
-          <div className="text-center border-b border-surface-variant pb-5 mb-6">
-            <p className="text-[11px] font-bold uppercase tracking-widest text-secondary mb-1">
-              Experiencia
-            </p>
-            <h2 className="font-serif text-xl sm:text-2xl font-bold text-on-background">
-              {reservation.tastingTitle}
-            </h2>
-          </div>
-
-          {/* Details Grid */}
-          <div className="grid grid-cols-2 gap-y-5 gap-x-4 mb-6">
-            <div>
-              <p className="text-[10px] font-bold uppercase tracking-widest text-secondary flex items-center gap-1">
-                <span className="material-symbols-outlined text-xs text-primary">calendar_month</span> Fecha
-              </p>
-              <p className="text-xs sm:text-sm font-semibold text-on-background mt-1">
-                {reservation.tastingDate}
-              </p>
+        {/* Double-Bezel Ticket Card */}
+        <div className="p-2 sm:p-2.5 rounded-[2.5rem] bg-black/[0.02] border border-black/[0.05]">
+          <div className="bg-white rounded-[calc(2.5rem-0.625rem)] p-7 sm:p-9 shadow-[0_8px_32px_rgba(122,32,72,0.04)] relative overflow-hidden">
+            <div className="text-center border-b border-black/[0.05] pb-5 mb-6">
+              <span className="text-[10px] font-semibold uppercase tracking-widest text-on-surface-variant/60 block mb-1">
+                Experiencia Seleccionada
+              </span>
+              <h2 className="font-serif text-xl sm:text-2xl font-semibold text-on-surface">
+                {reservation.tastingTitle}
+              </h2>
             </div>
 
-            <div>
-              <p className="text-[10px] font-bold uppercase tracking-widest text-secondary flex items-center gap-1">
-                <span className="material-symbols-outlined text-xs text-primary">schedule</span> Hora
-              </p>
-              <p className="text-xs sm:text-sm font-semibold text-on-background mt-1">
-                {reservation.tastingTime}
-              </p>
+            {/* Details Grid */}
+            <div className="grid grid-cols-2 gap-y-5 gap-x-4 mb-6 text-[13px]">
+              <div>
+                <span className="text-[10px] font-semibold uppercase tracking-widest text-on-surface-variant/60 block">
+                  Fecha
+                </span>
+                <p className="font-semibold text-on-surface mt-0.5">
+                  {reservation.tastingDate}
+                </p>
+              </div>
+
+              <div>
+                <span className="text-[10px] font-semibold uppercase tracking-widest text-on-surface-variant/60 block">
+                  Hora
+                </span>
+                <p className="font-semibold text-on-surface mt-0.5">
+                  {reservation.tastingTime}
+                </p>
+              </div>
+
+              <div>
+                <span className="text-[10px] font-semibold uppercase tracking-widest text-on-surface-variant/60 block">
+                  Asistentes
+                </span>
+                <p className="font-semibold text-on-surface mt-0.5">
+                  {reservation.spotsCount} pers. ({reservation.customerName})
+                </p>
+              </div>
+
+              <div>
+                <span className="text-[10px] font-semibold uppercase tracking-widest text-on-surface-variant/60 block">
+                  Código de Ticket
+                </span>
+                <p className="font-semibold text-primary font-mono mt-0.5">
+                  {reservation.code}
+                </p>
+              </div>
             </div>
 
-            <div>
-              <p className="text-[10px] font-bold uppercase tracking-widest text-secondary flex items-center gap-1">
-                <span className="material-symbols-outlined text-xs text-primary">group</span> Asistentes
-              </p>
-              <p className="text-xs sm:text-sm font-semibold text-on-background mt-1">
-                {reservation.spotsCount} {reservation.spotsCount === 1 ? "Persona" : "Personas"} ({reservation.customerName})
-              </p>
-            </div>
+            {/* QR Code Section */}
+            <QRCodeDisplay
+              value={verificationUrl}
+              codeLabel={reservation.code}
+              showDownloadButton={false}
+            />
 
-            <div>
-              <p className="text-[10px] font-bold uppercase tracking-widest text-secondary flex items-center gap-1">
-                <span className="material-symbols-outlined text-xs text-primary">confirmation_number</span> Código
-              </p>
-              <p className="text-xs sm:text-sm font-bold text-primary font-mono mt-1">
-                {reservation.code}
-              </p>
-            </div>
-          </div>
-
-          {/* QR Code Section */}
-          <QRCodeDisplay
-            value={verificationUrl}
-            codeLabel={reservation.code}
-            showDownloadButton={false}
-          />
-
-          {/* Interactive Tools Buttons */}
-          <div className="mt-6 pt-6 border-t border-surface-variant space-y-3">
-            <Link
-              href={`/cata-en-vivo/${reservation.token || reservation.id}`}
-              className="w-full bg-[#5C0531] text-white text-xs font-bold uppercase tracking-wider py-3.5 px-4 rounded-xl hover:bg-primary transition-all shadow-sm flex items-center justify-center gap-2 active:scale-95 text-center"
-            >
-              <span className="material-symbols-outlined text-[18px]">psychology_alt</span>
-              Abrir Ficha de Cata Sensorial en Vivo
-            </Link>
-
-            <div className="grid grid-cols-2 gap-2">
-              <button
-                onClick={handleDownloadTicketPDF}
-                className="bg-surface border border-outline-variant hover:border-primary text-on-surface text-[11px] font-bold uppercase py-2.5 px-2 rounded-xl transition-all flex items-center justify-center gap-1"
+            {/* Actions */}
+            <div className="mt-6 pt-6 border-t border-black/[0.05] space-y-3">
+              <Link
+                href={`/cata-en-vivo/${reservation.token || reservation.id}`}
+                className="group w-full flex items-center justify-between pl-5 pr-2 py-2 bg-primary-container hover:bg-primary text-white text-[12px] font-semibold rounded-full transition-all duration-300 shadow-sm"
               >
-                <span className="material-symbols-outlined text-sm">download</span>
-                Descargar Ticket PDF
-              </button>
+                <span>Abrir Ficha de Cata en Vivo</span>
+                <span className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center transition-transform group-hover:translate-x-0.5">
+                  <span className="material-symbols-outlined text-[16px]">psychology_alt</span>
+                </span>
+              </Link>
 
-              <button
-                onClick={handleAddToCalendar}
-                className="bg-surface border border-outline-variant hover:border-primary text-on-surface text-[11px] font-bold uppercase py-2.5 px-2 rounded-xl transition-all flex items-center justify-center gap-1"
-              >
-                <span className="material-symbols-outlined text-sm">event</span>
-                Añadir al Calendario
-              </button>
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  onClick={handleDownloadTicketPDF}
+                  className="bg-surface-container-low hover:bg-black/[0.04] text-on-surface text-[11px] font-semibold py-2.5 px-3 rounded-full transition-colors flex items-center justify-center gap-1.5"
+                >
+                  <span className="material-symbols-outlined text-[15px]">download</span>
+                  Ticket PDF
+                </button>
+
+                <button
+                  onClick={handleAddToCalendar}
+                  className="bg-surface-container-low hover:bg-black/[0.04] text-on-surface text-[11px] font-semibold py-2.5 px-3 rounded-full transition-colors flex items-center justify-center gap-1.5"
+                >
+                  <span className="material-symbols-outlined text-[15px]">event</span>
+                  Calendario
+                </button>
+              </div>
             </div>
           </div>
         </div>
 
-        {/* Action Links */}
-        <div className="mt-6 flex flex-col sm:flex-row gap-3 justify-center text-center">
+        <div className="mt-8 text-center">
           <Link
             href="/"
-            className="text-xs font-bold uppercase tracking-widest text-secondary hover:text-primary transition-colors py-2"
+            className="text-[12px] font-semibold uppercase tracking-wider text-on-surface-variant/70 hover:text-primary transition-colors"
           >
             ← Volver al inicio
           </Link>

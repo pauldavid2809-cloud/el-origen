@@ -10,84 +10,90 @@ export function TastingCard({ tasting }: TastingCardProps) {
   const isSoldOut = tasting.availableSpots <= 0 || tasting.status === "sold_out";
 
   return (
-    <article className="group bg-white rounded-2xl overflow-hidden hover-lift soft-shadow hover:soft-shadow-hover flex flex-col">
-      {/* Image */}
-      <div className="relative w-full aspect-[4/3] overflow-hidden">
-        <div
-          className="absolute inset-0 bg-cover bg-center transition-transform duration-700 ease-out-expo group-hover:scale-[1.04]"
-          style={{ backgroundImage: `url('${tasting.imageUrl}')` }}
-        />
-        <div className="absolute inset-0 bg-[#1a1a1a]/10" />
+    /* Outer Shell (Double-Bezel Architecture) */
+    <div className="p-1.5 sm:p-2 rounded-[2rem] bg-black/[0.02] border border-black/[0.05] hover:border-primary/25 transition-all duration-500 ease-[cubic-bezier(0.16,1,0.3,1)] hover-lift">
+      {/* Inner Core */}
+      <article className="group bg-white rounded-[calc(2rem-0.5rem)] overflow-hidden shadow-[inset_0_1px_1px_rgba(255,255,255,0.8)] flex flex-col h-full">
+        {/* Top Image Container */}
+        <div className="relative w-full aspect-[16/10] overflow-hidden bg-surface-container">
+          <div
+            className="absolute inset-0 bg-cover bg-center transition-transform duration-700 ease-[cubic-bezier(0.16,1,0.3,1)] group-hover:scale-[1.04]"
+            style={{ backgroundImage: `url('${tasting.imageUrl}')` }}
+          />
+          <div className="absolute inset-0 bg-black/10" />
 
-        {/* Floating date pill */}
-        <div className="absolute top-4 right-4">
-          <span className="text-[11px] font-semibold text-white bg-primary-container/90 backdrop-blur-sm px-3 py-1.5 rounded-full">
-            {tasting.dateDisplay}
-          </span>
-        </div>
-
-        {/* Category eyebrow */}
-        <div className="absolute bottom-4 left-4">
-          <span className="text-[10px] font-semibold text-white/90 tracking-wider uppercase">
-            {tasting.category === "reserva"
-              ? "Reserva de Cava"
-              : tasting.category === "atardecer"
-              ? "Sunset Experience"
-              : "Degustación"}
-          </span>
-        </div>
-      </div>
-
-      {/* Content */}
-      <div className="p-5 sm:p-6 flex flex-col flex-grow">
-        <h3 className="font-serif text-xl font-semibold text-on-surface tracking-tight mb-2 group-hover:text-primary transition-colors duration-300">
-          {tasting.title}
-        </h3>
-
-        <p className="text-[13px] text-on-surface-variant/80 leading-relaxed mb-5 flex-grow line-clamp-2">
-          {tasting.description}
-        </p>
-
-        {/* Meta row */}
-        <div className="flex items-center justify-between text-[12px] text-on-surface-variant/70 mb-4 pb-4 border-b border-outline-variant/30">
-          <span className="flex items-center gap-1.5">
-            <span className="material-symbols-outlined text-[15px]">schedule</span>
-            {tasting.timeStart} – {tasting.timeEnd}
-          </span>
-          <span className="font-serif text-lg font-semibold text-primary">
-            {tasting.priceFormatted}
-          </span>
-        </div>
-
-        {/* Spots */}
-        <div className="flex items-center justify-between mb-4">
-          {isSoldOut ? (
-            <span className="text-[11px] font-semibold text-error/80">Sin disponibilidad</span>
-          ) : (
-            <span className="text-[11px] font-medium text-on-surface-variant/60 flex items-center gap-1.5">
-              <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse-soft" />
-              {tasting.availableSpots} cupos restantes
+          {/* Eyebrow Category */}
+          <div className="absolute top-4 left-4">
+            <span className="text-[10px] font-semibold text-white bg-black/40 backdrop-blur-md px-3 py-1 rounded-full uppercase tracking-wider">
+              {tasting.category === "reserva"
+                ? "Reserva de Cava"
+                : tasting.category === "atardecer"
+                ? "Sunset Experience"
+                : "Degustación"}
             </span>
-          )}
+          </div>
+
+          {/* Date pill */}
+          <div className="absolute top-4 right-4">
+            <span className="text-[11px] font-semibold text-white bg-primary-container/90 backdrop-blur-md px-3 py-1 rounded-full shadow-sm">
+              {tasting.dateDisplay}
+            </span>
+          </div>
         </div>
 
-        {/* CTA */}
-        <Link
-          href={`/catas/${tasting.slug || tasting.id}`}
-          className={`w-full flex items-center justify-center gap-2 text-[12px] font-semibold py-3 rounded-xl transition-all duration-300 ease-out-expo ${
-            isSoldOut
-              ? "bg-surface-container text-on-surface-variant/50 cursor-not-allowed"
-              : "bg-primary-container text-white hover:bg-primary active:scale-[0.98]"
-          }`}
-        >
-          {isSoldOut ? "Sin cupos" : "Reservar experiencia"}
-          {!isSoldOut && (
-            <span className="material-symbols-outlined text-[15px] transition-transform duration-300 group-hover:translate-x-0.5">
-              arrow_forward
+        {/* Content Section */}
+        <div className="p-6 sm:p-7 flex flex-col flex-grow">
+          <div className="mb-2">
+            <h3 className="font-serif text-xl sm:text-2xl font-semibold text-on-surface tracking-tight group-hover:text-primary transition-colors duration-300">
+              {tasting.title}
+            </h3>
+          </div>
+
+          <p className="text-[13px] text-on-surface-variant/80 leading-relaxed mb-6 flex-grow line-clamp-2">
+            {tasting.description}
+          </p>
+
+          {/* Metadata Row */}
+          <div className="flex items-center justify-between text-[12px] text-on-surface-variant/70 mb-4 pb-4 border-b border-black/[0.05]">
+            <span className="flex items-center gap-1.5 font-medium">
+              <span className="material-symbols-outlined text-[16px] text-primary">schedule</span>
+              {tasting.timeStart} – {tasting.timeEnd}
             </span>
-          )}
-        </Link>
-      </div>
-    </article>
+            <span className="font-serif text-xl font-semibold text-primary">
+              {tasting.priceFormatted}
+            </span>
+          </div>
+
+          {/* Spots Remaining Indicator */}
+          <div className="flex items-center justify-between mb-5">
+            {isSoldOut ? (
+              <span className="text-[11px] font-semibold text-error/80">Sin disponibilidad</span>
+            ) : (
+              <span className="text-[11px] font-medium text-on-surface-variant/70 flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-emerald-600 animate-pulse-soft" />
+                {tasting.availableSpots} cupos disponibles
+              </span>
+            )}
+          </div>
+
+          {/* Button-in-Button Nested CTA */}
+          <Link
+            href={`/catas/${tasting.slug || tasting.id}`}
+            className={`w-full flex items-center justify-between pl-5 pr-2 py-2 rounded-full text-[12px] font-semibold transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] ${
+              isSoldOut
+                ? "bg-surface-container text-on-surface-variant/40 cursor-not-allowed"
+                : "bg-primary-container text-white hover:bg-primary active:scale-[0.98] shadow-sm"
+            }`}
+          >
+            <span>{isSoldOut ? "Agotado" : "Reservar Experiencia"}</span>
+            {!isSoldOut && (
+              <span className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center transition-transform duration-300 group-hover:translate-x-0.5 group-hover:-translate-y-[0.5px]">
+                <span className="material-symbols-outlined text-[16px]">arrow_forward</span>
+              </span>
+            )}
+          </Link>
+        </div>
+      </article>
+    </div>
   );
 }
