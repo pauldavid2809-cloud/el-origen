@@ -18,6 +18,7 @@ export const translations = {
       ctaSecondary: "Ver próximas catas",
     },
     tastings: {
+      badge: "Agenda & Disponibilidad",
       title: "Próximas Catas",
       subtitle: "Descubra nuestras exclusivas experiencias de degustación guiadas por sommeliers expertos en un entorno inigualable.",
       spotsLeft: "cupos restantes",
@@ -118,6 +119,7 @@ export const translations = {
       ctaSecondary: "Explore upcoming dates",
     },
     tastings: {
+      badge: "Upcoming Experiences",
       title: "Upcoming Tastings",
       subtitle: "Discover our exclusive wine tasting experiences guided by expert sommeliers in an unparalleled mountain setting.",
       spotsLeft: "spots remaining",
