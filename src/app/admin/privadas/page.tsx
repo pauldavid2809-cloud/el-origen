@@ -26,9 +26,9 @@ export default function AdminPrivadasPage() {
       },
       {
         id: "inq-2",
-        companyOrName: "Tech Summit Mendoza",
+        companyOrName: "Tech Summit Caracas",
         contactEmail: "speakers@techsummit.io",
-        contactPhone: "+54 9 261 778-9900",
+        contactPhone: "+58 414 778-9900",
         estimatedGuests: 35,
         preferredDate: "2026-12-05",
         eventType: "vip",

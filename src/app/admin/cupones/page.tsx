@@ -72,7 +72,7 @@ export default function AdminCuponesPage() {
               required
               value={code}
               onChange={(e) => setCode(e.target.value)}
-              placeholder="Ej: MENDOZA25"
+              placeholder="Ej: CARACAS2026"
               className="w-full bg-surface-container-low border border-surface-variant rounded-xl p-3 uppercase font-mono font-bold text-primary focus:border-primary focus:outline-none"
             />
           </div>

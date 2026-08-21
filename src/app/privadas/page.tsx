@@ -152,7 +152,7 @@ export default function PrivateEventsPage() {
                     required
                     value={contactPhone}
                     onChange={(e) => setContactPhone(e.target.value)}
-                    placeholder="+54 9 11 1234-5678"
+                    placeholder="+58 414 123-4567"
                     className="w-full bg-surface-container-low border border-black/[0.06] rounded-xl p-3 text-on-surface focus:border-primary focus:outline-none transition-colors"
                   />
                 </div>
@@ -197,7 +197,7 @@ export default function PrivateEventsPage() {
                       className="rounded text-primary focus:ring-primary h-4 w-4"
                     />
                     <span className="text-[12px] font-medium text-on-surface">
-                      Traslado privado en Van ejecutiva
+                      Servicio de traslado privado en Caracas
                     </span>
                   </label>
 
@@ -206,9 +206,9 @@ export default function PrivateEventsPage() {
                     onChange={(e) => setPairingPreference(e.target.value as any)}
                     className="w-full bg-surface-container-low border border-black/[0.06] rounded-2xl p-3.5 text-[12px] font-medium focus:border-primary focus:outline-none transition-colors"
                   >
-                    <option value="standard">Maridaje Tradicional de Quesos & Fiambres</option>
-                    <option value="premium">Menú Degustación 4 Pasos con Chef</option>
-                    <option value="asado_cordillerano">Asado Criollo de Montaña & Brasas</option>
+                    <option value="standard">Maridaje de Quesos Sowi & Charcutería</option>
+                    <option value="premium">Menú Degustación con Maratea Trattoria</option>
+                    <option value="asado_cordillerano">Experiencia de Alta Cocina & Vinos Gran Reserva</option>
                   </select>
                 </div>
               </div>

@@ -1,48 +1,48 @@
 import React from "react";
 
 export function JsonLd() {
-  const winerySchema = {
+  const eventOrganizerSchema = {
     "@context": "https://schema.org",
-    "@type": ["Winery", "TouristAttraction"],
-    "name": "Bodega El Origen",
-    "alternateName": "El Origen Wine Experience",
+    "@type": ["EventVenue", "FoodEstablishment"],
+    "name": "El Origen | Experiencias de Cata & Vinos de Colección",
+    "alternateName": "El Origen Caracas",
     "url": "https://el-origen-two.vercel.app",
     "logo": "https://el-origen-two.vercel.app/images/logo-color.png",
     "image": [
-      "https://images.unsplash.com/photo-1506377247377-2a5b3b417ebb?q=80&w=1200&auto=format&fit=crop",
-      "https://images.unsplash.com/photo-1510812431401-41d2bd2722f3?q=80&w=1200&auto=format&fit=crop"
+      "https://images.unsplash.com/photo-1510812431401-41d2bd2722f3?q=80&w=1200&auto=format&fit=crop",
+      "https://images.unsplash.com/photo-1506377247377-2a5b3b417ebb?q=80&w=1200&auto=format&fit=crop"
     ],
-    "description": "Experiencias boutique de cata de vino guiadas por sommeliers en Mendoza a 1.400 msnm. Reserva de cupos online y maridaje de autor.",
-    "telephone": "+54-9-261-455-8822",
-    "email": "experiencias@elorigen.com",
-    "priceRange": "$$$$",
-    "currenciesAccepted": "ARS, USD",
-    "paymentAccepted": "Credit Card, Stripe, Apple Pay, Bank Transfer",
-    "servesCuisine": "Wine Tasting, Gourmet Pairing",
+    "description": "Experiencias boutique de cata de vino y degustaciones guiadas por sommeliers en Caracas, Venezuela. Venta de cupos online, maridaje de autor y eventos privados.",
+    "telephone": "+58-414-1074007",
+    "email": "contacto@elorigen.com",
+    "priceRange": "$$$",
+    "currenciesAccepted": "USD, VES",
+    "paymentAccepted": "Zelle, Pago Móvil, Stripe, Apple Pay, Credit Card",
+    "servesCuisine": "Wine Tasting, Gourmet Pairings, Charcuterie & Cheese",
     "address": {
       "@type": "PostalAddress",
-      "streetAddress": "Ruta del Vino s/n",
-      "addressLocality": "Mendoza",
-      "addressRegion": "Mendoza",
-      "postalCode": "M5561",
-      "addressCountry": "AR"
+      "streetAddress": "Caracas",
+      "addressLocality": "Caracas",
+      "addressRegion": "Distrito Capital",
+      "postalCode": "1060",
+      "addressCountry": "VE"
     },
     "geo": {
       "@type": "GeoCoordinates",
-      "latitude": -33.5684,
-      "longitude": -69.0423
+      "latitude": 10.4806,
+      "longitude": -66.9036
     },
     "openingHoursSpecification": [
       {
         "@type": "OpeningHoursSpecification",
-        "dayOfWeek": ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"],
-        "opens": "10:00",
-        "closes": "21:00"
+        "dayOfWeek": ["Thursday", "Friday", "Saturday", "Sunday"],
+        "opens": "18:00",
+        "closes": "23:00"
       }
     ],
     "sameAs": [
-      "https://instagram.com/bodegaelorigen",
-      "https://wa.me/5492614558822"
+      "https://instagram.com/elorigen_wine",
+      "https://wa.me/584141074007"
     ]
   };
 
@@ -52,26 +52,26 @@ export function JsonLd() {
     "mainEntity": [
       {
         "@type": "Question",
-        "name": "¿Cuál es el código de vestimenta y la temperatura de la cava en Bodega El Origen?",
+        "name": "¿Cuál es el formato y duración de las catas en El Origen Caracas?",
         "acceptedAnswer": {
           "@type": "Answer",
-          "text": "Recomendamos calzado cómodo para el recorrido por viñedos y un abrigo liviano para la cava subterránea de barricas, que se mantiene a una temperatura constante de 14°C durante todo el año."
+          "text": "Nuestras experiencias de cata tienen una duración aproximada de 2 horas y media. Incluyen una selección curada de 4 a 5 etiquetas de vinos de colección, maridaje de autor paso a paso y la guía en vivo de un sommelier certificado."
         }
       },
       {
         "@type": "Question",
-        "name": "¿Cómo funciona la llegada y las opciones de traslado a la bodega?",
+        "name": "¿Cuáles son los métodos de pago aceptados?",
         "acceptedAnswer": {
           "@type": "Answer",
-          "text": "La finca cuenta con estacionamiento privado y seguridad 24 hs. Si prefiere disfrutar de la degustación sin preocuparse por conducir, puede añadir el servicio de traslado privado ejecutivo en el checkout."
+          "text": "Aceptamos pagos en USD mediante Zelle y Tarjetas Internacionales (Stripe / Apple Pay), así como transferencias y Pago Móvil en Bolívares a la tasa oficial del BCV del día."
         }
       },
       {
         "@type": "Question",
-        "name": "¿Se adaptan los maridajes de las catas a restricciones dietéticas o celiaquía?",
+        "name": "¿Se adaptan los maridajes a restricciones dietéticas o celiaquía?",
         "acceptedAnswer": {
           "@type": "Answer",
-          "text": "Sí, disponemos de opciones 100% Sin TACC / Celíacos, vegetarianas y veganas. Solo debe indicarlo en el paso 2 del proceso de reserva online."
+          "text": "Sí, disponemos de opciones 100% Sin TACC / Celíacos, vegetarianas y libres de frutos secos. Solo debe indicarlo en el paso 2 del proceso de reserva online."
         }
       },
       {
@@ -89,7 +89,7 @@ export function JsonLd() {
     <>
       <script
         type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(winerySchema) }}
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(eventOrganizerSchema) }}
       />
       <script
         type="application/ld+json"

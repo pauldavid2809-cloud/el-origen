@@ -2,9 +2,9 @@ import { MetadataRoute } from "next";
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: "El Origen | Boutique Wine Tasting Experience",
+    name: "El Origen | Experiencias de Cata en Caracas",
     short_name: "El Origen",
-    description: "Experiencias boutique de cata de vino en Mendoza, Argentina. Reserva de cupos online y maridajes de altura.",
+    description: "Experiencias boutique de cata de vinos de colección y maridaje de autor en Caracas, Venezuela.",
     start_url: "/",
     display: "standalone",
     background_color: "#FAF8F7",

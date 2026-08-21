@@ -46,29 +46,29 @@ export default function TastingDetailPage() {
 
         const defaultAddOns: AddOn[] = [
           {
-            id: "gran-reserva-bottle",
-            title: "Botella Malbec Gran Reserva 2020",
-            description: "Botella numerada de colección firmada por el enólogo jefe para llevar a casa.",
-            price: 28000,
-            priceFormatted: "$28.000",
+            id: "coleccion-bottle",
+            title: "Botella de Colección para Llevar",
+            description: "Botella seleccionada por el sommelier para disfrutar en casa.",
+            price: 35,
+            priceFormatted: "$35 USD",
             icon: "wine_bar",
             category: "bottle",
           },
           {
-            id: "private-transfer",
-            title: "Traslado Privado Ida y Vuelta",
-            description: "Chofer privado desde tu hotel o ciudad hasta la bodega en van ejecutiva.",
-            price: 18000,
-            priceFormatted: "$18.000",
-            icon: "directions_car",
-            category: "transport",
+            id: "copas-cristal-set",
+            title: "Set de 2 Copas de Cristal El Origen",
+            description: "Copas de cata profesional en estuche conmemorativo.",
+            price: 25,
+            priceFormatted: "$25 USD",
+            icon: "award_star",
+            category: "experience",
           },
           {
             id: "pairing-premium",
-            title: "Maridaje de Quesos Madurados & Embutidos",
-            description: "Tabla de autor con quesos de cabra curados, jamón serrano y panes de masa madre.",
-            price: 12000,
-            priceFormatted: "$12.000",
+            title: "Maridaje Extra de Quesos Sowi",
+            description: "Tabla de autor con quesos madurados Sowi, jamón serrano y panes artesanales.",
+            price: 20,
+            priceFormatted: "$20 USD",
             icon: "restaurant",
             category: "pairing",
           },
@@ -262,7 +262,7 @@ export default function TastingDetailPage() {
                 <span className="text-[11px] font-semibold text-on-surface-variant/60 uppercase tracking-wider block">Ubicación</span>
                 <span className="font-semibold text-on-surface flex items-center gap-1.5 truncate">
                   <span className="material-symbols-outlined text-primary text-[17px]">location_on</span>
-                  Mendoza, Argentina
+                  Caracas, Venezuela
                 </span>
               </div>
             </div>
@@ -500,7 +500,7 @@ export default function TastingDetailPage() {
                         required
                         value={customerPhone}
                         onChange={(e) => setCustomerPhone(e.target.value)}
-                        placeholder="+54 9 261 123-4567"
+                        placeholder="+58 414 123-4567"
                         className="w-full bg-surface-container-low border border-black/[0.06] rounded-xl p-3 text-[13px] text-on-surface focus:border-primary focus:outline-none transition-colors"
                       />
                     </div>
@@ -513,7 +513,7 @@ export default function TastingDetailPage() {
                         type="text"
                         value={dietaryRestrictions}
                         onChange={(e) => setDietaryRestrictions(e.target.value)}
-                        placeholder="Ej: Menú Vegetariano, Celíaco / Sin TACC..."
+                        placeholder="Ej: Menú Vegetariano, Celíaco / Sin TACC, sin frutos secos..."
                         className="w-full bg-surface-container-low border border-black/[0.06] rounded-xl p-3 text-[13px] text-on-surface focus:border-primary focus:outline-none transition-colors"
                       />
                     </div>
@@ -559,7 +559,7 @@ export default function TastingDetailPage() {
                           type="text"
                           value={couponCode}
                           onChange={(e) => setCouponCode(e.target.value)}
-                          placeholder="Ej: ORIGEN10 o VIP2024"
+                          placeholder="Ej: ORIGEN10 o VIP2026"
                           className="flex-grow bg-surface-container-low border border-black/[0.06] rounded-xl px-3 py-2 text-[12px] uppercase font-mono text-on-surface focus:border-primary focus:outline-none"
                         />
                         <button
@@ -598,9 +598,9 @@ export default function TastingDetailPage() {
                         >
                           <span className="flex items-center gap-1.5 font-semibold text-primary">
                             <span className="material-symbols-outlined text-[16px]">credit_card</span>
-                            Tarjeta / Stripe
+                            Tarjeta (Stripe / Apple Pay)
                           </span>
-                          <span className="text-[10px] text-on-surface-variant/60">Apple Pay / Google Pay</span>
+                          <span className="text-[10px] text-on-surface-variant/60">Moneda internacional (USD)</span>
                         </button>
 
                         <button
@@ -614,9 +614,9 @@ export default function TastingDetailPage() {
                         >
                           <span className="flex items-center gap-1.5 font-semibold text-on-surface">
                             <span className="material-symbols-outlined text-[16px]">account_balance</span>
-                            Transferencia
+                            Zelle / Pago Móvil
                           </span>
-                          <span className="text-[10px] text-on-surface-variant/60">Carga de comprobante</span>
+                          <span className="text-[10px] text-on-surface-variant/60">Tasa oficial BCV</span>
                         </button>
                       </div>
                     </div>
@@ -625,25 +625,23 @@ export default function TastingDetailPage() {
                     <div className="bg-surface-container-low p-4 rounded-2xl border border-black/[0.05] space-y-2 text-[12px]">
                       <div className="flex justify-between text-on-surface-variant/70">
                         <span>Catas ({spotsCount} x {tasting.priceFormatted}):</span>
-                        <span>${tastingBaseTotal.toLocaleString("es-CL")}</span>
+                        <span>${tastingBaseTotal} USD</span>
                       </div>
                       {addOnsTotal > 0 && (
                         <div className="flex justify-between text-on-surface-variant/70">
                           <span>Experiencias adicionales:</span>
-                          <span>+${addOnsTotal.toLocaleString("es-CL")}</span>
+                          <span>+${addOnsTotal} USD</span>
                         </div>
                       )}
                       {discountAmount > 0 && (
                         <div className="flex justify-between text-emerald-700 font-semibold">
                           <span>Descuento aplicado:</span>
-                          <span>-${discountAmount.toLocaleString("es-CL")}</span>
+                          <span>-${discountAmount} USD</span>
                         </div>
                       )}
-                      <div className="border-t border-black/[0.06] pt-2 flex justify-between items-center font-semibold">
-                        <span className="text-on-surface">Total:</span>
-                        <span className="font-serif text-2xl text-primary font-semibold">
-                          ${grandTotal.toLocaleString("es-CL")}
-                        </span>
+                      <div className="pt-2 border-t border-black/[0.08] flex justify-between font-bold text-on-surface text-[14px]">
+                        <span>Total Final:</span>
+                        <span className="text-primary font-serif text-lg">${grandTotal} USD</span>
                       </div>
                     </div>
 

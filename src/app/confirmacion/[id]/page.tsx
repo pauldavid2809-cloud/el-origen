@@ -74,7 +74,7 @@ export default function ConfirmationPage() {
     doc.setFont("helvetica", "normal");
     doc.setFontSize(10);
     doc.setTextColor(107, 105, 102);
-    doc.text("Boutique Wine Tasting • Mendoza, Argentina", 105, 38, { align: "center" });
+    doc.text("Experiencia de Catas • Caracas, Venezuela", 105, 38, { align: "center" });
 
     doc.setDrawColor(221, 210, 213);
     doc.setLineWidth(0.5);
@@ -106,7 +106,7 @@ export default function ConfirmationPage() {
     const details = encodeURIComponent(
       `Reserva confirmada (${reservation.spotsCount} personas). Código: ${reservation.code}. Presentar QR al llegar.`
     );
-    const location = encodeURIComponent("Bodega El Origen, Mendoza, Argentina");
+    const location = encodeURIComponent("El Origen, Caracas, Venezuela");
     const googleCalendarUrl = `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${title}&details=${details}&location=${location}`;
     window.open(googleCalendarUrl, "_blank");
   };

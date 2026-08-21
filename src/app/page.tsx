@@ -169,8 +169,8 @@ export default function HomePage() {
             <div className="lg:col-span-6 p-2 rounded-[2.5rem] bg-black/[0.02] border border-black/[0.05]">
               <div className="relative rounded-[calc(2.5rem-0.5rem)] overflow-hidden aspect-[4/3] w-full bg-surface-container">
                 <Image
-                  src="https://images.unsplash.com/photo-1506377247377-2a5b3b417ebb?q=80&w=1200&auto=format&fit=crop"
-                  alt="Viñedos El Origen en Mendoza"
+                  src="https://images.unsplash.com/photo-1510812431401-41d2bd2722f3?q=80&w=1200&auto=format&fit=crop"
+                  alt="Curaduría de vinos El Origen Caracas"
                   fill
                   className="object-cover"
                 />

@@ -1,15 +1,15 @@
 import { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "Catálogo de Experiencias de Cata | Mendoza, Argentina",
+  title: "Catálogo de Experiencias de Cata | Caracas, Venezuela",
   description:
-    "Explore y reserve en línea degustaciones guiadas de Malbec Reserva, Gran Reserva y Sunset Tastings con maridaje de autor en Bodega El Origen.",
+    "Explore y reserve en línea degustaciones guiadas de vinos de colección, copas de alta gama y maridaje de autor en Caracas con El Origen.",
   alternates: {
     canonical: "/catas",
   },
   openGraph: {
-    title: "Catálogo de Experiencias de Cata | Bodega El Origen",
-    description: "Reserve cupos online para catas de vino guiadas por sommeliers en Mendoza, Argentina.",
+    title: "Catálogo de Experiencias de Cata | El Origen Caracas",
+    description: "Reserve cupos online para catas de vino guiadas por sommeliers en Caracas, Venezuela.",
     url: "https://el-origen-two.vercel.app/catas",
   },
 };

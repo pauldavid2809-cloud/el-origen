@@ -65,7 +65,7 @@ export function CertificateGenerator({
     doc.setTextColor(107, 105, 102);
     doc.setFont("helvetica", "normal");
     doc.setFontSize(10);
-    doc.text("BOUTIQUE WINE TASTING EXPERIENCE • MENDOZA", 105, 46, { align: "center" });
+    doc.text("EXPERIENCIA DE CATA & MARIDAJE • CARACAS", 105, 46, { align: "center" });
 
     doc.setTextColor(201, 168, 76);
     doc.setFontSize(14);
@@ -97,7 +97,7 @@ export function CertificateGenerator({
     doc.setTextColor(107, 105, 102);
     doc.setFont("helvetica", "normal");
     doc.setFontSize(11);
-    doc.text(`Celebrada el ${tastingDate} en Bodega El Origen`, 105, 142, { align: "center" });
+    doc.text(`Celebrada el ${tastingDate} en El Origen Caracas`, 105, 142, { align: "center" });
 
     // Scores & Aromas
     doc.setDrawColor(221, 210, 213);
@@ -120,18 +120,18 @@ export function CertificateGenerator({
     doc.setTextColor(26, 26, 26);
     doc.setFont("times", "italic");
     doc.setFontSize(13);
-    doc.text("Jaifred Pastran", 65, 225, { align: "center" });
-    doc.text("Alejandro Morales", 145, 225, { align: "center" });
+    doc.text("Belkis Croquer", 65, 225, { align: "center" });
+    doc.text("Jaifred Pastran", 145, 225, { align: "center" });
 
     doc.setFont("helvetica", "normal");
     doc.setFontSize(9);
     doc.setTextColor(107, 105, 102);
     doc.text("Head Sommelier", 65, 232, { align: "center" });
-    doc.text("Enólogo Principal", 145, 232, { align: "center" });
+    doc.text("Sommelier Anfitrión", 145, 232, { align: "center" });
 
     // Certificate ID & Date
     doc.setFontSize(8);
-    doc.text(`Certificado N° ${certificateCode} • Emitido en Mendoza, Argentina`, 105, 260, { align: "center" });
+    doc.text(`Certificado N° ${certificateCode} • Emitido en Caracas, Venezuela`, 105, 260, { align: "center" });
 
     doc.save(`Certificado-El-Origen-${attendeeName.replace(/\s+/g, "_")}.pdf`);
   };
@@ -174,7 +174,7 @@ export function CertificateGenerator({
               EL ORIGEN
             </h1>
             <p className="text-[10px] uppercase tracking-widest text-white/60 mt-0.5">
-              Mendoza • Argentina
+              Caracas • Venezuela
             </p>
           </div>
 

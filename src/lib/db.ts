@@ -14,161 +14,161 @@ import { generateReservationCode, generateUUID } from "./utils";
 // Initial seed tastings
 const INITIAL_TASTINGS: Tasting[] = [
   {
-    id: "tasting-malbec-reserva",
-    slug: "cata-malbec-reserva",
-    title: "Cata Malbec Reserva",
-    subtitle: "El alma de la cordillera en cuatro copas excepcionales",
-    description: "Un recorrido profundo por nuestras mejores añadas de Malbec cultivadas a 1.400 metros de altitud, maridado con quesos artesanales y charcutería de la región.",
+    id: "tasting-vinos-coleccion",
+    slug: "cata-vinos-coleccion",
+    title: "Cata Vinos de Colección & Maridaje de Autor",
+    subtitle: "Recorrido sensorial por cuatro etiquetas internacionales de alta gama",
+    description: "Una velada íntima guiada por sommelier certificado, degustando añadas de colección de España, Francia e Italia, maridadas con tablas de quesos artesanales Sowi y charcutería selecta.",
     date: "2026-10-24",
     dateDisplay: "24 OCT",
     dateFull: "Sábado, 24 de Octubre de 2026",
-    timeStart: "18:00",
-    timeEnd: "20:30",
-    location: "Cava Principal, Bodega El Origen, Mendoza",
-    price: 45000,
-    priceFormatted: "$45.000",
-    totalSpots: 20,
+    timeStart: "19:00",
+    timeEnd: "21:30",
+    location: "Salón Exclusivo, Caracas, Venezuela",
+    price: 55,
+    priceFormatted: "$55 USD",
+    totalSpots: 18,
     availableSpots: 8,
     imageUrl: "https://images.unsplash.com/photo-1510812431401-41d2bd2722f3?q=80&w=1200&auto=format&fit=crop",
-    imageAlt: "Copa de vino tinto servida en una mesa rústica de madera en cava boutique.",
+    imageAlt: "Copa de vino tinto servida en mesa de degustación con cristalería fina.",
     category: "reserva",
     wines: [
       {
-        name: "El Origen Malbec Single Vineyard",
-        vintage: "2021",
-        type: "Tinto de Altura",
-        description: "Intenso color violeta profundo. Notas de ciruela madura, violetas y un fondo mineral de piedra caliza.",
-        aromaProfile: ["Ciruela", "Violetas", "Grafito", "Pimienta negra"],
-        audioStory: "Nuestras vides de Malbec de 1970 reciben el deshielo directo de los Andes, otorgando una concentración inigualable."
+        name: "Gran Reserva Rioja Alta Crianza",
+        vintage: "2018",
+        type: "Tempranillo - España",
+        description: "Intenso color rubí brillante. Notas de cereza negra, vainilla noble, cuero y fondo especiado.",
+        aromaProfile: ["Cereza", "Vainilla", "Cedro", "Pimienta negra"],
+        audioStory: "Crianza lenta de 24 meses en barricas de roble francés y americano con guarda en botella."
       },
       {
-        name: "El Origen Gran Reserva Malbec",
+        name: "Chianti Classico Gran Selezione",
         vintage: "2019",
-        type: "Crianza 18 meses en Roble Francés",
-        description: "Taninos aterciopelados y gran estructura. Aromas a frutos negros, cacao amargo y tostado elegante.",
-        aromaProfile: ["Cacao", "Vainilla", "Mora", "Tabaco"],
-        audioStory: "Crianza lenta en barricas de primer uso en nuestra cava subterránea de piedra volcánica."
+        type: "Sangiovese - Toscana, Italia",
+        description: "Taninos aterciopelados y gran vivacidad. Aromas a violetas, frutos del bosque y cacao amargo.",
+        aromaProfile: ["Violetas", "Mora", "Cacao", "Tabaco dulce"],
+        audioStory: "Producido en viñedos históricos en colinas toscanas de suelos arcillo-calcáreos."
       },
       {
-        name: "El Origen Terroir Selección de Cava",
-        vintage: "2017",
-        type: "Edición Limitada de Colección",
-        description: "Madurez impecable, notas de trufa, cuero noble y final prolongado de más de 20 segundos.",
-        aromaProfile: ["Cuero", "Trufa", "Higo seco", "Cedro"],
-        audioStory: "Una cosecha histórica en Mendoza con noches frescas que preservaron una acidez vibrante."
+        name: "Cabernet Sauvignon Terroir de Autor",
+        vintage: "2020",
+        type: "Tinto de Guarda - Valle Central",
+        description: "Estructura potente y elegante, notas de cassis, grafito y final prolongado.",
+        aromaProfile: ["Cassis", "Grafito", "Chocolate negro", "Eucalipto"],
+        audioStory: "Una añada memorable seleccionada por su equilibrio perfecto entre fruta y madera."
       }
     ],
     pairings: [
-      "Queso de cabra curado en ceniza",
-      "Jamón crudo de autor madurado 24 meses",
-      "Trufas de chocolate negro 70% al Malbec"
+      "Tabla de quesos madurados artesanales Sowi",
+      "Jamón serrano y embutidos curados de autor",
+      "Trufas de chocolate oscuro 70% maridadas al vino"
     ],
     sommelier: {
-      name: "Jaifred Pastran",
-      role: "Head Sommelier & Admin",
-      bio: "Miembro de la Asociación Internacional de Sommeliers, dedicado a transmitir la mística de los vinos de montaña.",
+      name: "Belkis Croquer",
+      role: "Head Sommelier Invitada",
+      bio: "Sommelier certificada y curadora enológica, creadora de 'De Cata en Cata'.",
       avatarUrl: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?q=80&w=400&auto=format&fit=crop"
     },
     status: "active",
     createdAt: "2026-08-01T12:00:00Z"
   },
   {
-    id: "tasting-atardecer-vinedo",
-    slug: "atardecer-en-el-vinedo",
-    title: "Atardecer en el Viñedo",
-    subtitle: "Golden Hour entre hileras de vid y cordillera",
-    description: "Degustación al aire libre de nuestra línea joven y rosados de prensa directa mientras el sol se esconde tras los picos nevados de la cordillera.",
+    id: "tasting-atardecer-terrazas",
+    slug: "cata-atardecer-terrazas",
+    title: "Cata Atardecer & Terrazas",
+    subtitle: "Golden Hour con Espumosos, Blancos y Rosados de Alta Gama",
+    description: "Degustación al atardecer en terraza selecta de Caracas con copas de espumosos método tradicional, blancos minerales y maridajes frescos de autor.",
     date: "2026-10-28",
     dateDisplay: "28 OCT",
     dateFull: "Miércoles, 28 de Octubre de 2026",
-    timeStart: "17:30",
-    timeEnd: "19:30",
-    location: "Deck Panorámico del Viñedo, El Origen",
-    price: 35000,
-    priceFormatted: "$35.000",
-    totalSpots: 25,
-    availableSpots: 4,
+    timeStart: "18:00",
+    timeEnd: "20:30",
+    location: "Terraza Lounge, Caracas, Venezuela",
+    price: 45,
+    priceFormatted: "$45 USD",
+    totalSpots: 20,
+    availableSpots: 6,
     imageUrl: "https://images.unsplash.com/photo-1506377247377-2a5b3b417ebb?q=80&w=1200&auto=format&fit=crop",
-    imageAlt: "Atardecer dorado sobre hileras de viñedos con montañas de fondo.",
+    imageAlt: "Atardecer dorado y copas de vino en terraza.",
     category: "atardecer",
     wines: [
       {
-        name: "El Origen Rosé de Malbec",
-        vintage: "2023",
-        type: "Rosado Prensado Directo",
-        description: "Fresco, floral y aromático con matices de frambuesa fresca y pomelo rosado.",
-        aromaProfile: ["Frambuesa", "Pomelo", "Rosas silvestres"],
-        audioStory: "Cosechado a mano en las primeras horas de la madrugada para conservar los aromas más sutiles."
+        name: "Cava Reserva Brut Nature",
+        vintage: "2021",
+        type: "Espumoso Método Tradicional",
+        description: "Burbuja fina y persistente, aromas de manzana verde, cítricos y notas sutiles de panadería tostada.",
+        aromaProfile: ["Manzana verde", "Brioche", "Cítricos", "Flor blanca"],
+        audioStory: "Crianza mínima de 18 meses sobre lías que le confiere una textura cremosa."
       },
       {
-        name: "El Origen Blend Joven de Montaña",
-        vintage: "2022",
-        type: "Malbec - Cabernet Franc",
-        description: "Jugoso, ágil y sedoso. Una explosión de frutas rojas frescas.",
-        aromaProfile: ["Cereza", "Grosella", "Hierbas de montaña"],
-        audioStory: "Elaborado con fermentación en piletas de hormigón sin paso por madera."
+        name: "Sauvignon Blanc Selección de Cava",
+        vintage: "2023",
+        type: "Blanco Fresco & Mineral",
+        description: "Aromático, fresco y chispeante. Notas de maracuyá, hierba fresca y pomelo.",
+        aromaProfile: ["Maracuyá", "Pomelo", "Hierba cortada"],
+        audioStory: "Fermentado en frío en acero inoxidable para preservar la frescura frutal."
       }
     ],
     pairings: [
-      "Bruschettas de tomate confitado y albahaca",
-      "Empanadas mendocinas al horno de barro",
-      "Frutas de estación marinadas"
+      "Bruschettas de tomate confitado, albahaca y queso feta Sowi",
+      "Ceviche fresco con reducción de cítricos",
+      "Selección de frutos secos caramelizados"
     ],
     sommelier: {
-      name: "Gonzalo Valenzuela",
-      role: "Sommelier de Terraza",
-      bio: "Especialista en maridajes contemporáneos y experiencias sensoriales al aire libre.",
+      name: "Jaifred Pastran",
+      role: "Sommelier Anfitrión",
+      bio: "Especialista en maridajes contemporáneos y experiencias sensoriales dinámicas.",
       avatarUrl: "https://images.unsplash.com/photo-1560250097-0b93528c311a?q=80&w=400&auto=format&fit=crop"
     },
     status: "active",
     createdAt: "2026-08-05T12:00:00Z"
   },
   {
-    id: "tasting-blancos-altura",
-    slug: "blancos-de-altura",
-    title: "Blancos de Altura & Mineralidad",
-    subtitle: "Acidez vibrante y frescura extrema de los 1.500 metros",
-    description: "Exploración sensorial de cepas blancas (Chardonnay, Torrontés de Altura, Semillón) cultivadas en las laderas más frías de la finca.",
+    id: "tasting-maratea-trattoria",
+    slug: "noche-vinos-trattoria",
+    title: "Noche de Vinos & Maridaje Italiano",
+    subtitle: "Grandes Vinos en alianza con Maratea Trattoria",
+    description: "Una experiencia culinaria exclusiva junto a Maratea Trattoria: cuatro tiempos de pastas artesanales y antipastos maridados copa a copa con vinos italianos y españoles.",
     date: "2026-11-02",
     dateDisplay: "02 NOV",
     dateFull: "Lunes, 02 de Noviembre de 2026",
-    timeStart: "11:00",
-    timeEnd: "13:00",
-    location: "Galería de Cristal & Sala de Barricas Blancas",
-    price: 40000,
-    priceFormatted: "$40.000",
-    totalSpots: 18,
-    availableSpots: 12,
+    timeStart: "19:30",
+    timeEnd: "22:00",
+    location: "Maratea Trattoria, Caracas, Venezuela",
+    price: 65,
+    priceFormatted: "$65 USD",
+    totalSpots: 16,
+    availableSpots: 5,
     imageUrl: "https://images.unsplash.com/photo-1528823872057-9c018a7a7553?q=80&w=1200&auto=format&fit=crop",
-    imageAlt: "Sommelier vertiendo vino blanco en copas de cristal en cava con barricas de roble.",
+    imageAlt: "Sommelier sirviendo vino en copas de cristal en cena gourmet.",
     category: "blancos",
     wines: [
       {
-        name: "El Origen Chardonnay Reserva de Altura",
-        vintage: "2022",
-        type: "Chardonnay con fermentación en barrica",
-        description: "Notas de pera blanca, avellanas tostadas, manteca y una acidez punzante y mineral.",
-        aromaProfile: ["Pera", "Avellana", "Manzana verde", "Brioche"],
-        audioStory: "El suelo calcáreo aporta una mineralidad salina única que recuerda a los grandes vinos de Borgoña."
+        name: "Primitivo di Manduria Riserva",
+        vintage: "2020",
+        type: "Tinto con Cuerpo - Puglia, Italia",
+        description: "Envolvente, cálido y sedoso. Notas de mermelada de higos, ciruela pasa y especias dulces.",
+        aromaProfile: ["Higo", "Ciruela pasa", "Canela", "Café"],
+        audioStory: "Vendimia tardía de viñedos viejos en la costa sur de Italia."
       },
       {
-        name: "El Origen Semillón Viñas Viejas",
-        vintage: "2021",
-        type: "Semillón Tradicional",
-        description: "Cera de abejas, miel suave, cítricos maduros y gran volumen en boca.",
-        aromaProfile: ["Miel", "Lima", "Hierba fresca", "Cera de abeja"],
-        audioStory: "Cepas patrimoniales plantadas en 1955 rescatadas con viticultura biodinámica."
+        name: "Pinot Grigio delle Venezie DOC",
+        vintage: "2022",
+        type: "Blanco Elegante",
+        description: "Fresco, floral y equilibrado con matices de pera madura y flores de acacia.",
+        aromaProfile: ["Pera", "Acacia", "Almendra fresca"],
+        audioStory: "Acompañamiento ideal para abrir el apetito con antipastos finos."
       }
     ],
     pairings: [
-      "Tartar de trucha de río andina",
-      "Queso brie con frutos secos caramelizados",
-      "Pan brioche artesanal con manteca de hierbas"
+      "Antipasto italiano con focaccia artesanal y burrata",
+      "Pasta fresca al ragú tradicional de la trattoria",
+      "Cannoli siciliani con ricota dulce"
     ],
     sommelier: {
-      name: "Jaifred Pastran",
-      role: "Head Sommelier & Admin",
-      bio: "Enamorado de la pureza de las cepas blancas de montaña.",
+      name: "Belkis Croquer",
+      role: "Head Sommelier",
+      bio: "Curadora enológica y apasionada de la armonía entre cocina y vino.",
       avatarUrl: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?q=80&w=400&auto=format&fit=crop"
     },
     status: "active",
@@ -178,29 +178,29 @@ const INITIAL_TASTINGS: Tasting[] = [
 
 const INITIAL_ADDONS: AddOn[] = [
   {
-    id: "gran-reserva-bottle",
-    title: "Botella Malbec Gran Reserva 2020",
-    description: "Botella numerada de colección firmada por el enólogo jefe para llevar a casa.",
-    price: 28000,
-    priceFormatted: "$28.000",
+    id: "coleccion-bottle",
+    title: "Botella de Colección para Llevar",
+    description: "Botella seleccionada por el sommelier para disfrutar en casa.",
+    price: 35,
+    priceFormatted: "$35 USD",
     icon: "wine_bar",
     category: "bottle"
   },
   {
-    id: "private-transfer",
-    title: "Traslado Privado Ida y Vuelta",
-    description: "Chofer privado desde tu hotel o centro de la ciudad hasta la bodega en van ejecutiva.",
-    price: 18000,
-    priceFormatted: "$18.000",
-    icon: "directions_car",
-    category: "transport"
+    id: "copas-cristal-set",
+    title: "Set de 2 Copas de Cristal El Origen",
+    description: "Copas de cata profesional en estuche conmemorativo.",
+    price: 25,
+    priceFormatted: "$25 USD",
+    icon: "award_star",
+    category: "experience"
   },
   {
     id: "pairing-premium",
-    title: "Maridaje de Quesos Madurados & Embutidos",
-    description: "Tabla de autor con quesos de cabra curados, jamón serrano y panes de masa madre.",
-    price: 12000,
-    priceFormatted: "$12.000",
+    title: "Maridaje Extra de Quesos Sowi",
+    description: "Tabla de autor con quesos madurados Sowi, jamón serrano y panes artesanales.",
+    price: 20,
+    priceFormatted: "$20 USD",
     icon: "restaurant",
     category: "pairing"
   }

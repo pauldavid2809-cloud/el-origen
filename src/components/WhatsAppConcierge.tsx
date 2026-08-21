@@ -8,7 +8,7 @@ export function WhatsAppConcierge() {
   return (
     <div className="fixed bottom-6 right-6 z-40 animate-fade-in pointer-events-auto">
       <a
-        href="https://wa.me/5492614558822?text=Hola%20El%20Origen,%20quisiera%20consultar%20por%20las%20experiencias%20de%20cata"
+        href="https://wa.me/584141074007?text=Hola%20El%20Origen,%20quisiera%20consultar%20por%20las%20experiencias%20de%20cata%20en%20Caracas"
         target="_blank"
         rel="noopener noreferrer"
         onMouseEnter={() => setHovered(true)}

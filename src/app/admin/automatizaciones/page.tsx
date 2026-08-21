@@ -145,7 +145,7 @@ export default function AdminAutomatizacionesPage() {
                     </div>
                   </div>
                   <p className="text-[11px] text-on-surface-variant leading-tight">
-                    ¡Hola! Te esperamos mañana para tu cata a las 6 PM en Bodega El Origen.
+                    ¡Hola! Te esperamos mañana para tu experiencia de cata a las 7 PM en El Origen Caracas.
                   </p>
                 </div>
 

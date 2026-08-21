@@ -1,15 +1,15 @@
 import { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "Nuestra Historia & Terroir de Altura en Mendoza",
+  title: "Nuestra Propuesta & Curaduría de Vinos | El Origen Caracas",
   description:
-    "Descubra la filosofía de Bodega El Origen: viñedos a 1.400 metros de altura, irrigación por deshielo puro de los Andes y vinificación de mínima intervención.",
+    "Descubra la filosofía de El Origen: curaduría de vinos de colección internacionales, cristalería de alta gama y maridajes gastronómicos de autor en Caracas, Venezuela.",
   alternates: {
     canonical: "/nosotros",
   },
   openGraph: {
-    title: "Nuestra Historia & Terroir de Altura | Bodega El Origen",
-    description: "Viñedos a 1.400 msnm al pie de los Andes. Filosofía enológica y crianza en roble francés.",
+    title: "Nuestra Propuesta & Curaduría de Vinos | El Origen Caracas",
+    description: "Experiencias boutique de cata y maridaje de autor guiadas por sommeliers en Caracas.",
     url: "https://el-origen-two.vercel.app/nosotros",
   },
 };

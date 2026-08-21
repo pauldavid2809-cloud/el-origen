@@ -13,26 +13,26 @@ export const viewport: Viewport = {
 export const metadata: Metadata = {
   metadataBase: new URL("https://el-origen-two.vercel.app"),
   title: {
-    default: "El Origen | Boutique Wine Tasting Experience en Mendoza",
-    template: "%s | Bodega El Origen",
+    default: "El Origen | Experiencias de Cata de Vinos en Caracas, Venezuela",
+    template: "%s | El Origen Caracas",
   },
   description:
-    "Experiencias exclusivas de cata de vino en Mendoza a 1.400 msnm. Reserva de cupos online, degustaciones guiadas por sommeliers, maridaje de autor y tickets QR.",
+    "Experiencias exclusivas de cata de vinos de colección y maridaje de autor en Caracas, Venezuela. Reserva de cupos online, sommelier certificado y eventos privados.",
   keywords: [
-    "vino mendoza",
-    "catas de vino mendoza",
-    "wine tasting mendoza",
-    "bodega boutique mendoza",
-    "malbec reserva degustacion",
-    "enoturismo argentina",
-    "degustacion de vinos mendoza",
-    "visitas a bodegas mendoza",
+    "catas de vino caracas",
+    "degustacion de vinos venezuela",
+    "eventos privados caracas",
+    "maridaje de autor caracas",
+    "wine tasting caracas",
+    "catas privadas caracas",
     "el origen wine experience",
-    "reserva de catas online",
+    "sommelier caracas",
+    "reserva de catas online caracas",
+    "experiencias gastronomicas caracas",
   ],
-  authors: [{ name: "Bodega El Origen", url: "https://el-origen-two.vercel.app" }],
-  creator: "Bodega El Origen",
-  publisher: "Bodega El Origen",
+  authors: [{ name: "El Origen Caracas", url: "https://el-origen-two.vercel.app" }],
+  creator: "El Origen Caracas",
+  publisher: "El Origen Caracas",
   formatDetection: {
     email: true,
     address: true,
@@ -41,33 +41,33 @@ export const metadata: Metadata = {
   alternates: {
     canonical: "/",
     languages: {
-      "es-AR": "/",
+      "es-VE": "/",
       "en-US": "/",
     },
   },
   openGraph: {
-    title: "El Origen | Boutique Wine Tasting Experience en Mendoza",
+    title: "El Origen | Experiencias de Cata de Vinos en Caracas, Venezuela",
     description:
-      "Una experiencia de cata única a 1.400 msnm en el corazón de los Andes. Reserve su cupo online para degustaciones de colección guiadas por sommeliers.",
+      "Una experiencia de cata única en Caracas. Reserve su cupo online para degustaciones de colección guiadas por sommeliers y maridaje de autor.",
     url: "https://el-origen-two.vercel.app",
-    siteName: "Bodega El Origen",
+    siteName: "El Origen",
     images: [
       {
-        url: "https://images.unsplash.com/photo-1506377247377-2a5b3b417ebb?q=80&w=1200&auto=format&fit=crop",
+        url: "https://images.unsplash.com/photo-1510812431401-41d2bd2722f3?q=80&w=1200&auto=format&fit=crop",
         width: 1200,
         height: 630,
-        alt: "Viñedos de altura Bodega El Origen en Mendoza",
+        alt: "Experiencias de cata y maridaje de vinos en Caracas - El Origen",
       },
     ],
-    locale: "es_AR",
+    locale: "es_VE",
     type: "website",
   },
   twitter: {
     card: "summary_large_image",
-    title: "El Origen | Boutique Wine Tasting Experience en Mendoza",
+    title: "El Origen | Experiencias de Cata de Vinos en Caracas",
     description:
-      "Catas guiadas de colección, barricas de roble y maridajes de autor al pie de la cordillera en Mendoza.",
-    images: ["https://images.unsplash.com/photo-1506377247377-2a5b3b417ebb?q=80&w=1200&auto=format&fit=crop"],
+      "Catas guiadas de colección, copas de cristal y maridajes de autor en Caracas, Venezuela.",
+    images: ["https://images.unsplash.com/photo-1510812431401-41d2bd2722f3?q=80&w=1200&auto=format&fit=crop"],
   },
   robots: {
     index: true,
@@ -81,10 +81,10 @@ export const metadata: Metadata = {
     },
   },
   other: {
-    "geo.region": "AR-M",
-    "geo.placename": "Mendoza, Argentina",
-    "geo.position": "-33.5684;-69.0423",
-    "ICBM": "-33.5684, -69.0423",
+    "geo.region": "VE-A",
+    "geo.placename": "Caracas, Venezuela",
+    "geo.position": "10.4806;-66.9036",
+    "ICBM": "10.4806, -66.9036",
   },
 };
 

@@ -55,7 +55,7 @@ export default function NosotrosPage() {
               <div className="relative rounded-[calc(2.5rem-0.5rem)] overflow-hidden aspect-[4/3] w-full bg-surface-container">
                 <Image
                   src="https://images.unsplash.com/photo-1506377247377-2a5b3b417ebb?q=80&w=1200&auto=format&fit=crop"
-                  alt="Viñedos de montaña El Origen"
+                  alt="Curaduría de vinos El Origen Caracas"
                   fill
                   className="object-cover"
                 />
@@ -89,7 +89,7 @@ export default function NosotrosPage() {
               <div className="relative rounded-[calc(2.5rem-0.5rem)] overflow-hidden aspect-[4/3] w-full bg-surface-container">
                 <Image
                   src="https://images.unsplash.com/photo-1510812431401-41d2bd2722f3?q=80&w=1200&auto=format&fit=crop"
-                  alt="Cava y barricas de roble"
+                  alt="Degustación y maridaje de autor en Caracas"
                   fill
                   className="object-cover"
                 />
