@@ -23,6 +23,8 @@ export const metadata: Metadata = {
   },
 };
 
+import { WhatsAppConcierge } from "@/components/WhatsAppConcierge";
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -44,6 +46,7 @@ export default function RootLayout({
       </head>
       <body className="bg-background text-on-background antialiased min-h-screen flex flex-col selection:bg-primary-fixed selection:text-primary">
         {children}
+        <WhatsAppConcierge />
       </body>
     </html>
   );

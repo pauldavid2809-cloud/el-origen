@@ -14,6 +14,7 @@ export default function HomePage() {
   const [lang, setLang] = useState<Language>("es");
   const [tastings, setTastings] = useState<Tasting[]>([]);
   const [loading, setLoading] = useState(true);
+  const [openFaq, setOpenFaq] = useState<number | null>(null);
 
   const t = translations[lang];
 
@@ -33,6 +34,25 @@ export default function HomePage() {
     }
     fetchTastings();
   }, []);
+
+  const faqs = [
+    {
+      q: "¿Cuál es el código de vestimenta y la temperatura de la cava?",
+      a: "Recomendamos calzado cómodo para el recorrido por viñedos y un abrigo liviano para la cava subterránea, que se mantiene a una temperatura constante de 14°C durante todo el año.",
+    },
+    {
+      q: "¿Cómo funciona la llegada y las opciones de traslado?",
+      a: "La finca cuenta con estacionamiento privado y seguridad 24 hs. Si prefiere disfrutar de la degustación sin preocuparse por conducir, puede añadir el servicio de traslado privado ejecutivo en el checkout.",
+    },
+    {
+      q: "¿Se adaptan los maridajes a restricciones dietéticas o celiaquía?",
+      a: "Absolutamente. Disponemos de opciones 100% Sin TACC / Celíacos, vegetarianas y veganas. Solo debe indicarlo en el paso 2 del proceso de reserva online.",
+    },
+    {
+      q: "¿Cuál es la política de reprogramación o cancelación?",
+      a: "Puede reprogramar su cupo sin ningún costo con hasta 48 horas de anticipación a la fecha seleccionada, o transferir su entrada digital QR a otra persona.",
+    },
+  ];
 
   return (
     <div className="bg-background text-on-background min-h-screen flex flex-col selection:bg-primary/10 selection:text-primary">
@@ -218,8 +238,50 @@ export default function HomePage() {
           </div>
         </section>
 
+        {/* ─── FAQ ACCORDION SECTION (Double-Bezel Container) ─── */}
+        <section className="py-20 sm:py-28 px-5 sm:px-8 lg:px-12 max-w-4xl mx-auto w-full">
+          <div className="text-center mb-12">
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-black/[0.03] border border-black/[0.06] mb-3">
+              <span className="text-[10px] font-semibold uppercase tracking-[0.2em] text-primary">
+                Preguntas Frecuentes
+              </span>
+            </div>
+            <h2 className="font-serif text-3xl sm:text-4xl font-semibold text-on-surface tracking-tight">
+              Información para su Visita
+            </h2>
+          </div>
+
+          <div className="p-2 rounded-[2.5rem] bg-black/[0.02] border border-black/[0.05]">
+            <div className="bg-white rounded-[calc(2.5rem-0.5rem)] p-6 sm:p-8 divide-y divide-black/[0.05]">
+              {faqs.map((faq, idx) => (
+                <div key={idx} className="py-4 first:pt-0 last:pb-0">
+                  <button
+                    onClick={() => setOpenFaq(openFaq === idx ? null : idx)}
+                    className="w-full flex items-center justify-between text-left gap-4 font-serif text-lg font-semibold text-on-surface hover:text-primary transition-colors py-1"
+                  >
+                    <span>{faq.q}</span>
+                    <span
+                      className={`material-symbols-outlined text-primary text-[20px] transition-transform duration-300 ${
+                        openFaq === idx ? "rotate-180" : ""
+                      }`}
+                    >
+                      expand_more
+                    </span>
+                  </button>
+
+                  {openFaq === idx && (
+                    <div className="pt-3 text-[13px] text-on-surface-variant/80 leading-relaxed animate-fade-in font-sans">
+                      {faq.a}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+
         {/* ─── CONTACT & PRIVATE TASTINGS BANNER ─── */}
-        <section id="contacto" className="py-20 sm:py-28 px-5 sm:px-8 lg:px-12 max-w-[1320px] mx-auto w-full text-center">
+        <section id="contacto" className="py-16 sm:py-24 px-5 sm:px-8 lg:px-12 max-w-[1320px] mx-auto w-full text-center">
           <div className="max-w-xl mx-auto space-y-4">
             <h2 className="font-serif text-2xl sm:text-3xl font-semibold text-on-surface">
               ¿Desea una experiencia a medida?
