@@ -7,6 +7,7 @@ import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
 import { TerroirDivider } from "@/components/TerroirDivider";
 import { TastingCard } from "@/components/TastingCard";
+import { CommercialShowcase } from "@/components/CommercialShowcase";
 import { PartnersSection } from "@/components/PartnersSection";
 import { Tasting } from "@/types";
 import { translations, Language } from "@/lib/i18n";
@@ -122,6 +123,9 @@ export default function HomePage() {
             </div>
           </div>
         </section>
+
+        {/* ─── BANNER PRINCIPAL COMERCIAL & MARCAS ALIADAS (8:4 GRID) ─── */}
+        <CommercialShowcase currentLang={lang} />
 
         {/* ─── PRÓXIMAS CATAS SECTION (Double-Bezel Cards Grid) ─── */}
         <section id="proximas-catas" className="py-24 sm:py-32 px-5 sm:px-8 lg:px-12 max-w-[1320px] mx-auto w-full">
