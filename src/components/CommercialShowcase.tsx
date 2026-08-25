@@ -147,7 +147,7 @@ export function CommercialShowcase({ currentLang }: CommercialShowcaseProps) {
                 </a>
 
                 <a
-                  href={`https://wa.me/584120000000?text=${whatsappAllianceMsg}`}
+                  href={`https://wa.me/584141074007?text=${whatsappAllianceMsg}`}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="inline-flex items-center justify-center gap-2 text-[12px] sm:text-[12.5px] font-medium text-white bg-white/10 hover:bg-white/20 border border-white/15 px-4 sm:px-5 py-3 rounded-full transition-colors backdrop-blur-sm active:scale-[0.97]"
@@ -206,7 +206,7 @@ export function CommercialShowcase({ currentLang }: CommercialShowcaseProps) {
                 </span>
 
                 <a
-                  href={`https://wa.me/584120000000?text=${whatsappGastroMsg}`}
+                  href={`https://wa.me/584141074007?text=${whatsappGastroMsg}`}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="group inline-flex items-center gap-1.5 text-[12px] sm:text-[12.5px] font-semibold text-primary hover:text-primary-container transition-colors pt-0.5 active:scale-[0.98]"

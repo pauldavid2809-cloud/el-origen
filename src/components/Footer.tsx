@@ -70,7 +70,7 @@ export function Footer({ currentLang = "es" }: FooterProps) {
             <div className="flex gap-2 md:justify-end">
               {[
                 { href: "mailto:experiencias@elorigen.com", icon: "mail", label: "Email" },
-                { href: "https://wa.me/5492614558822", icon: "chat", label: "WhatsApp" },
+                { href: "https://wa.me/584141074007", icon: "chat", label: "WhatsApp" },
                 { href: "https://maps.google.com", icon: "location_on", label: "Maps" },
               ].map((s) => (
                 <a
