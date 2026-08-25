@@ -60,7 +60,7 @@ export default function HomePage() {
         <TerroirDivider className="max-w-[1320px] mx-auto px-5" />
 
         {/* ─── PRÓXIMAS CATAS SECTION (Double-Bezel Cards Grid) ─── */}
-        <section id="proximas-catas" className="py-24 sm:py-32 px-5 sm:px-8 lg:px-12 max-w-[1320px] mx-auto w-full">
+        <section id="proximas-catas" className="py-24 sm:py-32 px-4 sm:px-8 lg:px-12 max-w-[1320px] mx-auto w-full">
           <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6 mb-14">
             <div>
               <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-black/[0.03] border border-black/[0.06] mb-3">
@@ -99,7 +99,7 @@ export default function HomePage() {
         <TerroirDivider className="max-w-[1320px] mx-auto px-5" />
 
         {/* ─── EDITORIAL TERROIR SPLIT ─── */}
-        <section id="terroir" className="py-24 sm:py-36 px-5 sm:px-8 lg:px-12 max-w-[1320px] mx-auto w-full">
+        <section id="terroir" className="py-24 sm:py-36 px-4 sm:px-8 lg:px-12 max-w-[1320px] mx-auto w-full">
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 lg:gap-16 items-center">
             {/* Left Column: Big Image in Double-Bezel Frame */}
             <div className="lg:col-span-6 p-2 rounded-[2.5rem] bg-black/[0.02] border border-black/[0.05]">
@@ -149,7 +149,7 @@ export default function HomePage() {
         </section>
 
         {/* ─── LIVE SENSORY TASTING CALLOUT ─── */}
-        <section className="py-16 sm:py-24 px-5 sm:px-8 lg:px-12 max-w-[1320px] mx-auto w-full">
+        <section className="py-16 sm:py-24 px-4 sm:px-8 lg:px-12 max-w-[1320px] mx-auto w-full">
           <div className="p-2 sm:p-2.5 rounded-[2.5rem] bg-black/[0.03] border border-black/[0.05]">
             <div className="rounded-[calc(2.5rem-0.625rem)] bg-[#5C0531] text-white p-8 sm:p-14 lg:p-16 relative overflow-hidden">
               <div className="max-w-2xl space-y-6 relative z-10">
@@ -187,7 +187,7 @@ export default function HomePage() {
         <TerroirDivider className="max-w-[1320px] mx-auto px-5" />
 
         {/* ─── FAQ ACCORDION SECTION ─── */}
-        <section className="py-20 sm:py-28 px-5 sm:px-8 lg:px-12 max-w-4xl mx-auto w-full">
+        <section className="py-20 sm:py-28 px-4 sm:px-8 lg:px-12 max-w-4xl mx-auto w-full">
           <div className="text-center mb-12">
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-black/[0.03] border border-black/[0.06] mb-3">
               <span className="text-[10px] font-semibold uppercase tracking-[0.2em] text-primary">
@@ -229,7 +229,7 @@ export default function HomePage() {
         </section>
 
         {/* ─── CONTACT & PRIVATE TASTINGS BANNER ─── */}
-        <section id="contacto" className="py-16 sm:py-24 px-5 sm:px-8 lg:px-12 max-w-[1320px] mx-auto w-full text-center">
+        <section id="contacto" className="py-16 sm:py-24 px-4 sm:px-8 lg:px-12 max-w-[1320px] mx-auto w-full text-center">
           <div className="max-w-xl mx-auto space-y-4">
             <h2 className="font-serif text-2xl sm:text-3xl font-semibold text-on-surface">
               {t.custom.title}

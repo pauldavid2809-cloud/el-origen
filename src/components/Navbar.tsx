@@ -131,8 +131,8 @@ export function Navbar({ currentLang = "es", onLanguageChange }: NavbarProps) {
 
       {/* Fullscreen Mobile Glass Overlay */}
       {mobileMenuOpen && (
-        <div className="fixed inset-0 z-40 bg-surface/98 backdrop-blur-3xl flex flex-col justify-center items-center p-6 animate-fade-in md:hidden">
-          <nav className="flex flex-col items-center gap-7 w-full max-w-xs text-center">
+        <div className="fixed inset-0 z-40 bg-surface/98 backdrop-blur-3xl flex flex-col justify-center items-center p-6 animate-fade-in md:hidden overflow-y-auto">
+          <nav className="flex flex-col items-center gap-6 sm:gap-7 w-full max-w-xs text-center my-auto">
             {navLinks.map((link) => (
               <Link
                 key={link.href}
