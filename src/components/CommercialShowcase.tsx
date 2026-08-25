@@ -26,33 +26,44 @@ export function CommercialShowcase({ currentLang }: CommercialShowcaseProps) {
   );
 
   return (
-    <section className="px-5 sm:px-8 lg:px-12 max-w-[1320px] mx-auto w-full pt-2 pb-16 sm:pb-24 animate-fade-in-up">
+    <section className="px-5 sm:px-8 lg:px-12 max-w-[1320px] mx-auto w-full pt-6 sm:pt-8 pb-16 sm:pb-24 animate-fade-in">
       
-      {/* ─── SECTION EYEBROW ─── */}
-      <div className="flex items-center justify-between mb-5">
-        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-black/[0.03] border border-black/[0.06]">
-          <span className="w-1.5 h-1.5 rounded-full bg-[#C9A84C] animate-pulse" />
-          <span className="text-[10px] font-semibold uppercase tracking-[0.2em] text-primary">
+      {/* ─── TOP BRAND & COMMERCIAL HEADER ─── */}
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6 sm:mb-8">
+        <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-black/[0.03] border border-black/[0.06]">
+          <span className="w-2 h-2 rounded-full bg-primary animate-pulse-soft" />
+          <span className="text-[11px] font-semibold uppercase tracking-[0.2em] text-primary">
             {s.eyebrow}
           </span>
         </div>
 
-        <a
-          href="/Dossier-El-Origen-Caracas.pdf"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="hidden sm:inline-flex items-center gap-1.5 text-[12px] font-semibold text-primary hover:text-primary-container transition-colors"
-        >
-          <span className="material-symbols-outlined text-[16px]">picture_as_pdf</span>
-          <span>Dossier Comercial PDF</span>
-        </a>
+        <div className="flex items-center gap-4 text-[12.5px] font-semibold">
+          <a
+            href="/Dossier-El-Origen-Caracas.pdf"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1.5 text-primary hover:text-primary-container transition-colors"
+          >
+            <span className="material-symbols-outlined text-[17px]">picture_as_pdf</span>
+            <span>Dossier Comercial PDF</span>
+          </a>
+
+          <a
+            href="#proximas-catas"
+            className="text-on-surface-variant/70 hover:text-primary transition-colors hidden md:inline-flex items-center gap-1"
+          >
+            <span>Ver Catas al Público</span>
+            <span className="material-symbols-outlined text-[15px]">arrow_downward</span>
+          </a>
+        </div>
       </div>
 
+      {/* ─── 8:4 COMMERCIAL SHOWCASE GRID ─── */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch">
         
-        {/* ─── BANNER PRINCIPAL: PATROCINIO & ALIANZAS (8 COLS) ─── */}
+        {/* ─── BANNER PRINCIPAL (8 COLS EN DESKTOP) ─── */}
         <div className="lg:col-span-8 p-2 sm:p-2.5 rounded-[2.5rem] bg-black/[0.03] border border-black/[0.06] shadow-card flex flex-col">
-          <div className="rounded-[calc(2.5rem-0.625rem)] relative overflow-hidden bg-primary text-white min-h-[480px] sm:min-h-[520px] flex flex-col justify-between p-6 sm:p-10 lg:p-12 flex-1">
+          <div className="rounded-[calc(2.5rem-0.625rem)] relative overflow-hidden bg-primary text-white min-h-[490px] sm:min-h-[530px] flex flex-col justify-between p-6 sm:p-10 lg:p-12 flex-1">
             
             {/* High-End Background Image & Scrim */}
             <Image
@@ -63,7 +74,7 @@ export function CommercialShowcase({ currentLang }: CommercialShowcaseProps) {
               className="object-cover object-center transform scale-105 transition-transform duration-700 hover:scale-100"
             />
             <div className="absolute inset-0 bg-gradient-to-t from-black/95 via-black/65 to-black/35 pointer-events-none" />
-            <div className="absolute inset-0 bg-gradient-to-r from-primary/70 via-transparent to-black/50 pointer-events-none" />
+            <div className="absolute inset-0 bg-gradient-to-r from-primary/75 via-transparent to-black/50 pointer-events-none" />
 
             {/* Top Bar: Badge & City */}
             <div className="relative z-10 flex flex-wrap items-center justify-between gap-3">
@@ -82,11 +93,11 @@ export function CommercialShowcase({ currentLang }: CommercialShowcaseProps) {
 
             {/* Middle: Headline, Narrative & Impact Metrics */}
             <div className="relative z-10 my-6 sm:my-8 space-y-5">
-              <h2 className="font-serif text-2xl sm:text-4xl lg:text-[40px] font-semibold text-white leading-[1.12] tracking-tight text-balance">
+              <h1 className="font-serif text-2xl sm:text-4xl lg:text-[42px] font-semibold text-white leading-[1.12] tracking-tight text-balance">
                 {s.main.title}
-              </h2>
+              </h1>
 
-              <p className="text-[13px] sm:text-[15.5px] text-white/85 max-w-2xl leading-relaxed font-normal text-pretty">
+              <p className="text-[13.5px] sm:text-[16px] text-white/85 max-w-2xl leading-relaxed font-normal text-pretty">
                 {s.main.subtitle}
               </p>
 
@@ -128,7 +139,7 @@ export function CommercialShowcase({ currentLang }: CommercialShowcaseProps) {
                   href="/Dossier-El-Origen-Caracas.pdf"
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="group inline-flex items-center justify-center gap-3 bg-white text-primary hover:bg-[#FAF8F7] text-[13px] font-semibold px-6 py-3.5 rounded-full transition-all duration-300 shadow-md active:scale-[0.98]"
+                  className="group inline-flex items-center justify-center gap-3 bg-white text-primary hover:bg-[#FAF8F7] text-[13px] font-semibold px-6 py-3.5 rounded-full transition-all duration-300 shadow-md active:scale-[0.97]"
                 >
                   <span className="material-symbols-outlined text-[18px] text-primary">download</span>
                   <span>{s.main.ctaPrimary}</span>
@@ -138,7 +149,7 @@ export function CommercialShowcase({ currentLang }: CommercialShowcaseProps) {
                   href={`https://wa.me/584120000000?text=${whatsappAllianceMsg}`}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="inline-flex items-center justify-center gap-2 text-[12.5px] font-medium text-white bg-white/10 hover:bg-white/20 border border-white/15 px-5 py-3 rounded-full transition-colors backdrop-blur-sm"
+                  className="inline-flex items-center justify-center gap-2 text-[12.5px] font-medium text-white bg-white/10 hover:bg-white/20 border border-white/15 px-5 py-3.5 rounded-full transition-colors backdrop-blur-sm active:scale-[0.97]"
                 >
                   <span className="material-symbols-outlined text-[16px] text-[#25D366]">chat</span>
                   <span>{s.main.ctaSecondary}</span>
@@ -149,7 +160,7 @@ export function CommercialShowcase({ currentLang }: CommercialShowcaseProps) {
           </div>
         </div>
 
-        {/* ─── COLUMNA LATERAL: DOS CUADRADOS DE COMERCIALIZACIÓN (4 COLS) ─── */}
+        {/* ─── COLUMNA LATERAL: DOS CUADRADOS (4 COLS EN DESKTOP) ─── */}
         <div className="lg:col-span-4 flex flex-col sm:grid sm:grid-cols-2 lg:flex lg:flex-col gap-6">
           
           {/* Cuadrado 1: Alianza Gastronómica & Producto en Mesa */}
@@ -197,7 +208,7 @@ export function CommercialShowcase({ currentLang }: CommercialShowcaseProps) {
                   href={`https://wa.me/584120000000?text=${whatsappGastroMsg}`}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="group inline-flex items-center gap-1.5 text-[12.5px] font-semibold text-primary hover:text-primary-container transition-colors pt-1"
+                  className="group inline-flex items-center gap-1.5 text-[12.5px] font-semibold text-primary hover:text-primary-container transition-colors pt-1 active:scale-[0.98]"
                 >
                   <span>{s.card1.cta}</span>
                   <span className="material-symbols-outlined text-[15px] transition-transform group-hover:translate-x-1">
@@ -245,7 +256,7 @@ export function CommercialShowcase({ currentLang }: CommercialShowcaseProps) {
 
                 <Link
                   href="/privadas"
-                  className="group inline-flex items-center gap-1.5 text-[12.5px] font-semibold text-white hover:text-[#D4AF37] transition-colors pt-1"
+                  className="group inline-flex items-center gap-1.5 text-[12.5px] font-semibold text-white hover:text-[#D4AF37] transition-colors pt-1 active:scale-[0.98]"
                 >
                   <span>{s.card2.cta}</span>
                   <span className="material-symbols-outlined text-[15px] transition-transform group-hover:translate-x-1">

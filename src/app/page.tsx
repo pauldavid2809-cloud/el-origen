@@ -54,78 +54,10 @@ export default function HomePage() {
       <Navbar currentLang={lang} onLanguageChange={handleLanguageChange} />
 
       <main className="flex-grow">
-        {/* ─── HERO SECTION (Bilingual Dynamic Text) ─── */}
-        <section className="relative pt-16 sm:pt-24 pb-28 sm:pb-36 px-5 sm:px-8 lg:px-12 max-w-[1320px] mx-auto w-full text-center flex flex-col items-center">
-          {/* Eyebrow badge */}
-          <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-black/[0.03] border border-black/[0.06] mb-8 animate-fade-in">
-            <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse-soft" />
-            <span className="text-[10px] font-semibold uppercase tracking-[0.2em] text-primary">
-              {t.hero.eyebrow}
-            </span>
-          </div>
-
-          {/* Massive Display Headline */}
-          <h1 className="font-serif text-4xl sm:text-6xl md:text-7xl lg:text-[76px] font-semibold text-on-surface leading-[1.08] tracking-tight max-w-4xl mx-auto mb-6 text-balance animate-fade-in-up">
-            {t.hero.titleMain}{" "}
-            <span className="italic text-primary font-normal">{t.hero.titleHighlight}</span>
-          </h1>
-
-          {/* Subtitle */}
-          <p className="text-[15px] sm:text-lg text-on-surface-variant/80 max-w-2xl mx-auto leading-relaxed mb-10 text-balance animate-fade-in-up">
-            {t.hero.subtitle}
-          </p>
-
-          {/* Primary & Secondary Actions */}
-          <div className="flex flex-col sm:flex-row items-center gap-3.5 sm:gap-4 w-full sm:w-auto animate-fade-in-up">
-            <Link
-              href="/catas"
-              className="group w-full sm:w-auto flex items-center justify-between sm:justify-start gap-4 bg-primary-container hover:bg-primary text-white text-[13px] font-semibold pl-6 pr-2 py-2 rounded-full transition-all duration-500 ease-[cubic-bezier(0.16,1,0.3,1)] shadow-sm active:scale-[0.98]"
-            >
-              <span>{t.hero.ctaPrimary}</span>
-              <span className="w-9 h-9 rounded-full bg-white/20 flex items-center justify-center transition-transform duration-300 group-hover:translate-x-0.5 group-hover:-translate-y-[0.5px]">
-                <span className="material-symbols-outlined text-[18px]">arrow_forward</span>
-              </span>
-            </Link>
-
-            <a
-              href="#proximas-catas"
-              className="w-full sm:w-auto text-center text-[13px] font-semibold text-on-surface hover:text-primary bg-black/[0.03] hover:bg-black/[0.06] px-6 py-3.5 rounded-full transition-all duration-300"
-            >
-              {t.hero.ctaSecondary}
-            </a>
-          </div>
-
-          {/* Floating Metadata Pills */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-6 mt-16 sm:mt-20 w-full max-w-3xl pt-10 border-t border-black/[0.05]">
-            <div className="flex flex-col items-center sm:items-start text-center sm:text-left">
-              <span className="font-serif text-2xl sm:text-3xl font-semibold text-primary">
-                {t.hero.statAltitudeValue}
-              </span>
-              <span className="text-[12px] text-on-surface-variant/70 mt-0.5">
-                {t.hero.statAltitudeLabel}
-              </span>
-            </div>
-            <div className="flex flex-col items-center sm:items-start text-center sm:text-left">
-              <span className="font-serif text-2xl sm:text-3xl font-semibold text-primary">
-                {t.hero.statCapacityValue}
-              </span>
-              <span className="text-[12px] text-on-surface-variant/70 mt-0.5">
-                {t.hero.statCapacityLabel}
-              </span>
-            </div>
-            <div className="flex flex-col items-center sm:items-start text-center sm:text-left">
-              <span className="font-serif text-2xl sm:text-3xl font-semibold text-primary">
-                {t.hero.statCheckinValue}
-              </span>
-              <span className="text-[12px] text-on-surface-variant/70 mt-0.5">
-                {t.hero.statCheckinLabel}
-              </span>
-            </div>
-          </div>
-        </section>
-
-        {/* ─── BANNER PRINCIPAL COMERCIAL & MARCAS ALIADAS (8:4 GRID) ─── */}
+        {/* ─── HERO INICIAL: SHOWCASE COMERCIAL & MARCAS ALIADAS (8:4 GRID) ─── */}
         <CommercialShowcase currentLang={lang} />
+
+        <TerroirDivider className="max-w-[1320px] mx-auto px-5" />
 
         {/* ─── PRÓXIMAS CATAS SECTION (Double-Bezel Cards Grid) ─── */}
         <section id="proximas-catas" className="py-24 sm:py-32 px-5 sm:px-8 lg:px-12 max-w-[1320px] mx-auto w-full">
