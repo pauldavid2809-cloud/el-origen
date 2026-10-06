@@ -2,6 +2,7 @@ import React from "react";
 import Link from "next/link";
 import { Language, translations } from "@/lib/i18n";
 import { Logo, AvilaRidge } from "@/components/Brand";
+import { CONTACT, whatsappLink } from "@/lib/contact";
 
 interface FooterProps {
   currentLang?: Language;
@@ -12,9 +13,9 @@ export function Footer({ currentLang = "es" }: FooterProps) {
   const es = currentLang === "es";
 
   const contact = [
-    { href: "https://wa.me/584141074007", icon: "chat", label: "WhatsApp", value: "+58 414-107 4007" },
-    { href: "https://www.instagram.com/elorigen.vzla", icon: "photo_camera", label: "Instagram", value: "@elorigen.vzla" },
-    { href: "mailto:experiencias@elorigen.com", icon: "mail", label: "Email", value: "experiencias@elorigen.com" },
+    { href: whatsappLink(), icon: "chat", label: es ? "Atención al cliente (WhatsApp)" : "Customer service (WhatsApp)", value: CONTACT.phoneDisplay },
+    { href: CONTACT.instagramUrl, icon: "photo_camera", label: "Instagram", value: CONTACT.instagramHandle },
+    { href: `mailto:${CONTACT.email}`, icon: "mail", label: "Email", value: CONTACT.email },
   ];
 
   return (
@@ -68,7 +69,13 @@ export function Footer({ currentLang = "es" }: FooterProps) {
                         <span className="material-symbols-outlined text-[17px]">{c.icon}</span>
                       </span>
                       <span>
-                        <span className="sr-only">{c.label}: </span>
+                        {c.icon === "chat" ? (
+                          <span className="block text-[11px] font-semibold uppercase tracking-[0.14em] text-sun">
+                            {es ? "Atención al cliente" : "Customer service"}
+                          </span>
+                        ) : (
+                          <span className="sr-only">{c.label}: </span>
+                        )}
                         {c.value}
                       </span>
                     </a>

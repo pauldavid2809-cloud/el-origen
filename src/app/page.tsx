@@ -11,6 +11,7 @@ import { PartnersSection } from "@/components/PartnersSection";
 import { AvilaRidge, SectionHeading, SunBurst } from "@/components/Brand";
 import { Tasting } from "@/types";
 import { translations, Language } from "@/lib/i18n";
+import { whatsappLink } from "@/lib/contact";
 
 export default function HomePage() {
   const [lang, setLang] = useState<Language>("es");
@@ -339,7 +340,7 @@ export default function HomePage() {
                 {t.custom.cta}
               </Link>
               <a
-                href="https://wa.me/584141074007"
+                href={whatsappLink()}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="inline-flex items-center justify-center gap-2 h-[52px] px-7 border border-on-surface/20 hover:border-primary-container hover:text-primary-container text-[14px] font-semibold rounded transition-colors"

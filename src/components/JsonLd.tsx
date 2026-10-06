@@ -14,10 +14,10 @@ export function JsonLd() {
     ],
     "description": "Experiencias boutique de cata de vino y degustaciones guiadas por sommeliers en Caracas, Venezuela. Venta de cupos online, maridaje de autor y eventos privados.",
     "telephone": "+58-414-1074007",
-    "email": "contacto@elorigen.com",
+    "email": "experiencethewine22@gmail.com",
     "priceRange": "$$$",
     "currenciesAccepted": "USD, VES",
-    "paymentAccepted": "Zelle, Pago Móvil, Stripe, Apple Pay, Credit Card",
+    "paymentAccepted": "Pago Móvil, Transferencia bancaria, Stripe, Apple Pay, Credit Card",
     "servesCuisine": "Wine Tasting, Gourmet Pairings, Charcuterie & Cheese",
     "address": {
       "@type": "PostalAddress",
@@ -41,7 +41,7 @@ export function JsonLd() {
       }
     ],
     "sameAs": [
-      "https://instagram.com/elorigen_wine",
+      "https://www.instagram.com/elorigen.vzla",
       "https://wa.me/584141074007"
     ]
   };
@@ -63,7 +63,7 @@ export function JsonLd() {
         "name": "¿Cuáles son los métodos de pago aceptados?",
         "acceptedAnswer": {
           "@type": "Answer",
-          "text": "Aceptamos pagos en USD mediante Zelle y Tarjetas Internacionales (Stripe / Apple Pay), así como transferencias y Pago Móvil en Bolívares a la tasa oficial del BCV del día."
+          "text": "Aceptamos Pago Móvil y transferencias en bolívares (Banco de Venezuela y Banco Mercantil) a la tasa oficial del BCV del día, así como tarjetas internacionales en USD (Stripe / Apple Pay). Los datos de pago aparecen al reservar."
         }
       },
       {

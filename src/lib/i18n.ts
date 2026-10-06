@@ -170,7 +170,7 @@ export const translations = {
         },
         {
           q: "¿Cuáles son los métodos de pago aceptados en Caracas?",
-          a: "Aceptamos pagos en USD mediante Zelle y Tarjetas Internacionales (Stripe / Apple Pay), así como transferencias y Pago Móvil en Bolívares a la tasa oficial del BCV del día.",
+          a: "Aceptamos Pago Móvil y transferencias en bolívares (Banco de Venezuela y Banco Mercantil) a la tasa oficial del BCV del día, así como tarjetas internacionales en USD (Stripe / Apple Pay). Los datos de pago aparecen al reservar.",
         },
         {
           q: "¿Se adaptan los maridajes a restricciones dietéticas o celiaquía?",
@@ -208,7 +208,7 @@ export const translations = {
       discount: "Descuento",
       total: "Total a pagar",
       payWithStripe: "Pagar con Tarjeta Internacional (Stripe / Apple Pay)",
-      payWithTransfer: "Pagar con Zelle / Pago Móvil (Tasa BCV)",
+      payWithTransfer: "Pagar con Pago Móvil / Transferencia (Tasa BCV)",
       processing: "Procesando reserva...",
     },
     confirmation: {
@@ -424,7 +424,7 @@ export const translations = {
         },
         {
           q: "What payment methods are accepted in Caracas?",
-          a: "We accept USD payments via Zelle and International Credit Cards (Stripe / Apple Pay), as well as local transfers and Pago Móvil in Bolívares at the official BCV exchange rate of the day.",
+          a: "We accept Pago Móvil and bank transfers in bolívares (Banco de Venezuela and Banco Mercantil) at the official BCV rate of the day, as well as international cards in USD (Stripe / Apple Pay). Payment details are shown when you book.",
         },
         {
           q: "Can pairings accommodate dietary restrictions or celiac needs?",
@@ -462,7 +462,7 @@ export const translations = {
       discount: "Discount",
       total: "Total amount",
       payWithStripe: "Pay with International Card (Stripe / Apple Pay)",
-      payWithTransfer: "Pay with Zelle / Pago Móvil (Official BCV Rate)",
+      payWithTransfer: "Pay with Pago Móvil / Bank Transfer (Official BCV Rate)",
       processing: "Securing your reservation...",
     },
     confirmation: {

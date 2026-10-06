@@ -6,6 +6,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
+import { PaymentDetails } from "@/components/PaymentDetails";
 import { TerroirDivider } from "@/components/TerroirDivider";
 import { Tasting, AddOn } from "@/types";
 
@@ -614,12 +615,16 @@ export default function TastingDetailPage() {
                         >
                           <span className="flex items-center gap-1.5 font-semibold text-on-surface">
                             <span className="material-symbols-outlined text-[16px]">account_balance</span>
-                            Zelle / Pago Móvil
+                            Pago Móvil / Transferencia
                           </span>
-                          <span className="text-[10px] text-on-surface-variant/60">Tasa oficial BCV</span>
+                          <span className="text-[10px] text-on-surface-variant/60">Bolívares a tasa BCV</span>
                         </button>
                       </div>
                     </div>
+
+                    {paymentMethod === "bank_transfer" && (
+                      <PaymentDetails amountUsd={grandTotal} className="animate-fade-in" />
+                    )}
 
                     {/* Price Breakdown */}
                     <div className="bg-surface-container-low p-4 rounded-2xl border border-black/[0.05] space-y-2 text-[12px]">
