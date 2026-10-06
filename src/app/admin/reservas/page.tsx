@@ -1,377 +1,398 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
-import jsPDF from "jspdf";
-import { Reservation } from "@/types";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
+import type { Order } from "@/lib/orders";
 
-export default function AdminReservasPage() {
-  const [reservations, setReservations] = useState<Reservation[]>([]);
-  const [search, setSearch] = useState("");
-  const [filterStatus, setFilterStatus] = useState("all");
+type AdminOrder = Order & { proofUrl: string | null };
+type Tab = "in_review" | "pending_payment" | "approved" | "rejected" | "cancelled";
+
+const TABS: { id: Tab; label: string }[] = [
+  { id: "in_review", label: "Por revisar" },
+  { id: "pending_payment", label: "Sin pago" },
+  { id: "approved", label: "Aprobadas" },
+  { id: "rejected", label: "Rechazadas" },
+  { id: "cancelled", label: "Anuladas" },
+];
+
+const REJECT_REASONS = [
+  "La referencia no aparece en la cuenta",
+  "El monto no coincide con el total",
+  "El comprobante está ilegible o incompleto",
+  "La referencia ya fue usada en otra reserva",
+  "El pago aún no se refleja en la cuenta",
+];
+
+const DELIVERY: Record<string, { label: string; cls: string }> = {
+  sent: { label: "enviado", cls: "bg-emerald-100 text-emerald-900" },
+  failed: { label: "falló", cls: "bg-error-container text-on-error-container" },
+  disabled: { label: "no configurado", cls: "bg-surface-container-high text-on-surface-variant" },
+  not_sent: { label: "pendiente", cls: "bg-surface-container-high text-on-surface-variant" },
+};
+
+const bs = (n: number) => n.toLocaleString("es-VE", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const when = (iso: string | null) =>
+  iso ? new Date(iso).toLocaleString("es-VE", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" }) : "—";
+
+export default function AdminReservationsPage() {
+  const [orders, setOrders] = useState<AdminOrder[]>([]);
+  const [persistent, setPersistent] = useState(true);
   const [loading, setLoading] = useState(true);
+  const [tab, setTab] = useState<Tab>("in_review");
+  const [tasting, setTasting] = useState("");
+  const [q, setQ] = useState("");
+  const [busy, setBusy] = useState<string | null>(null);
+  const [rejecting, setRejecting] = useState<AdminOrder | null>(null);
+  const [reason, setReason] = useState(REJECT_REASONS[0]);
+  const [toast, setToast] = useState<{ text: string; ok: boolean } | null>(null);
 
-  useEffect(() => {
-    // Initial mock/loaded reservations
-    setReservations([
-      {
-        id: "res-1",
-        token: "tok-carlos-mendoza-8492",
-        code: "#EO-8492A",
-        tastingId: "tasting-malbec-reserva",
-        tastingTitle: "Cata Malbec Reserva",
-        tastingDate: "Sábado, 24 de Octubre",
-        tastingTime: "18:00 - 20:30",
-        customerName: "Carlos Mendoza",
-        customerEmail: "carlos.mendoza@ejemplo.com",
-        customerPhone: "+54 9 261 455-8822",
-        spotsCount: 2,
-        dietaryRestrictions: "Sin restricciones",
-        selectedAddOns: [
-          { id: "gran-reserva-bottle", title: "Botella Malbec Gran Reserva 2020", price: 28000, quantity: 1 },
-        ],
-        subtotal: 118000,
-        discountAmount: 11800,
-        couponCode: "ORIGEN10",
-        totalAmount: 106200,
-        paymentMethod: "stripe",
-        paymentStatus: "paid",
-        checkinStatus: "checked_in",
-        checkedInAt: "2026-08-20T18:15:00Z",
-        checkedInBy: "Jaifred Pastran",
-        createdAt: "2026-08-20T16:00:00Z",
-      },
-      {
-        id: "res-2",
-        token: "tok-lucia-ferreyra-7193",
-        code: "#EO-7193B",
-        tastingId: "tasting-atardecer-vinedo",
-        tastingTitle: "Atardecer en el Viñedo",
-        tastingDate: "Miércoles, 28 de Octubre",
-        tastingTime: "17:30 - 19:30",
-        customerName: "Lucía Ferreyra",
-        customerEmail: "lucia.f@ejemplo.com",
-        customerPhone: "+54 9 11 3499-1122",
-        spotsCount: 2,
-        dietaryRestrictions: "Menú Vegetariano",
-        selectedAddOns: [
-          { id: "private-transfer", title: "Traslado Privado Ida y Vuelta", price: 18000, quantity: 1 },
-        ],
-        subtotal: 88000,
-        discountAmount: 0,
-        totalAmount: 88000,
-        paymentMethod: "stripe",
-        paymentStatus: "paid",
-        checkinStatus: "pending",
-        createdAt: "2026-08-21T02:30:00Z",
-      },
-      {
-        id: "res-3",
-        token: "tok-martin-rossi-6204",
-        code: "#EO-6204C",
-        tastingId: "tasting-blancos-altura",
-        tastingTitle: "Blancos de Altura",
-        tastingDate: "Lunes, 02 de Noviembre",
-        tastingTime: "11:00 - 13:00",
-        customerName: "Martín Rossi",
-        customerEmail: "martin.rossi@ejemplo.com",
-        customerPhone: "+54 9 261 887-1234",
-        spotsCount: 1,
-        dietaryRestrictions: "Celíaco / Sin TACC",
-        selectedAddOns: [],
-        subtotal: 40000,
-        discountAmount: 0,
-        totalAmount: 40000,
-        paymentMethod: "bank_transfer",
-        paymentStatus: "pending_transfer",
-        checkinStatus: "pending",
-        createdAt: "2026-08-20T10:00:00Z",
-      },
-      {
-        id: "res-4",
-        token: "tok-ana-gimenez-5109",
-        code: "#EO-5109D",
-        tastingId: "tasting-malbec-reserva",
-        tastingTitle: "Cata Malbec Reserva",
-        tastingDate: "Sábado, 24 de Octubre",
-        tastingTime: "18:00 - 20:30",
-        customerName: "Ana P. Giménez",
-        customerEmail: "ana.g@ejemplo.com",
-        customerPhone: "+54 9 261 990-4411",
-        spotsCount: 2,
-        dietaryRestrictions: "Ninguna",
-        selectedAddOns: [],
-        subtotal: 90000,
-        discountAmount: 0,
-        totalAmount: 90000,
-        paymentMethod: "stripe",
-        paymentStatus: "paid",
-        checkinStatus: "pending",
-        createdAt: "2026-08-20T11:00:00Z",
-      },
-    ]);
-    setLoading(false);
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const res = await fetch("/api/admin/orders", { cache: "no-store" });
+      const data = await res.json();
+      if (data.success) {
+        setOrders(data.orders);
+        setPersistent(data.persistent);
+      }
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
-  const handleToggleCheckIn = async (id: string) => {
-    setReservations((prev) =>
-      prev.map((r) => {
-        if (r.id === id) {
-          const next = r.checkinStatus === "checked_in" ? "pending" : "checked_in";
-          return {
-            ...r,
-            checkinStatus: next,
-            checkedInAt: next === "checked_in" ? new Date().toISOString() : undefined,
-          };
-        }
-        return r;
-      })
-    );
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  const notify = (text: string, ok = true) => {
+    setToast({ text, ok });
+    setTimeout(() => setToast(null), 4000);
   };
 
-  const handleConfirmTransfer = (id: string) => {
-    setReservations((prev) =>
-      prev.map((r) => (r.id === id ? { ...r, paymentStatus: "paid" } : r))
-    );
+  const act = async (o: AdminOrder, action: "approve" | "reject" | "resend" | "cancel", why?: string) => {
+    setBusy(o.id);
+    try {
+      const res = await fetch(`/api/admin/orders/${o.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action, reason: why }),
+      });
+      const data = await res.json();
+      if (!data.success) throw new Error(data.message);
+      const u: Order = data.order;
+      const msg: Record<string, string> = {
+        approve: `Aprobada ${u.code}. Correo: ${DELIVERY[u.emailStatus].label} · WhatsApp: ${DELIVERY[u.whatsappStatus].label}.`,
+        reject: `Rechazada ${u.code}. Se avisó al cliente por correo.`,
+        resend: `Reenvío ${u.code}. Correo: ${DELIVERY[u.emailStatus].label} · WhatsApp: ${DELIVERY[u.whatsappStatus].label}.`,
+        cancel: `Anulada ${u.code}. Los cupos quedaron libres.`,
+      };
+      notify(msg[action]);
+      setRejecting(null);
+      await load();
+    } catch (err) {
+      notify((err as Error).message || "No se pudo completar la acción.", false);
+    } finally {
+      setBusy(null);
+    }
   };
 
-  const exportToCSV = () => {
-    const headers = "Codigo,Asistente,Email,Telefono,Cata,Fecha,Cupos,Total,Pago,Checkin,Dieta\n";
-    const rows = reservations
-      .map(
-        (r) =>
-          `"${r.code}","${r.customerName}","${r.customerEmail}","${r.customerPhone}","${r.tastingTitle}","${r.tastingDate}",${r.spotsCount},${r.totalAmount},"${r.paymentStatus}","${r.checkinStatus}","${r.dietaryRestrictions || ""}"`
-      )
-      .join("\n");
+  const tastings = useMemo(() => {
+    const m = new Map<string, string>();
+    orders.forEach((o) => m.set(o.tastingId, `${o.tastingTitle} · ${o.tastingDate}`));
+    return Array.from(m.entries());
+  }, [orders]);
 
-    const blob = new Blob([headers + rows], { type: "text/csv;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = `asistentes-el-origen-${new Date().toISOString().split("T")[0]}.csv`;
-    link.click();
-  };
+  const counts = useMemo(() => {
+    const c: Record<string, number> = {};
+    orders.forEach((o) => (c[o.status] = (c[o.status] ?? 0) + 1));
+    return c;
+  }, [orders]);
 
-  const exportToPDF = () => {
-    const doc = new jsPDF();
-    doc.setFillColor(252, 249, 248);
-    doc.rect(0, 0, 210, 297, "F");
-
-    doc.setTextColor(122, 32, 72);
-    doc.setFont("times", "bold");
-    doc.setFontSize(20);
-    doc.text("EL ORIGEN — LISTA DE RECEPCIÓN EN PUERTA", 105, 25, { align: "center" });
-
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(9);
-    doc.setTextColor(95, 94, 91);
-    doc.text(`Generado el ${new Date().toLocaleDateString("es-CL")} • Total Asistentes: ${reservations.length}`, 105, 32, { align: "center" });
-
-    doc.setDrawColor(217, 192, 198);
-    doc.line(15, 38, 195, 38);
-
-    let y = 48;
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(9);
-    doc.setTextColor(27, 28, 28);
-    doc.text("CÓDIGO", 15, y);
-    doc.text("ASISTENTE", 45, y);
-    doc.text("EVENTO", 95, y);
-    doc.text("CUPOS", 145, y);
-    doc.text("CHECK-IN", 165, y);
-
-    y += 4;
-    doc.setDrawColor(217, 192, 198);
-    doc.line(15, y, 195, y);
-
-    doc.setFont("helvetica", "normal");
-    y += 8;
-
-    reservations.forEach((r) => {
-      if (y > 270) {
-        doc.addPage();
-        y = 25;
-      }
-      doc.text(r.code, 15, y);
-      doc.text(r.customerName, 45, y);
-      doc.text(r.tastingTitle.substring(0, 22), 95, y);
-      doc.text(`${r.spotsCount} p.`, 145, y);
-      doc.text(r.checkinStatus === "checked_in" ? "[✓] INGRESÓ" : "[ ] Pendiente", 165, y);
-      y += 8;
+  const list = orders
+    .filter((o) => o.status === tab)
+    .filter((o) => !tasting || o.tastingId === tasting)
+    .filter((o) => {
+      const s = q.trim().toLowerCase();
+      if (!s) return true;
+      return [o.code, o.customerName, o.customerDocId, o.customerEmail, o.paymentReference ?? ""].some((v) => v.toLowerCase().includes(s));
     });
 
-    doc.save(`Lista-Recepcion-El-Origen.pdf`);
-  };
-
-  const filtered = reservations.filter((r) => {
-    if (filterStatus === "checked_in" && r.checkinStatus !== "checked_in") return false;
-    if (filterStatus === "pending" && r.checkinStatus !== "pending") return false;
-    if (filterStatus === "transfer" && r.paymentStatus !== "pending_transfer") return false;
-    if (search.trim()) {
-      const q = search.toLowerCase();
-      return (
-        r.customerName.toLowerCase().includes(q) ||
-        r.code.toLowerCase().includes(q) ||
-        r.customerEmail.toLowerCase().includes(q) ||
-        r.tastingTitle.toLowerCase().includes(q)
-      );
-    }
-    return true;
-  });
+  const approvedSpots = orders
+    .filter((o) => o.status === "approved" && (!tasting || o.tastingId === tasting))
+    .reduce((s, o) => s + o.spotsCount, 0);
 
   return (
-    <div className="p-6 sm:p-10 max-w-7xl mx-auto space-y-8">
-      {/* Header */}
-      <header className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b border-surface-variant pb-6">
-        <div>
-          <p className="text-xs uppercase font-bold tracking-[0.2em] text-secondary mb-1">
-            Recepción & Control de Asistencia
-          </p>
-          <h2 className="font-serif text-2xl sm:text-3xl font-bold text-on-surface">
-            Asistentes & Reservas
-          </h2>
+    <div className="p-5 sm:p-8 lg:p-10 max-w-6xl mx-auto space-y-6">
+      {toast && (
+        <div
+          role="status"
+          className={`fixed top-5 right-5 z-50 max-w-sm rounded-lg px-4 py-3 text-[14px] shadow-elevated ${
+            toast.ok ? "bg-ink text-paper" : "bg-error text-white"
+          }`}
+        >
+          {toast.text}
         </div>
-        <div className="flex flex-wrap gap-2">
-          <button
-            onClick={exportToCSV}
-            className="flex items-center gap-1.5 px-4 py-2.5 bg-surface border border-outline-variant hover:border-primary text-on-surface rounded-xl text-xs font-bold uppercase tracking-wider transition-colors shadow-sm"
-          >
-            <span className="material-symbols-outlined text-sm text-primary">table_view</span>
-            Exportar CSV
+      )}
+
+      <header className="flex flex-col md:flex-row md:items-end justify-between gap-4">
+        <div>
+          <p className="eyebrow mb-2">Panel</p>
+          <h1 className="font-serif text-3xl sm:text-4xl">Reservas y pagos</h1>
+          <p className="text-[14px] text-on-surface-variant mt-1">
+            {approvedSpots} cupos confirmados{tasting ? " en esta cata" : ""} · {counts.in_review ?? 0} comprobantes por revisar
+          </p>
+        </div>
+        <div className="flex gap-2">
+          <button onClick={load} className="h-11 px-4 rounded border border-outline-variant text-[14px] font-semibold inline-flex items-center gap-2 hover:border-primary-container">
+            <span className="material-symbols-outlined text-[18px]">refresh</span>
+            Actualizar
           </button>
-          <button
-            onClick={exportToPDF}
-            className="flex items-center gap-1.5 px-4 py-2.5 bg-surface border border-outline-variant hover:border-primary text-on-surface rounded-xl text-xs font-bold uppercase tracking-wider transition-colors shadow-sm"
+          <a
+            href={`/api/admin/orders/export${tasting ? `?tasting=${encodeURIComponent(tasting)}` : ""}`}
+            className="h-11 px-4 rounded bg-primary-container hover:bg-primary text-white text-[14px] font-semibold inline-flex items-center gap-2"
           >
-            <span className="material-symbols-outlined text-sm text-primary">picture_as_pdf</span>
-            PDF Recepción
-          </button>
+            <span className="material-symbols-outlined text-[18px]">download</span>
+            Exportar Excel
+          </a>
         </div>
       </header>
 
-      {/* Filter & Search Bar */}
-      <div className="flex flex-col sm:flex-row gap-4 justify-between items-center bg-surface p-4 rounded-2xl border border-surface-variant soft-shadow">
-        <div className="flex flex-wrap gap-2 w-full sm:w-auto">
-          {[
-            { id: "all", label: "Todos" },
-            { id: "checked_in", label: "Check-in Realizado" },
-            { id: "pending", label: "Pendientes en Puerta" },
-            { id: "transfer", label: "Transferencias x Confirmar" },
-          ].map((f) => (
+      {!persistent && (
+        <div className="rounded-lg border border-tertiary/40 bg-tertiary-fixed/60 p-4 text-[14px] text-on-tertiary-fixed-variant">
+          <strong>Modo de prueba:</strong> Supabase no está configurado, las reservas se guardan en memoria y se pierden al reiniciar.
+          Configure <code>NEXT_PUBLIC_SUPABASE_URL</code> y <code>SUPABASE_SERVICE_ROLE_KEY</code> y ejecute <code>supabase/orders.sql</code>.
+        </div>
+      )}
+
+      <div className="flex flex-col gap-3">
+        <div className="flex gap-1.5 overflow-x-auto -mx-5 px-5 sm:mx-0 sm:px-0 sm:flex-wrap" role="tablist">
+          {TABS.map((t) => (
             <button
-              key={f.id}
-              onClick={() => setFilterStatus(f.id)}
-              className={`px-3 py-1.5 rounded-lg text-xs font-bold uppercase tracking-wider transition-all ${
-                filterStatus === f.id
-                  ? "bg-primary-container text-white"
-                  : "bg-surface-container text-secondary hover:bg-surface-variant"
+              key={t.id}
+              role="tab"
+              aria-selected={tab === t.id}
+              onClick={() => setTab(t.id)}
+              className={`h-10 px-4 rounded-full border text-[13px] font-semibold whitespace-nowrap transition-colors ${
+                tab === t.id ? "bg-primary-container border-primary-container text-white" : "border-outline-variant text-on-surface-variant hover:border-primary-container"
               }`}
             >
-              {f.label}
+              {t.label}
+              <span className="ml-1.5 tabular-nums opacity-80">{counts[t.id] ?? 0}</span>
             </button>
           ))}
         </div>
-
-        <div className="relative w-full sm:w-64">
+        <div className="flex flex-col sm:flex-row gap-2">
+          <select value={tasting} onChange={(e) => setTasting(e.target.value)} className="h-11 rounded border border-outline-variant bg-surface-container-lowest px-3 text-[14px] sm:w-80">
+            <option value="">Todas las catas</option>
+            {tastings.map(([id, label]) => (
+              <option key={id} value={id}>{label}</option>
+            ))}
+          </select>
           <input
-            type="text"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Buscar por nombre, código..."
-            className="w-full bg-surface-container-low border border-surface-variant rounded-xl pl-9 pr-4 py-2 text-xs text-on-surface focus:border-primary focus:outline-none"
+            type="search"
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            placeholder="Nombre, código, cédula o referencia"
+            className="h-11 rounded border border-outline-variant bg-surface-container-lowest px-3 text-[14px] sm:flex-1"
           />
-          <span className="material-symbols-outlined absolute left-2.5 top-2.5 text-secondary text-sm">
-            search
-          </span>
         </div>
       </div>
 
-      {/* Table */}
-      <div className="bg-surface rounded-2xl border border-surface-variant soft-shadow overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse text-xs">
-            <thead>
-              <tr className="bg-surface-container-low border-b border-surface-variant">
-                <th className="px-5 py-3.5 font-bold uppercase tracking-wider text-secondary">Ticket / Código</th>
-                <th className="px-5 py-3.5 font-bold uppercase tracking-wider text-secondary">Asistente</th>
-                <th className="px-5 py-3.5 font-bold uppercase tracking-wider text-secondary">Cata & Fecha</th>
-                <th className="px-5 py-3.5 font-bold uppercase tracking-wider text-secondary">Cupos & Add-ons</th>
-                <th className="px-5 py-3.5 font-bold uppercase tracking-wider text-secondary">Monto</th>
-                <th className="px-5 py-3.5 font-bold uppercase tracking-wider text-secondary">Pago</th>
-                <th className="px-5 py-3.5 font-bold uppercase tracking-wider text-secondary text-center">Acciones Check-in</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-surface-variant">
-              {filtered.map((r) => (
-                <tr key={r.id} className="hover:bg-surface-container-lowest transition-colors">
-                  <td className="px-5 py-4 font-mono font-bold text-primary">
-                    {r.code}
-                    <a
-                      href={`/confirmacion/${r.id}?token=${r.token}`}
-                      target="_blank"
-                      className="block text-[10px] text-secondary font-sans hover:underline"
-                    >
-                      Ver Ticket QR ↗
-                    </a>
-                  </td>
-                  <td className="px-5 py-4">
-                    <p className="font-bold text-on-surface text-sm">{r.customerName}</p>
-                    <p className="text-[11px] text-secondary">{r.customerEmail}</p>
-                    <p className="text-[10px] text-secondary font-mono">{r.customerPhone}</p>
-                    {r.dietaryRestrictions && (
-                      <span className="inline-block mt-1 text-[10px] bg-amber-100 text-amber-900 px-2 py-0.5 rounded font-semibold">
-                        Dieta: {r.dietaryRestrictions}
-                      </span>
-                    )}
-                  </td>
-                  <td className="px-5 py-4">
-                    <p className="font-semibold text-on-surface">{r.tastingTitle}</p>
-                    <p className="text-secondary">{r.tastingDate}</p>
-                    <p className="text-[10px] text-secondary">{r.tastingTime} hs</p>
-                  </td>
-                  <td className="px-5 py-4">
-                    <p className="font-bold text-on-surface">{r.spotsCount} personas</p>
-                    {r.selectedAddOns.map((a, i) => (
-                      <p key={i} className="text-[10px] text-primary">
-                        + {a.title} ({a.quantity})
-                      </p>
-                    ))}
-                  </td>
-                  <td className="px-5 py-4 font-serif font-bold text-sm text-on-surface">
-                    ${r.totalAmount.toLocaleString("es-CL")}
-                  </td>
-                  <td className="px-5 py-4">
-                    {r.paymentStatus === "paid" ? (
-                      <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800">
-                        Pagado ✓
-                      </span>
-                    ) : (
-                      <button
-                        onClick={() => handleConfirmTransfer(r.id)}
-                        className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 hover:bg-amber-200 transition-colors"
-                        title="Clic para confirmar transferencia bancaria"
-                      >
-                        Confirmar Transf.
-                      </button>
-                    )}
-                  </td>
-                  <td className="px-5 py-4 text-center">
-                    <button
-                      onClick={() => handleToggleCheckIn(r.id)}
-                      className={`px-3 py-1.5 rounded-xl text-xs font-bold uppercase tracking-wider transition-all ${
-                        r.checkinStatus === "checked_in"
-                          ? "bg-emerald-700 text-white shadow-sm"
-                          : "bg-surface-container border border-outline-variant hover:border-primary text-secondary"
-                      }`}
-                    >
-                      {r.checkinStatus === "checked_in" ? "✓ Ingresó" : "Marcar Ingreso"}
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+      {loading ? (
+        <div className="py-20 text-center text-on-surface-variant">
+          <span className="material-symbols-outlined animate-spin">progress_activity</span>
         </div>
-      </div>
+      ) : list.length === 0 ? (
+        <div className="py-20 text-center border border-dashed border-outline-variant rounded-xl text-on-surface-variant">
+          No hay reservas en esta sección.
+        </div>
+      ) : (
+        <ul className="space-y-4">
+          {list.map((o) => {
+            const expectedBs = o.bcvRate ? o.totalUsd * o.bcvRate : null;
+            const mismatch = expectedBs !== null && o.paymentAmountBs !== null && Math.abs(o.paymentAmountBs - expectedBs) > Math.max(1, expectedBs * 0.01);
+            const isPdf = o.proofPath?.endsWith(".pdf");
+            return (
+              <li key={o.id} className="rounded-xl border border-outline-variant bg-surface-container-lowest overflow-hidden">
+                <div className="grid grid-cols-1 md:grid-cols-[1fr_auto] gap-5 p-5">
+                  <div className="space-y-4 min-w-0">
+                    <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+                      <span className="font-serif text-xl">{o.customerName}</span>
+                      <span className="text-[13px] font-semibold tracking-wider text-primary-container">{o.code}</span>
+                      <span className="text-[12px] text-on-surface-variant">creada {when(o.createdAt)}</span>
+                    </div>
+                    <p className="text-[14px] text-on-surface-variant">
+                      <strong className="text-on-surface">{o.spotsCount} cupo{o.spotsCount === 1 ? "" : "s"}</strong> · {o.tastingTitle} · {o.tastingDate}
+                      {o.addOns.length > 0 && <> · {o.addOns.map((a) => `${a.quantity}× ${a.title}`).join(", ")}</>}
+                    </p>
+                    <p className="text-[13px] text-on-surface-variant">
+                      C.I. {o.customerDocId} · {o.customerPhone} · {o.customerEmail}
+                      {o.dietaryRestrictions && <> · Dieta: {o.dietaryRestrictions}</>}
+                    </p>
+
+                    {o.paymentReference && (
+                      <dl className="grid grid-cols-2 sm:grid-cols-4 gap-3 rounded-lg bg-surface-container-low p-3 text-[13px]">
+                        <div>
+                          <dt className="text-on-surface-variant">Total</dt>
+                          <dd className="font-semibold">${o.totalUsd} USD</dd>
+                          {expectedBs !== null && <dd className="text-on-surface-variant">≈ Bs {bs(expectedBs)}</dd>}
+                        </div>
+                        <div>
+                          <dt className="text-on-surface-variant">Pagado</dt>
+                          <dd className={`font-semibold ${mismatch ? "text-error" : ""}`}>
+                            Bs {o.paymentAmountBs != null ? bs(o.paymentAmountBs) : "—"}
+                            {mismatch && <span className="block text-[11px] font-normal">no coincide</span>}
+                          </dd>
+                        </div>
+                        <div>
+                          <dt className="text-on-surface-variant">Referencia</dt>
+                          <dd className="font-semibold tabular-nums break-all">{o.paymentReference}</dd>
+                        </div>
+                        <div>
+                          <dt className="text-on-surface-variant">{o.paymentMethod === "pago_movil" ? "Pago Móvil" : "Transferencia"}</dt>
+                          <dd className="font-semibold">{o.payerBank}</dd>
+                          <dd className="text-on-surface-variant">→ {o.paymentBank}</dd>
+                        </div>
+                      </dl>
+                    )}
+
+                    {o.rejectionReason && o.status === "rejected" && (
+                      <p className="text-[13px] text-error">Motivo: {o.rejectionReason}</p>
+                    )}
+
+                    {o.status === "approved" && (
+                      <div className="flex flex-wrap gap-2 text-[12px]">
+                        <span className={`px-2.5 py-1 rounded-full ${DELIVERY[o.emailStatus].cls}`}>Correo {DELIVERY[o.emailStatus].label}</span>
+                        <span className={`px-2.5 py-1 rounded-full ${DELIVERY[o.whatsappStatus].cls}`}>WhatsApp {DELIVERY[o.whatsappStatus].label}</span>
+                        <span className={`px-2.5 py-1 rounded-full ${o.checkedInAt ? "bg-emerald-100 text-emerald-900" : "bg-surface-container-high text-on-surface-variant"}`}>
+                          {o.checkedInAt ? `Ingresó ${when(o.checkedInAt)}` : "Sin ingresar"}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Comprobante */}
+                  {o.proofUrl && (
+                    <a
+                      href={o.proofUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="block w-full md:w-44 h-56 md:h-auto rounded-lg border border-outline-variant overflow-hidden bg-surface-container hover:border-primary-container"
+                      title="Abrir comprobante"
+                    >
+                      {isPdf ? (
+                        <span className="h-full flex flex-col items-center justify-center gap-1 text-primary-container">
+                          <span className="material-symbols-outlined text-4xl">picture_as_pdf</span>
+                          <span className="text-[13px] font-semibold">Ver PDF</span>
+                        </span>
+                      ) : (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={o.proofUrl} alt={`Comprobante de ${o.customerName}`} className="w-full h-full object-cover object-top" />
+                      )}
+                    </a>
+                  )}
+                </div>
+
+                {/* Acciones */}
+                <div className="flex flex-wrap gap-2 border-t border-outline-variant bg-surface-container-low/60 px-5 py-3">
+                  {(o.status === "in_review" || o.status === "pending_payment" || o.status === "rejected") && (
+                    <button
+                      disabled={busy === o.id}
+                      onClick={() => {
+                        if (o.status !== "in_review" && !confirm("Esta orden no tiene un comprobante en revisión. ¿Aprobar de todos modos?")) return;
+                        act(o, "approve");
+                      }}
+                      className="h-10 px-4 rounded bg-emerald-700 hover:bg-emerald-800 text-white text-[13px] font-semibold inline-flex items-center gap-1.5 disabled:opacity-60"
+                    >
+                      <span className="material-symbols-outlined text-[18px]">check</span>
+                      Aprobar y enviar QR
+                    </button>
+                  )}
+                  {o.status === "in_review" && (
+                    <button
+                      disabled={busy === o.id}
+                      onClick={() => {
+                        setRejecting(o);
+                        setReason(REJECT_REASONS[0]);
+                      }}
+                      className="h-10 px-4 rounded border border-error/50 text-error text-[13px] font-semibold inline-flex items-center gap-1.5 hover:bg-error-container/50"
+                    >
+                      <span className="material-symbols-outlined text-[18px]">close</span>
+                      Rechazar
+                    </button>
+                  )}
+                  {o.status === "approved" && (
+                    <>
+                      <button
+                        disabled={busy === o.id}
+                        onClick={() => act(o, "resend")}
+                        className="h-10 px-4 rounded border border-outline-variant text-[13px] font-semibold inline-flex items-center gap-1.5 hover:border-primary-container"
+                      >
+                        <span className="material-symbols-outlined text-[18px]">forward_to_inbox</span>
+                        Reenviar QR
+                      </button>
+                      <a
+                        href={`/orden/${o.token}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="h-10 px-4 rounded border border-outline-variant text-[13px] font-semibold inline-flex items-center gap-1.5 hover:border-primary-container"
+                      >
+                        <span className="material-symbols-outlined text-[18px]">qr_code_2</span>
+                        Ver entrada
+                      </a>
+                    </>
+                  )}
+                  {o.status !== "cancelled" && !o.checkedInAt && (
+                    <button
+                      disabled={busy === o.id}
+                      onClick={() => confirm(`¿Anular la reserva ${o.code}? Se liberan sus cupos.`) && act(o, "cancel")}
+                      className="h-10 px-3 rounded text-[13px] font-semibold text-on-surface-variant hover:text-error ml-auto"
+                    >
+                      Anular
+                    </button>
+                  )}
+                </div>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+
+      {/* Rechazo */}
+      {rejecting && (
+        <div className="fixed inset-0 z-50 bg-ink/50 flex items-end sm:items-center justify-center p-4" role="dialog" aria-modal="true">
+          <div className="w-full max-w-md rounded-2xl bg-surface-container-lowest p-6">
+            <h2 className="font-serif text-2xl">Rechazar pago de {rejecting.customerName}</h2>
+            <p className="text-[14px] text-on-surface-variant mt-1">El cliente recibirá el motivo por correo y podrá reportar el pago de nuevo.</p>
+            <div className="mt-5 space-y-2">
+              {REJECT_REASONS.map((r) => (
+                <label key={r} className="flex items-center gap-3 min-h-11 px-3 rounded border border-outline-variant cursor-pointer">
+                  <input type="radio" name="reason" checked={reason === r} onChange={() => setReason(r)} className="accent-[#7D2A46]" />
+                  <span className="text-[14px]">{r}</span>
+                </label>
+              ))}
+              <textarea
+                value={REJECT_REASONS.includes(reason) ? "" : reason}
+                onChange={(e) => setReason(e.target.value || REJECT_REASONS[0])}
+                placeholder="U otro motivo…"
+                rows={2}
+                className="w-full rounded border border-outline-variant px-3 py-2 text-[14px]"
+              />
+            </div>
+            <div className="mt-5 flex gap-2 justify-end">
+              <button onClick={() => setRejecting(null)} className="h-11 px-4 rounded text-[14px] font-semibold">
+                Cancelar
+              </button>
+              <button
+                disabled={busy === rejecting.id}
+                onClick={() => act(rejecting, "reject", reason)}
+                className="h-11 px-5 rounded bg-error text-white text-[14px] font-semibold disabled:opacity-60"
+              >
+                Rechazar pago
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

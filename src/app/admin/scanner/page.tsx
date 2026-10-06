@@ -2,14 +2,21 @@
 
 import React, { useState } from "react";
 import confetti from "canvas-confetti";
-import { Reservation } from "@/types";
+interface ScanSummary {
+  code: string;
+  customerName: string;
+  spotsCount: number;
+  tastingTitle: string;
+  dietaryRestrictions: string | null;
+  status: string;
+}
 
 export default function AdminScannerPage() {
   const [tokenInput, setTokenInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<{
     success: boolean;
-    reservation?: Reservation;
+    order?: ScanSummary;
     message: string;
   } | null>(null);
 
@@ -27,7 +34,6 @@ export default function AdminScannerPage() {
         body: JSON.stringify({
           token: tokenInput.trim(),
           action: "checkin",
-          checkedInBy: "Sommelier de Recepción",
         }),
       });
       const data = await res.json();
@@ -48,10 +54,6 @@ export default function AdminScannerPage() {
     } finally {
       setLoading(false);
     }
-  };
-
-  const handleQuickCode = (code: string) => {
-    setTokenInput(code);
   };
 
   return (
@@ -81,7 +83,7 @@ export default function AdminScannerPage() {
                   type="text"
                   value={tokenInput}
                   onChange={(e) => setTokenInput(e.target.value)}
-                  placeholder="Ej: #EO-8492A o token UUID..."
+                  placeholder="Ej: EO-7KQ2M o enlace del QR"
                   className="w-full bg-surface-container-low border border-black/[0.06] rounded-xl p-3.5 text-base font-mono uppercase text-on-surface focus:border-primary focus:outline-none transition-colors"
                   autoFocus
                 />
@@ -109,25 +111,6 @@ export default function AdminScannerPage() {
             </button>
           </form>
 
-          {/* Demo Fast Tags */}
-          <div className="pt-4 border-t border-black/[0.05]">
-            <p className="text-[10px] uppercase font-semibold text-on-surface-variant/60 tracking-wider mb-2">
-              Tickets de prueba para recepción:
-            </p>
-            <div className="flex flex-wrap gap-2">
-              {["#EO-8492A", "#EO-7193B", "#EO-6204C"].map((c) => (
-                <button
-                  key={c}
-                  type="button"
-                  onClick={() => handleQuickCode(c)}
-                  className="text-[11px] font-mono bg-surface-container hover:bg-black/[0.05] text-primary px-3 py-1 rounded-lg border border-black/[0.06] font-semibold transition-all active:scale-95"
-                >
-                  {c}
-                </button>
-              ))}
-            </div>
-          </div>
-
           {/* Result Card with Micro-Animation Recipe */}
           {result && (
             <div
@@ -141,26 +124,23 @@ export default function AdminScannerPage() {
                 <span className="material-symbols-outlined text-[18px]">
                   {result.success ? "check_circle" : "error"}
                 </span>
-                <span>{result.success ? "¡Check-in Exitoso!" : "Entrada Ya Utilizada o Inválida"}</span>
+                <span>{result.success ? "¡Check-in exitoso!" : "Entrada no válida"}</span>
               </div>
 
               <p className="text-[12px] leading-relaxed mb-3">{result.message}</p>
 
-              {result.reservation && (
+              {result.order && (
                 <div className="bg-white/95 rounded-xl p-4 text-[12px] space-y-1.5 text-on-surface">
-                  <p className="font-serif text-base font-semibold text-primary">{result.reservation.customerName}</p>
+                  <p className="font-serif text-base font-semibold text-primary">{result.order.customerName}</p>
                   <p>
-                    <strong>Cata:</strong> {result.reservation.tastingTitle}
+                    <strong>Cata:</strong> {result.order.tastingTitle}
                   </p>
                   <p>
-                    <strong>Cupos:</strong> {result.reservation.spotsCount} personas ({result.reservation.code})
+                    <strong>Cupos:</strong> {result.order.spotsCount} personas ({result.order.code})
                   </p>
-                  <p>
-                    <strong>Pago:</strong> {result.reservation.paymentStatus === "paid" ? "Pagado ✓" : "Pendiente"}
-                  </p>
-                  {result.reservation.dietaryRestrictions && (
+                  {result.order.dietaryRestrictions && (
                     <p className="text-amber-800">
-                      <strong>Dieta:</strong> {result.reservation.dietaryRestrictions}
+                      <strong>Dieta:</strong> {result.order.dietaryRestrictions}
                     </p>
                   )}
                 </div>

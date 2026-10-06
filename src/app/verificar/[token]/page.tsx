@@ -1,233 +1,121 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
-import confetti from "canvas-confetti";
-import { Reservation } from "@/types";
+import { Logo } from "@/components/Brand";
 
+interface Summary {
+  code: string;
+  customerName: string;
+  customerDocId: string;
+  spotsCount: number;
+  tastingTitle: string;
+  tastingDate: string;
+  tastingTime: string;
+  dietaryRestrictions: string | null;
+  status: string;
+  checkedInAt: string | null;
+}
+
+/* Al escanear el QR con la cámara del teléfono:
+   - el personal con sesión de admin ve la validación y el botón de check-in;
+   - cualquier otra persona ve un aviso y el enlace a su entrada. */
 export default function VerifyTicketPage() {
-  const params = useParams();
-  const token = params?.token as string;
+  const { token } = useParams<{ token: string }>();
+  const [admin, setAdmin] = useState<boolean | null>(null);
+  const [result, setResult] = useState<{ success: boolean; message: string; order?: Summary } | null>(null);
+  const [busy, setBusy] = useState(false);
 
-  const [reservation, setReservation] = useState<Reservation | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [checkingIn, setCheckingIn] = useState(false);
-  const [message, setMessage] = useState<string>("");
-  const [success, setSuccess] = useState<boolean>(false);
-
-  useEffect(() => {
-    async function checkToken() {
+  const call = useCallback(
+    async (action: "verify" | "checkin") => {
+      setBusy(true);
       try {
         const res = await fetch("/api/verify", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ token, action: "verify" }),
+          body: JSON.stringify({ token, action }),
         });
-        const data = await res.json();
-        setSuccess(data.success);
-        setMessage(data.message);
-        if (data.reservation) {
-          setReservation(data.reservation);
-        }
+        setResult(await res.json());
       } catch {
-        setMessage("Error al conectar con el servidor de validación.");
+        setResult({ success: false, message: "Error de conexión." });
       } finally {
-        setLoading(false);
+        setBusy(false);
       }
-    }
-    if (token) checkToken();
-  }, [token]);
+    },
+    [token]
+  );
 
-  const handlePerformCheckIn = async () => {
-    setCheckingIn(true);
-    try {
-      const res = await fetch("/api/verify", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          token,
-          action: "checkin",
-          checkedInBy: "Sommelier de Puerta",
-        }),
-      });
-      const data = await res.json();
-      setSuccess(data.success);
-      setMessage(data.message);
-      if (data.reservation) {
-        setReservation(data.reservation);
-      }
-      if (data.success) {
-        confetti({
-          particleCount: 60,
-          spread: 60,
-          origin: { y: 0.7 },
-        });
-      }
-    } catch {
-      alert("Error al registrar el check-in.");
-    } finally {
-      setCheckingIn(false);
-    }
-  };
+  useEffect(() => {
+    fetch("/api/admin/auth")
+      .then((r) => r.json())
+      .then((d) => {
+        setAdmin(Boolean(d.authenticated));
+        if (d.authenticated) call("verify");
+      })
+      .catch(() => setAdmin(false));
+  }, [call]);
 
-  if (loading) {
-    return (
-      <div className="bg-surface min-h-screen flex items-center justify-center p-4 text-secondary">
-        <span className="material-symbols-outlined animate-spin text-2xl mr-2">progress_activity</span>
-        Validando entrada en el sistema...
-      </div>
-    );
-  }
-
-  const isCheckedIn = reservation?.checkinStatus === "checked_in";
+  const o = result?.order;
+  const used = Boolean(o?.checkedInAt);
 
   return (
-    <div className="bg-surface text-on-background min-h-screen flex flex-col justify-center items-center p-4 sm:p-6 py-12">
-      <main className="w-full max-w-md mx-auto animate-fade-in-up">
-        {/* Header */}
-        <div className="text-center mb-6">
-          <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-primary-container text-white mb-2 shadow-md">
-            <span className="material-symbols-outlined text-2xl">verified_user</span>
-          </div>
-          <h1 className="font-serif text-2xl sm:text-3xl font-bold text-primary">
-            Control de Acceso
-          </h1>
-          <p className="text-xs text-secondary">Bodega El Origen • Recepción de Catas</p>
-        </div>
+    <main className="min-h-screen bg-background flex flex-col items-center justify-center px-5 py-12">
+      <Logo variant="full" className="w-36 mb-10" />
 
-        {/* Status Card */}
-        <div className="bg-surface-container-lowest border border-surface-variant rounded-2xl shadow-md p-6 relative overflow-hidden">
-          {/* Badge */}
+      {admin === null ? (
+        <span className="material-symbols-outlined animate-spin text-on-surface-variant">progress_activity</span>
+      ) : !admin ? (
+        <div className="max-w-sm text-center">
+          <h1 className="font-serif text-3xl">Entrada de El Origen</h1>
+          <p className="text-on-surface-variant mt-3 leading-relaxed">
+            Este código lo valida el personal en la puerta. Si es su entrada, puede verla completa aquí:
+          </p>
+          <Link href={`/orden/${token}`} className="mt-6 inline-flex items-center gap-2 h-12 px-6 rounded bg-primary-container text-white font-semibold">
+            Ver mi entrada
+          </Link>
+          <p className="mt-8 text-[13px] text-on-surface-variant">
+            ¿Personal de El Origen? <Link href="/admin" className="underline underline-offset-4">Inicie sesión</Link> y vuelva a escanear.
+          </p>
+        </div>
+      ) : (
+        <div className="w-full max-w-md">
           <div
-            className={`p-4 rounded-xl text-center mb-6 border ${
-              isCheckedIn
-                ? "bg-emerald-50 border-emerald-300 text-emerald-950"
-                : success
-                ? "bg-blue-50 border-blue-300 text-blue-950"
-                : "bg-red-50 border-red-300 text-red-950"
+            className={`rounded-2xl border-2 p-6 text-center ${
+              !result ? "border-outline-variant" : result.success ? "border-emerald-600 bg-emerald-50" : "border-error bg-error-container/50"
             }`}
           >
-            <span className="material-symbols-outlined text-3xl mb-1">
-              {isCheckedIn ? "how_to_reg" : success ? "check_circle" : "warning"}
+            <span className={`material-symbols-outlined text-5xl ${result?.success ? "text-emerald-700" : "text-error"}`}>
+              {!result ? "hourglass_top" : result.success ? (used ? "done_all" : "verified") : "block"}
             </span>
-            <h2 className="font-serif text-lg font-bold">
-              {isCheckedIn
-                ? "Check-in Realizado"
-                : success
-                ? "Entrada Válida"
-                : "Entrada No Válida / Ya Usada"}
-            </h2>
-            <p className="text-xs mt-1">{message}</p>
+            <p className="font-semibold text-lg mt-2">{result?.message ?? "Verificando…"}</p>
+            {o && (
+              <dl className="mt-5 text-left text-[15px] space-y-2 border-t border-black/10 pt-4">
+                <div className="flex justify-between gap-4"><dt className="text-on-surface-variant">Nombre</dt><dd className="font-semibold text-right">{o.customerName}</dd></div>
+                <div className="flex justify-between gap-4"><dt className="text-on-surface-variant">Cédula</dt><dd className="font-semibold">{o.customerDocId}</dd></div>
+                <div className="flex justify-between gap-4"><dt className="text-on-surface-variant">Personas</dt><dd className="font-semibold text-2xl">{o.spotsCount}</dd></div>
+                <div className="flex justify-between gap-4"><dt className="text-on-surface-variant">Cata</dt><dd className="font-semibold text-right">{o.tastingTitle}</dd></div>
+                <div className="flex justify-between gap-4"><dt className="text-on-surface-variant">Código</dt><dd className="font-semibold">{o.code}</dd></div>
+                {o.dietaryRestrictions && (
+                  <div className="flex justify-between gap-4"><dt className="text-on-surface-variant">Dieta</dt><dd className="font-semibold text-right">{o.dietaryRestrictions}</dd></div>
+                )}
+              </dl>
+            )}
           </div>
-
-          {reservation ? (
-            <div className="space-y-4 text-xs">
-              <div className="border-b border-surface-variant pb-3">
-                <span className="text-[10px] uppercase font-bold text-secondary tracking-widest block">
-                  Asistente Titular
-                </span>
-                <span className="font-serif text-xl font-bold text-on-surface">
-                  {reservation.customerName}
-                </span>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <span className="text-[10px] uppercase font-bold text-secondary tracking-widest block">
-                    Experiencia
-                  </span>
-                  <span className="font-bold text-on-surface">{reservation.tastingTitle}</span>
-                </div>
-
-                <div>
-                  <span className="text-[10px] uppercase font-bold text-secondary tracking-widest block">
-                    Cupos Totales
-                  </span>
-                  <span className="font-bold text-primary font-serif text-base">
-                    {reservation.spotsCount} personas
-                  </span>
-                </div>
-
-                <div>
-                  <span className="text-[10px] uppercase font-bold text-secondary tracking-widest block">
-                    Código de Ticket
-                  </span>
-                  <span className="font-mono font-bold text-on-surface">{reservation.code}</span>
-                </div>
-
-                <div>
-                  <span className="text-[10px] uppercase font-bold text-secondary tracking-widest block">
-                    Estado de Pago
-                  </span>
-                  <span className="font-bold text-emerald-700 uppercase">
-                    {reservation.paymentStatus === "paid" ? "Pagado ✓" : "Pendiente de Transferencia"}
-                  </span>
-                </div>
-              </div>
-
-              {reservation.dietaryRestrictions && (
-                <div className="p-3 bg-amber-50 rounded-xl border border-amber-200 text-amber-900">
-                  <span className="font-bold block text-[10px] uppercase tracking-wider">
-                    Restricción / Dieta:
-                  </span>
-                  <span>{reservation.dietaryRestrictions}</span>
-                </div>
-              )}
-
-              {/* Action Button */}
-              {!isCheckedIn && success && (
-                <div className="pt-4">
-                  <button
-                    onClick={handlePerformCheckIn}
-                    disabled={checkingIn}
-                    className="w-full bg-emerald-700 text-white text-xs font-bold uppercase tracking-wider py-4 rounded-xl hover:bg-emerald-800 transition-all shadow-md flex items-center justify-center gap-2 active:scale-95 disabled:opacity-50"
-                  >
-                    {checkingIn ? (
-                      <>
-                        <span className="material-symbols-outlined animate-spin text-sm">progress_activity</span>
-                        Registrando ingreso...
-                      </>
-                    ) : (
-                      <>
-                        <span className="material-symbols-outlined text-[18px]">how_to_reg</span>
-                        Marcar Check-in de Ingreso
-                      </>
-                    )}
-                  </button>
-                </div>
-              )}
-
-              {isCheckedIn && (
-                <div className="pt-2 text-center text-secondary">
-                  <p className="text-[11px]">
-                    Ingreso registrado a las {new Date(reservation.checkedInAt || "").toLocaleTimeString("es-CL")} hs.
-                  </p>
-                </div>
-              )}
-            </div>
-          ) : (
-            <div className="text-center py-6 text-secondary">
-              <p>No se encontró ninguna reserva asociada al código provisto.</p>
-            </div>
-          )}
-        </div>
-
-        {/* Links */}
-        <div className="mt-6 flex flex-col gap-2 text-center text-xs">
-          {reservation && (
-            <Link
-              href={`/cata-en-vivo/${reservation.token || token}`}
-              className="font-bold text-primary hover:underline"
+          {result?.success && !used && o?.status === "approved" && (
+            <button
+              onClick={() => call("checkin")}
+              disabled={busy}
+              className="mt-5 w-full h-14 rounded bg-emerald-700 hover:bg-emerald-800 text-white text-[16px] font-semibold disabled:opacity-60"
             >
-              Abrir Ficha de Cata Sensorial para este Asistente →
-            </Link>
+              {busy ? "Registrando…" : `Registrar ingreso (${o.spotsCount})`}
+            </button>
           )}
-          <Link href="/admin" className="text-secondary hover:text-primary transition-colors">
-            Volver al Panel de Administración
+          <Link href="/admin/scanner" className="mt-4 flex items-center justify-center h-12 rounded border border-outline-variant font-semibold text-[14px]">
+            Ir al escáner
           </Link>
         </div>
-      </main>
-    </div>
+      )}
+    </main>
   );
 }

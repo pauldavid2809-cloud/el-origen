@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
+import { requireAdmin } from "@/lib/auth";
 
 export async function GET(request: Request) {
   try {
@@ -14,6 +15,8 @@ export async function GET(request: Request) {
       return NextResponse.json({ success: true, coupon });
     }
 
+    const denied = requireAdmin();
+    if (denied) return denied;
     const coupons = await db.getCoupons();
     return NextResponse.json({ success: true, coupons });
   } catch (error) {
@@ -25,6 +28,8 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
+  const denied = requireAdmin();
+  if (denied) return denied;
   try {
     const body = await request.json();
     const newCoupon = await db.createCoupon(body);

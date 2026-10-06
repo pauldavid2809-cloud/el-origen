@@ -1,7 +1,10 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
+import { requireAdmin } from "@/lib/auth";
 
 export async function GET() {
+  const denied = requireAdmin();
+  if (denied) return denied;
   try {
     const logs = await db.getNotifications();
     return NextResponse.json({ success: true, logs });
@@ -14,6 +17,8 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
+  const denied = requireAdmin();
+  if (denied) return denied;
   try {
     const body = await request.json();
     const { type, recipient, reservationCode, customMessage } = body;

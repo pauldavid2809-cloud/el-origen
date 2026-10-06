@@ -7,9 +7,12 @@ interface PaymentDetailsProps {
   /** Monto en USD a mostrar como referencia (se paga en Bs a tasa BCV). */
   amountUsd?: number;
   className?: string;
+  /** Texto bajo el título; reemplaza la instrucción por defecto. */
+  intro?: React.ReactNode;
+  showWhatsApp?: boolean;
 }
 
-export function PaymentDetails({ amountUsd, className = "" }: PaymentDetailsProps) {
+export function PaymentDetails({ amountUsd, className = "", intro, showWhatsApp = true }: PaymentDetailsProps) {
   const [copied, setCopied] = useState<string | null>(null);
 
   const copy = async (key: string, value: string) => {
@@ -25,12 +28,16 @@ export function PaymentDetails({ amountUsd, className = "" }: PaymentDetailsProp
       <div className="px-4 pt-4 pb-3 border-b border-outline-variant">
         <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-primary-container">Datos para el pago</p>
         <p className="text-[12px] text-on-surface-variant mt-1 leading-relaxed">
-          {amountUsd !== undefined && (
+          {intro ?? (
             <>
-              Monto: <strong className="text-on-surface">${amountUsd} USD</strong> en bolívares a tasa BCV del día.{" "}
+              {amountUsd !== undefined && (
+                <>
+                  Monto: <strong className="text-on-surface">${amountUsd} USD</strong> en bolívares a tasa BCV del día.{" "}
+                </>
+              )}
+              Envíe el comprobante por WhatsApp para confirmar su cupo.
             </>
           )}
-          Envíe el comprobante por WhatsApp para confirmar su cupo.
         </p>
       </div>
 
@@ -66,6 +73,7 @@ export function PaymentDetails({ amountUsd, className = "" }: PaymentDetailsProp
         ))}
       </ul>
 
+      {showWhatsApp && (
       <a
         href={whatsappLink("Hola, adjunto el comprobante de pago de mi reserva en El Origen.")}
         target="_blank"
@@ -75,6 +83,7 @@ export function PaymentDetails({ amountUsd, className = "" }: PaymentDetailsProp
         <span className="material-symbols-outlined text-[17px]">chat</span>
         Enviar comprobante · {CONTACT.phoneDisplay}
       </a>
+      )}
     </div>
   );
 }

@@ -6,7 +6,6 @@ import Image from "next/image";
 import Link from "next/link";
 import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
-import { PaymentDetails } from "@/components/PaymentDetails";
 import { TerroirDivider } from "@/components/TerroirDivider";
 import { Tasting, AddOn } from "@/types";
 
@@ -25,11 +24,11 @@ export default function TastingDetailPage() {
   const [customerName, setCustomerName] = useState("");
   const [customerEmail, setCustomerEmail] = useState("");
   const [customerPhone, setCustomerPhone] = useState("");
+  const [customerDocId, setCustomerDocId] = useState("");
   const [dietaryRestrictions, setDietaryRestrictions] = useState("");
   const [couponCode, setCouponCode] = useState("");
   const [appliedDiscount, setAppliedDiscount] = useState<number>(0);
   const [couponMessage, setCouponMessage] = useState<{ text: string; type: "success" | "error" } | null>(null);
-  const [paymentMethod, setPaymentMethod] = useState<"stripe" | "bank_transfer">("stripe");
   const [submitting, setSubmitting] = useState(false);
   const [step, setStep] = useState<1 | 2 | 3>(1);
 
@@ -42,7 +41,9 @@ export default function TastingDetailPage() {
           const found = data.tastings.find(
             (t: Tasting) => t.id === tastingId || t.slug === tastingId
           );
-          setTasting(found || data.tastings[0]);
+          const t: Tasting = found || data.tastings[0];
+          setTasting(t);
+          setSpotsCount((n) => Math.max(1, Math.min(n, t.availableSpots || 1)));
         }
 
         const defaultAddOns: AddOn[] = [
@@ -147,8 +148,8 @@ export default function TastingDetailPage() {
 
   const handleSubmitReservation = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!customerName || !customerEmail || !customerPhone) {
-      alert("Por favor complete su nombre, correo y WhatsApp para generar su ticket.");
+    if (!customerName || !customerEmail || !customerPhone || !customerDocId) {
+      alert("Por favor complete su nombre, cédula, correo y WhatsApp para generar su entrada.");
       setStep(2);
       return;
     }
@@ -167,11 +168,11 @@ export default function TastingDetailPage() {
           customerName,
           customerEmail,
           customerPhone,
+          customerDocId,
           spotsCount,
           dietaryRestrictions,
           selectedAddOns: resolvedAddOns,
           couponCode: appliedDiscount > 0 ? couponCode : undefined,
-          paymentMethod,
         }),
       });
 
@@ -361,7 +362,7 @@ export default function TastingDetailPage() {
                   {[
                     { num: 1, label: "1. Cupos" },
                     { num: 2, label: "2. Datos" },
-                    { num: 3, label: "3. Pago" },
+                    { num: 3, label: "3. Confirmar" },
                   ].map((s) => (
                     <button
                       key={s.num}
@@ -401,7 +402,7 @@ export default function TastingDetailPage() {
                           </span>
                           <button
                             type="button"
-                            onClick={() => setSpotsCount(Math.min(tasting.availableSpots, spotsCount + 1))}
+                            onClick={() => setSpotsCount(Math.min(tasting.availableSpots, 10, spotsCount + 1))}
                             className="w-8 h-8 rounded-full bg-white text-primary font-bold text-base hover:bg-black/[0.04] flex items-center justify-center transition-colors shadow-sm active:scale-95"
                           >
                             +
@@ -480,6 +481,21 @@ export default function TastingDetailPage() {
 
                     <div>
                       <label className="block text-[11px] uppercase font-semibold tracking-wider text-on-surface-variant/70 mb-1">
+                        Cédula de identidad *
+                      </label>
+                      <input
+                        type="text"
+                        inputMode="numeric"
+                        required
+                        value={customerDocId}
+                        onChange={(e) => setCustomerDocId(e.target.value)}
+                        placeholder="Ej: V-12345678"
+                        className="w-full bg-surface-container-low border border-black/[0.06] rounded-xl p-3 text-[13px] text-on-surface focus:border-primary focus:outline-none transition-colors"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-[11px] uppercase font-semibold tracking-wider text-on-surface-variant/70 mb-1">
                         Correo electrónico * (para ticket QR)
                       </label>
                       <input
@@ -530,7 +546,7 @@ export default function TastingDetailPage() {
                       <button
                         type="button"
                         onClick={() => {
-                          if (!customerName || !customerEmail || !customerPhone) {
+                          if (!customerName || !customerEmail || !customerPhone || !customerDocId) {
                             alert("Por favor complete los campos obligatorios (*)");
                             return;
                           }
@@ -538,7 +554,7 @@ export default function TastingDetailPage() {
                         }}
                         className="group flex-1 flex items-center justify-between pl-6 pr-2 py-2 bg-primary-container hover:bg-primary text-white text-[12px] font-semibold rounded-full transition-all duration-300 shadow-sm active:scale-[0.98]"
                       >
-                        <span>Ir a Método de Pago</span>
+                        <span>Revisar y confirmar</span>
                         <span className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center transition-transform group-hover:translate-x-0.5">
                           <span className="material-symbols-outlined text-[16px]">arrow_forward</span>
                         </span>
@@ -582,49 +598,15 @@ export default function TastingDetailPage() {
                       )}
                     </div>
 
-                    {/* Payment Method */}
-                    <div className="space-y-2">
-                      <label className="block text-[11px] uppercase font-semibold tracking-wider text-on-surface-variant/70">
-                        Forma de pago
-                      </label>
-                      <div className="grid grid-cols-2 gap-2">
-                        <button
-                          type="button"
-                          onClick={() => setPaymentMethod("stripe")}
-                          className={`p-3.5 rounded-2xl border text-left text-[12px] font-medium flex flex-col gap-1 transition-all ${
-                            paymentMethod === "stripe"
-                              ? "border-primary bg-primary-fixed/20"
-                              : "border-black/[0.06] bg-white hover:border-black/[0.15]"
-                          }`}
-                        >
-                          <span className="flex items-center gap-1.5 font-semibold text-primary">
-                            <span className="material-symbols-outlined text-[16px]">credit_card</span>
-                            Tarjeta (Stripe / Apple Pay)
-                          </span>
-                          <span className="text-[10px] text-on-surface-variant/60">Moneda internacional (USD)</span>
-                        </button>
-
-                        <button
-                          type="button"
-                          onClick={() => setPaymentMethod("bank_transfer")}
-                          className={`p-3.5 rounded-2xl border text-left text-[12px] font-medium flex flex-col gap-1 transition-all ${
-                            paymentMethod === "bank_transfer"
-                              ? "border-primary bg-primary-fixed/20"
-                              : "border-black/[0.06] bg-white hover:border-black/[0.15]"
-                          }`}
-                        >
-                          <span className="flex items-center gap-1.5 font-semibold text-on-surface">
-                            <span className="material-symbols-outlined text-[16px]">account_balance</span>
-                            Pago Móvil / Transferencia
-                          </span>
-                          <span className="text-[10px] text-on-surface-variant/60">Bolívares a tasa BCV</span>
-                        </button>
-                      </div>
+                    <div className="rounded-xl border border-outline-variant bg-surface-container-low p-4 text-[12.5px] leading-relaxed text-on-surface-variant">
+                      <p className="font-semibold text-on-surface flex items-center gap-1.5 mb-1">
+                        <span className="material-symbols-outlined text-[17px] text-primary-container">account_balance</span>
+                        Pago Móvil o transferencia en bolívares
+                      </p>
+                      Al continuar verá los datos de pago y el monto a la tasa BCV del día. Luego suba su comprobante:
+                      al verificarlo le enviamos su entrada con código QR por correo y WhatsApp. Sus cupos quedan
+                      apartados por 60 minutos.
                     </div>
-
-                    {paymentMethod === "bank_transfer" && (
-                      <PaymentDetails amountUsd={grandTotal} className="animate-fade-in" />
-                    )}
 
                     {/* Price Breakdown */}
                     <div className="bg-surface-container-low p-4 rounded-2xl border border-black/[0.05] space-y-2 text-[12px]">
@@ -670,8 +652,8 @@ export default function TastingDetailPage() {
                           </>
                         ) : (
                           <>
-                            <span className="material-symbols-outlined text-[16px]">lock</span>
-                            Confirmar y Pagar
+                            Continuar al pago
+                            <span className="material-symbols-outlined text-[16px]">arrow_forward</span>
                           </>
                         )}
                       </button>

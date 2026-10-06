@@ -4,6 +4,7 @@ import React from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
+import { AdminAuthGuard } from "@/components/AdminAuthGuard";
 
 export default function AdminLayout({
   children,
@@ -15,7 +16,7 @@ export default function AdminLayout({
   const navItems = [
     { href: "/admin", label: "Dashboard", icon: "dashboard" },
     { href: "/admin/catas", label: "Catas & Cupos", icon: "calendar_month" },
-    { href: "/admin/reservas", label: "Asistentes & Reservas", icon: "group" },
+    { href: "/admin/reservas", label: "Reservas & Pagos", icon: "receipt_long" },
     { href: "/admin/cupones", label: "Cupones de Descuento", icon: "sell" },
     { href: "/admin/privadas", label: "Eventos Privados B2B", icon: "business_center" },
     { href: "/admin/recuerdos", label: "Galería de Recuerdos", icon: "photo_library" },
@@ -23,7 +24,13 @@ export default function AdminLayout({
     { href: "/admin/scanner", label: "Escáner QR Puerta", icon: "qr_code_scanner" },
   ];
 
+  const logout = async () => {
+    await fetch("/api/admin/auth", { method: "DELETE" });
+    window.location.reload();
+  };
+
   return (
+    <AdminAuthGuard>
     <div className="bg-background text-on-background min-h-screen flex flex-col lg:flex-row overflow-hidden">
       {/* Sidebar (Stitch panel_de_control_admin) */}
       <aside className="w-full lg:w-64 bg-surface-container-low border-r border-outline-variant flex flex-col justify-between flex-shrink-0 z-20">
@@ -83,20 +90,13 @@ export default function AdminLayout({
             Ver Sitio Público
           </Link>
 
-          <div className="flex items-center gap-3 px-2 pt-2 border-t border-surface-variant">
-            <div className="w-9 h-9 rounded-full bg-surface-variant overflow-hidden relative flex-shrink-0 border border-outline-variant">
-              <Image
-                src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?q=80&w=200&auto=format&fit=crop"
-                alt="Jaifred Pastran"
-                fill
-                className="object-cover"
-              />
-            </div>
-            <div className="text-xs">
-              <p className="font-bold text-on-surface">Jaifred Pastran</p>
-              <p className="text-[10px] text-secondary">Head Sommelier & Admin</p>
-            </div>
-          </div>
+          <button
+            onClick={logout}
+            className="flex items-center gap-2 text-xs font-semibold text-secondary hover:text-primary transition-colors px-2"
+          >
+            <span className="material-symbols-outlined text-sm">logout</span>
+            Cerrar sesión
+          </button>
         </div>
       </aside>
 
@@ -112,5 +112,6 @@ export default function AdminLayout({
         <div className="relative z-10 flex-1">{children}</div>
       </main>
     </div>
+    </AdminAuthGuard>
   );
 }
