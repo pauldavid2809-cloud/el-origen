@@ -153,11 +153,68 @@ export function normalizeVePhone(phone: string): string {
   return d;
 }
 
-export async function sendTicketWhatsApp(o: Order): Promise<DeliveryStatus> {
-  const token = process.env.WHATSAPP_ACCESS_TOKEN;
-  const phoneId = process.env.WHATSAPP_PHONE_NUMBER_ID;
-  if (!token || !phoneId) return "disabled";
+/* Variaciones del mensaje: textos idénticos y masivos son una señal de spam para WhatsApp,
+   así que se alterna saludo y cierre según la orden (como en el bot del congreso). */
+const GREETINGS = [
+  (n: string) => `¡Hola ${n}! 🍷`,
+  (n: string) => `¡Hola, ${n}! Qué gusto saludarte 🍇`,
+  (n: string) => `${n}, ¡buenas noticias! ✨`,
+  (n: string) => `¡Saludos ${n}! 🥂`,
+];
+const CLOSINGS = [
+  "¡Te esperamos para brindar!",
+  "Nos vemos pronto, copa en mano.",
+  "Gracias por elegirnos. ¡Salud!",
+  "Será un placer recibirte.",
+];
 
+export function buildTicketWhatsAppMessage(o: Order): string {
+  const seed = Array.from(o.code).reduce((acc, ch) => acc + ch.charCodeAt(0), 0);
+  const first = o.customerName.trim().split(/\s+/)[0] || o.customerName;
+  return [
+    GREETINGS[seed % GREETINGS.length](first),
+    "",
+    "Verificamos tu pago y tu reserva en *El Origen* está confirmada.",
+    "",
+    `*${o.tastingTitle}*`,
+    `📅 ${o.tastingDate}`,
+    `🕖 ${o.tastingTime}`,
+    `📍 ${o.tastingLocation}`,
+    `👥 ${o.spotsCount} persona${o.spotsCount === 1 ? "" : "s"} · Código *${o.code}*`,
+    "",
+    "Presenta el código QR de esta imagen al llegar. También puedes verlo aquí:",
+    orderUrl(o),
+    "",
+    "Si tienes alguna duda, responde a este mensaje.",
+    CLOSINGS[seed % CLOSINGS.length],
+  ].join("\n");
+}
+
+/** Hay bot propio (Baileys) consultando la cola. */
+export function whatsappQueueEnabled(): boolean {
+  return Boolean(process.env.WHATSAPP_QUEUE_SECRET);
+}
+
+function metaConfigured(): boolean {
+  return Boolean(process.env.WHATSAPP_ACCESS_TOKEN && process.env.WHATSAPP_PHONE_NUMBER_ID);
+}
+
+/**
+ * Envío del WhatsApp de la entrada:
+ *  1. API oficial de Meta, si está configurada.
+ *  2. Si no, se deja en cola para el bot propio (carpeta whatsapp-bot/), que la consulta cada pocos segundos.
+ */
+export async function sendTicketWhatsApp(o: Order): Promise<DeliveryStatus> {
+  if (metaConfigured()) {
+    const status = await sendViaMeta(o);
+    if (status === "sent" || !whatsappQueueEnabled()) return status;
+  }
+  return whatsappQueueEnabled() ? "queued" : "disabled";
+}
+
+async function sendViaMeta(o: Order): Promise<DeliveryStatus> {
+  const token = process.env.WHATSAPP_ACCESS_TOKEN as string;
+  const phoneId = process.env.WHATSAPP_PHONE_NUMBER_ID as string;
   const to = normalizeVePhone(o.customerPhone);
   const link = orderUrl(o);
   const template = process.env.WHATSAPP_TEMPLATE_NAME;
@@ -188,14 +245,7 @@ export async function sendTicketWhatsApp(o: Order): Promise<DeliveryStatus> {
         messaging_product: "whatsapp",
         to,
         type: "text",
-        text: {
-          preview_url: true,
-          body:
-            `¡Hola ${o.customerName}! 🍷\n\nTu reserva en *El Origen* está confirmada.\n\n` +
-            `*${o.tastingTitle}*\n📅 ${o.tastingDate}\n🕖 ${o.tastingTime}\n📍 ${o.tastingLocation}\n` +
-            `👥 ${o.spotsCount} cupo${o.spotsCount === 1 ? "" : "s"} · Código ${o.code}\n\n` +
-            `Tu entrada con código QR está aquí:\n${link}\n\nPreséntala al llegar. ¡Te esperamos!`,
-        },
+        text: { preview_url: true, body: buildTicketWhatsAppMessage(o) },
       };
 
   try {

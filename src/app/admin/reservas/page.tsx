@@ -24,6 +24,7 @@ const REJECT_REASONS = [
 
 const DELIVERY: Record<string, { label: string; cls: string }> = {
   sent: { label: "enviado", cls: "bg-emerald-100 text-emerald-900" },
+  queued: { label: "en cola del bot", cls: "bg-tertiary-fixed text-on-tertiary-fixed-variant" },
   failed: { label: "falló", cls: "bg-error-container text-on-error-container" },
   disabled: { label: "no configurado", cls: "bg-surface-container-high text-on-surface-variant" },
   not_sent: { label: "pendiente", cls: "bg-surface-container-high text-on-surface-variant" },
@@ -44,6 +45,11 @@ export default function AdminReservationsPage() {
   const [rejecting, setRejecting] = useState<AdminOrder | null>(null);
   const [reason, setReason] = useState(REJECT_REASONS[0]);
   const [toast, setToast] = useState<{ text: string; ok: boolean } | null>(null);
+  const [wa, setWa] = useState<{
+    provider: "meta" | "bot" | "none";
+    bot: { phone: string | null; running: boolean; online: boolean; lastSeen: string } | null;
+    queued: number;
+  } | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -54,6 +60,8 @@ export default function AdminReservationsPage() {
         setOrders(data.orders);
         setPersistent(data.persistent);
       }
+      const w = await fetch("/api/admin/whatsapp", { cache: "no-store" }).then((r) => r.json()).catch(() => null);
+      if (w?.success) setWa(w);
     } finally {
       setLoading(false);
     }
@@ -155,6 +163,8 @@ export default function AdminReservationsPage() {
           </a>
         </div>
       </header>
+
+      {wa && <WhatsAppStatus wa={wa} />}
 
       {!persistent && (
         <div className="rounded-lg border border-tertiary/40 bg-tertiary-fixed/60 p-4 text-[14px] text-on-tertiary-fixed-variant">
@@ -392,6 +402,55 @@ export default function AdminReservationsPage() {
             </div>
           </div>
         </div>
+      )}
+    </div>
+  );
+}
+
+function WhatsAppStatus({
+  wa,
+}: {
+  wa: { provider: "meta" | "bot" | "none"; bot: { phone: string | null; running: boolean; online: boolean; lastSeen: string } | null; queued: number };
+}) {
+  if (wa.provider === "meta") {
+    return (
+      <p className="text-[14px] text-on-surface-variant flex items-center gap-2">
+        <span className="w-2 h-2 rounded-full bg-emerald-600" />
+        WhatsApp: API oficial de Meta.
+      </p>
+    );
+  }
+  if (wa.provider === "none") {
+    return (
+      <div className="rounded-lg border border-outline-variant bg-surface-container-low p-4 text-[14px] text-on-surface-variant">
+        <strong className="text-on-surface">WhatsApp sin configurar.</strong> Defina <code>WHATSAPP_QUEUE_SECRET</code> y encienda el bot
+        (carpeta <code>whatsapp-bot/</code>) para enviar las entradas por WhatsApp.
+      </div>
+    );
+  }
+  const online = wa.bot?.online;
+  const seen = wa.bot ? new Date(wa.bot.lastSeen).toLocaleString("es-VE", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" }) : null;
+  return (
+    <div
+      className={`rounded-lg border p-4 text-[14px] flex flex-wrap items-center gap-x-4 gap-y-1 ${
+        online ? "border-emerald-300 bg-emerald-50 text-emerald-950" : "border-error/40 bg-error-container/50 text-on-error-container"
+      }`}
+    >
+      <span className="flex items-center gap-2 font-semibold">
+        <span className={`w-2.5 h-2.5 rounded-full ${online ? "bg-emerald-600 animate-pulse-soft" : "bg-error"}`} />
+        {online
+          ? `Bot de WhatsApp conectado${wa.bot?.phone ? ` (+${wa.bot.phone})` : ""}`
+          : wa.bot?.running
+            ? "Bot encendido, pero sin WhatsApp vinculado"
+            : "Bot de WhatsApp apagado"}
+      </span>
+      <span>{wa.queued} mensaje{wa.queued === 1 ? "" : "s"} en cola</span>
+      {!online && (
+        <span>
+          {wa.bot?.running
+            ? "Abra el panel del bot (http://localhost:3001) y escanee el QR con el teléfono de El Origen."
+            : `Encienda el bot en la computadora para enviar la cola${seen ? ` (última conexión: ${seen})` : ""}.`}
+        </span>
       )}
     </div>
   );

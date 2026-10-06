@@ -9,7 +9,8 @@ import { createClient, SupabaseClient } from "@supabase/supabase-js";
    ───────────────────────────────────────────────────────────── */
 
 export type OrderStatus = "pending_payment" | "in_review" | "approved" | "rejected" | "cancelled";
-export type DeliveryStatus = "not_sent" | "sent" | "failed" | "disabled";
+/** queued: esperando que el bot de WhatsApp lo envíe. */
+export type DeliveryStatus = "not_sent" | "queued" | "sent" | "failed" | "disabled";
 
 export interface OrderAddOn {
   id: string;
@@ -324,4 +325,57 @@ export async function proofUrl(path: string | null): Promise<string | null> {
   }
   const { data } = await sb.storage.from(PROOF_BUCKET).createSignedUrl(path, 600);
   return data?.signedUrl ?? null;
+}
+
+/* ─── Cola del bot de WhatsApp ─── */
+
+/** Órdenes aprobadas con el WhatsApp de la entrada en cola, las más antiguas primero. */
+export async function listWhatsAppQueue(limit = 10): Promise<Order[]> {
+  const sb = getAdminClient();
+  if (!sb) {
+    return Array.from(memOrders.values())
+      .filter((o) => o.status === "approved" && o.whatsappStatus === "queued")
+      .sort((a, b) => a.updatedAt.localeCompare(b.updatedAt))
+      .slice(0, limit);
+  }
+  const { data, error } = await sb
+    .from("orders")
+    .select("*")
+    .eq("status", "approved")
+    .eq("whatsapp_status", "queued")
+    .order("updated_at", { ascending: true })
+    .limit(limit);
+  if (error) throw new Error(error.message);
+  return (data ?? []).map(fromRow);
+}
+
+export async function countWhatsAppQueue(): Promise<number> {
+  const sb = getAdminClient();
+  if (!sb) return Array.from(memOrders.values()).filter((o) => o.status === "approved" && o.whatsappStatus === "queued").length;
+  const { count } = await sb
+    .from("orders")
+    .select("id", { count: "exact", head: true })
+    .eq("status", "approved")
+    .eq("whatsapp_status", "queued");
+  return count ?? 0;
+}
+
+/* ─── Ajustes clave/valor (latido del bot) ─── */
+
+const memKv = ((globalThis as unknown as { __eoKv?: Map<string, unknown> }).__eoKv ??= new Map());
+
+export async function setSetting(key: string, value: unknown): Promise<void> {
+  const sb = getAdminClient();
+  if (!sb) {
+    memKv.set(key, value);
+    return;
+  }
+  await sb.from("app_settings").upsert({ key, value, updated_at: new Date().toISOString() });
+}
+
+export async function getSetting<T>(key: string): Promise<T | null> {
+  const sb = getAdminClient();
+  if (!sb) return (memKv.get(key) as T) ?? null;
+  const { data } = await sb.from("app_settings").select("value").eq("key", key).maybeSingle();
+  return (data?.value as T) ?? null;
 }

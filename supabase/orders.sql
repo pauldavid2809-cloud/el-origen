@@ -82,3 +82,15 @@ for each row execute function public.touch_orders_updated_at();
 insert into storage.buckets (id, name, public)
 values ('comprobantes', 'comprobantes', false)
 on conflict (id) do update set public = false;
+
+-- Ajustes del sistema (por ahora: último latido del bot de WhatsApp).
+create table if not exists public.app_settings (
+    key text primary key,
+    value jsonb not null default '{}'::jsonb,
+    updated_at timestamptz not null default now()
+);
+alter table public.app_settings enable row level security;
+
+-- Cola del bot: órdenes aprobadas con WhatsApp pendiente.
+create index if not exists orders_whatsapp_queue_idx on public.orders (whatsapp_status, updated_at)
+    where status = 'approved';
