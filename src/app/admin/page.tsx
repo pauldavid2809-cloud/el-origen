@@ -206,7 +206,7 @@ export default function AdminDashboardPage() {
           />
           <div className="absolute inset-0 bg-gradient-to-t from-primary/95 via-primary/60 to-transparent" />
           <div className="relative z-10">
-            <span className="text-[10px] font-bold uppercase tracking-widest text-[#D4AF37] block mb-0.5">
+            <span className="text-[10px] font-bold uppercase tracking-widest text-[#D9A35A] block mb-0.5">
               Estado de Bodega
             </span>
             <h3 className="font-serif text-xl font-bold">Cosecha & Cava 2026</h3>

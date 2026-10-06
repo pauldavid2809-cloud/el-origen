@@ -67,9 +67,9 @@ export default function EventMemoriesPage() {
             <div
               key={p.id}
               onClick={() => setSelectedPhoto(p.url)}
-              className="group p-1.5 rounded-[2rem] bg-black/[0.02] border border-black/[0.05] hover:border-primary/25 cursor-pointer transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] hover-lift"
+              className="group p-1.5 rounded-2xl bg-black/[0.02] border border-black/[0.05] hover:border-primary/25 cursor-pointer transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] hover-lift"
             >
-              <div className="relative rounded-[calc(2rem-0.375rem)] overflow-hidden bg-surface-container aspect-square shadow-[inset_0_1px_1px_rgba(255,255,255,0.8)]">
+              <div className="relative rounded-xl overflow-hidden bg-surface-container aspect-square shadow-[inset_0_1px_1px_rgba(255,255,255,0.8)]">
                 <Image
                   src={p.url}
                   alt={p.title}
@@ -117,7 +117,7 @@ export default function EventMemoriesPage() {
                 target="_blank"
                 rel="noopener noreferrer"
                 download
-                className="absolute bottom-6 right-6 bg-white text-on-surface hover:bg-[#faf8f7] text-[12px] font-semibold px-5 py-2.5 rounded-full shadow-lg flex items-center gap-2 transition-all active:scale-95"
+                className="absolute bottom-6 right-6 bg-white text-on-surface hover:bg-[#F6F0E7] text-[12px] font-semibold px-5 py-2.5 rounded-full shadow-lg flex items-center gap-2 transition-all active:scale-95"
               >
                 <span className="material-symbols-outlined text-[16px] text-primary">download</span>
                 Descargar HD

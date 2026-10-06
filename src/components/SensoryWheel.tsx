@@ -33,19 +33,19 @@ const AROMA_FAMILIES = [
   {
     family: "Frutos Rojos & Negros",
     color: "bg-red-50/60 text-red-950 border-red-200/60",
-    activeColor: "bg-[#7A2048] text-white border-[#7A2048]",
+    activeColor: "bg-[#7D2A46] text-white border-[#7D2A46]",
     items: ["Ciruela Negra", "Mora Silvestre", "Cereza Madura", "Frambuesa", "Grosella", "Higo Seco"],
   },
   {
     family: "Especias & Balsámicos",
     color: "bg-amber-50/60 text-amber-950 border-amber-200/60",
-    activeColor: "bg-[#735C00] text-white border-[#735C00]",
+    activeColor: "bg-[#8A5A1C] text-white border-[#8A5A1C]",
     items: ["Pimienta Negra", "Clavo de Olor", "Vainilla", "Canela", "Regaliz", "Eucalipto"],
   },
   {
     family: "Crianza & Madera",
     color: "bg-orange-50/60 text-orange-950 border-orange-200/60",
-    activeColor: "bg-[#5C0531] text-white border-[#5C0531]",
+    activeColor: "bg-[#5A1C31] text-white border-[#5A1C31]",
     items: ["Roble Tostado", "Cacao Amargo", "Tabaco de Pipa", "Café Tostado", "Cuero Noble", "Cedro"],
   },
   {
@@ -57,12 +57,12 @@ const AROMA_FAMILIES = [
 ];
 
 const COLOR_PALETTE = [
-  { name: "Púrpura Joven", hex: "#4A0E2E" },
-  { name: "Rojo Rubí Intenso", hex: "#7A2048" },
+  { name: "Púrpura Joven", hex: "#3E1322" },
+  { name: "Rojo Rubí Intenso", hex: "#7D2A46" },
   { name: "Rojo Granate", hex: "#63172C" },
   { name: "Teja / Caoba", hex: "#6E2619" },
-  { name: "Amarillo Dorado", hex: "#D4AF37" },
-  { name: "Pajizo Brillante", hex: "#E8DC9E" },
+  { name: "Amarillo Dorado", hex: "#D9A35A" },
+  { name: "Pajizo Brillante", hex: "#E8BE7E" },
 ];
 
 export function SensoryWheel({
@@ -126,8 +126,8 @@ export function SensoryWheel({
   };
 
   return (
-    <div className="p-2 sm:p-2.5 rounded-[2.5rem] bg-black/[0.02] border border-black/[0.05]">
-      <div className="bg-white rounded-[calc(2.5rem-0.625rem)] p-6 sm:p-10 shadow-[0_8px_32px_rgba(122,32,72,0.04)] space-y-8">
+    <div className="p-2 sm:p-2.5 rounded-2xl bg-black/[0.02] border border-black/[0.05]">
+      <div className="bg-white rounded-xl p-6 sm:p-10 shadow-[0_8px_32px_rgba(125,42,70,0.04)] space-y-8">
         {/* Header */}
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 border-b border-black/[0.05] pb-5">
           <div>

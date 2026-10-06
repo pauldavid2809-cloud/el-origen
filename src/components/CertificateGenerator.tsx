@@ -30,7 +30,7 @@ export function CertificateGenerator({
         particleCount: 70,
         spread: 60,
         origin: { y: 0.6 },
-        colors: ["#7A2048", "#C9A84C", "#5C0531", "#E8DC9E"],
+        colors: ["#7D2A46", "#C08A3E", "#5A1C31", "#E8BE7E"],
       });
     } catch {
       // ignore
@@ -153,10 +153,10 @@ export function CertificateGenerator({
   return (
     <div className="flex flex-col items-center max-w-lg mx-auto w-full animate-fade-in-up">
       {/* Story / Instagram Canvas Preview (9:16 Aspect Ratio in Double-Bezel Frame) */}
-      <div className="p-2 sm:p-2.5 rounded-[2.5rem] bg-black/[0.03] border border-black/[0.05] w-full">
+      <div className="p-2 sm:p-2.5 rounded-2xl bg-black/[0.03] border border-black/[0.05] w-full">
         <div
           id="instagram-certificate"
-          className="w-full aspect-[9/16] bg-[#5C0531] text-white rounded-[calc(2.5rem-0.625rem)] p-8 sm:p-10 flex flex-col justify-between shadow-2xl relative overflow-hidden border border-[#C9A84C]/40"
+          className="w-full aspect-[9/16] bg-[#5A1C31] text-white rounded-xl p-8 sm:p-10 flex flex-col justify-between shadow-2xl relative overflow-hidden border border-[#C08A3E]/40"
         >
           {/* Subtle Background Pattern */}
           <div className="absolute inset-0 opacity-10 pointer-events-none flex items-center justify-center">
@@ -167,7 +167,7 @@ export function CertificateGenerator({
 
           {/* Top Branding */}
           <div className="text-center relative z-10 pt-2">
-            <span className="text-[10px] font-semibold uppercase tracking-[0.25em] text-[#C9A84C] block mb-1">
+            <span className="text-[10px] font-semibold uppercase tracking-[0.25em] text-[#C08A3E] block mb-1">
               Wine Tasting Diploma
             </span>
             <h1 className="font-serif text-2xl sm:text-3xl font-semibold tracking-tight text-white">
@@ -180,15 +180,15 @@ export function CertificateGenerator({
 
           {/* Center Content */}
           <div className="text-center relative z-10 my-auto space-y-4">
-            <div className="w-14 h-14 mx-auto rounded-full border border-[#C9A84C]/60 flex items-center justify-center bg-black/20 shadow-inner">
-              <span className="material-symbols-outlined text-[#C9A84C] text-2xl">wine_bar</span>
+            <div className="w-14 h-14 mx-auto rounded-full border border-[#C08A3E]/60 flex items-center justify-center bg-black/20 shadow-inner">
+              <span className="material-symbols-outlined text-[#C08A3E] text-2xl">wine_bar</span>
             </div>
 
             <div>
               <p className="text-[12px] italic text-white/80 font-serif">
                 Certificado de Degustador otorgado a
               </p>
-              <h2 className="font-serif text-2xl sm:text-3xl font-semibold text-[#FFE088] mt-1">
+              <h2 className="font-serif text-2xl sm:text-3xl font-semibold text-[#F6DDB6] mt-1">
                 {attendeeName || "Sommelier Distinguido"}
               </h2>
             </div>
@@ -203,12 +203,12 @@ export function CertificateGenerator({
 
               <div className="mt-3 pt-3 border-t border-white/15 flex justify-around items-center">
                 <div>
-                  <span className="text-[9px] uppercase tracking-widest text-[#C9A84C] block">Puntaje</span>
+                  <span className="text-[9px] uppercase tracking-widest text-[#C08A3E] block">Puntaje</span>
                   <span className="font-serif text-2xl font-semibold">{averageScore} pts</span>
                 </div>
                 <div className="h-6 w-px bg-white/20" />
                 <div>
-                  <span className="text-[9px] uppercase tracking-widest text-[#C9A84C] block">Rango</span>
+                  <span className="text-[9px] uppercase tracking-widest text-[#C08A3E] block">Rango</span>
                   <span className="text-[12px] font-semibold">Gran Reserva</span>
                 </div>
               </div>
@@ -218,7 +218,7 @@ export function CertificateGenerator({
               {featuredAromas.slice(0, 3).map((a) => (
                 <span
                   key={a}
-                  className="text-[10px] bg-[#C9A84C]/20 border border-[#C9A84C]/40 px-2.5 py-0.5 rounded-full text-[#FFE088]"
+                  className="text-[10px] bg-[#C08A3E]/20 border border-[#C08A3E]/40 px-2.5 py-0.5 rounded-full text-[#F6DDB6]"
                 >
                   #{a}
                 </span>

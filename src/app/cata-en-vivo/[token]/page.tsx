@@ -110,7 +110,7 @@ export default function LiveTastingExperiencePage() {
       <main className="flex-grow py-10 sm:py-16 px-4 sm:px-8 lg:px-16 max-w-4xl mx-auto w-full">
         {/* Top Header */}
         <div className="text-center mb-8">
-          <span className="text-[11px] font-bold uppercase tracking-[0.2em] text-[#D4AF37] bg-[#5C0531] text-white px-3.5 py-1.5 rounded-full shadow-sm">
+          <span className="text-[11px] font-bold uppercase tracking-[0.2em] text-[#D9A35A] bg-[#5A1C31] text-white px-3.5 py-1.5 rounded-full shadow-sm">
             Ficha de Cata Sensorial Digital
           </span>
           <h1 className="font-serif text-3xl sm:text-4xl font-bold text-on-surface mt-3 mb-1">

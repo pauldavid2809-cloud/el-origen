@@ -7,16 +7,16 @@ export default function manifest(): MetadataRoute.Manifest {
     description: "Experiencias boutique de cata de vinos de colección y maridaje de autor en Caracas, Venezuela.",
     start_url: "/",
     display: "standalone",
-    background_color: "#FAF8F7",
-    theme_color: "#5C0531",
+    background_color: "#F6F0E7",
+    theme_color: "#5A1C31",
     icons: [
       {
-        src: "/images/logo-color.png",
+        src: "/images/icon-192.png",
         sizes: "192x192",
         type: "image/png",
       },
       {
-        src: "/images/logo-color.png",
+        src: "/images/icon-512.png",
         sizes: "512x512",
         type: "image/png",
       },

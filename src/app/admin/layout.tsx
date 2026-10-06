@@ -31,9 +31,9 @@ export default function AdminLayout({
           {/* Brand header */}
           <div className="p-6 border-b border-surface-variant flex items-center justify-between">
             <Link href="/" className="flex items-center gap-3">
-              <div className="relative w-8 h-8 flex-shrink-0">
+              <div className="relative w-12 h-8 flex-shrink-0">
                 <Image
-                  src="/images/logo-color.png"
+                  src="/images/logo-color-mark.png"
                   alt="El Origen"
                   fill
                   className="object-contain"
@@ -105,7 +105,7 @@ export default function AdminLayout({
         <div
           className="absolute inset-0 pointer-events-none opacity-[0.02]"
           style={{
-            backgroundImage: "radial-gradient(#7a2048 1px, transparent 1px)",
+            backgroundImage: "radial-gradient(#7D2A46 1px, transparent 1px)",
             backgroundSize: "20px 20px",
           }}
         />

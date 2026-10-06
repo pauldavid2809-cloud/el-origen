@@ -81,8 +81,8 @@ export default function AdminAutomatizacionesPage() {
           {/* Right Phone Silhouettes (Stitch Exact Reproduction) */}
           <div className="lg:w-2/3 relative h-[560px] w-full flex justify-center items-center">
             {/* Phone Silhouette 1 (Back left) */}
-            <div className="absolute left-4 lg:left-12 top-6 w-[220px] h-[480px] bg-surface rounded-[2.5rem] border-[7px] border-surface-variant mockup-shadow opacity-60 transform -rotate-6 scale-90 hidden sm:block">
-              <div className="w-full h-full bg-surface-container-lowest rounded-[2rem] overflow-hidden p-3 pt-8">
+            <div className="absolute left-4 lg:left-12 top-6 w-[220px] h-[480px] bg-surface rounded-2xl border-[7px] border-surface-variant mockup-shadow opacity-60 transform -rotate-6 scale-90 hidden sm:block">
+              <div className="w-full h-full bg-surface-container-lowest rounded-2xl overflow-hidden p-3 pt-8">
                 <div className="w-full h-4 bg-surface-container-highest rounded-full mb-3"></div>
                 <div className="p-3 bg-surface rounded-xl border border-surface-variant text-[10px] text-secondary">
                   WhatsApp • Recordatorio 24h
@@ -91,8 +91,8 @@ export default function AdminAutomatizacionesPage() {
             </div>
 
             {/* Phone Silhouette 2 (Back right) */}
-            <div className="absolute right-4 lg:right-12 top-12 w-[220px] h-[480px] bg-surface rounded-[2.5rem] border-[7px] border-surface-variant mockup-shadow opacity-60 transform rotate-6 scale-90 hidden sm:block">
-              <div className="w-full h-full bg-surface-container-lowest rounded-[2rem] overflow-hidden p-3 pt-8">
+            <div className="absolute right-4 lg:right-12 top-12 w-[220px] h-[480px] bg-surface rounded-2xl border-[7px] border-surface-variant mockup-shadow opacity-60 transform rotate-6 scale-90 hidden sm:block">
+              <div className="w-full h-full bg-surface-container-lowest rounded-2xl overflow-hidden p-3 pt-8">
                 <div className="w-full h-4 bg-surface-container-highest rounded-full mb-3"></div>
                 <div className="p-3 bg-surface rounded-xl border border-surface-variant text-[10px] text-secondary">
                   Correo Electrónico • Ticket QR
@@ -101,7 +101,7 @@ export default function AdminAutomatizacionesPage() {
             </div>
 
             {/* Main Phone Silhouette (Center Front) */}
-            <div className="relative z-10 w-[290px] sm:w-[320px] h-[540px] bg-surface rounded-[3rem] border-[9px] border-surface-variant mockup-shadow flex flex-col overflow-hidden">
+            <div className="relative z-10 w-[290px] sm:w-[320px] h-[540px] bg-surface rounded-3xl border-[9px] border-surface-variant mockup-shadow flex flex-col overflow-hidden">
               {/* Notch area */}
               <div className="absolute top-0 inset-x-0 h-6 flex justify-center z-20">
                 <div className="w-28 h-4 bg-surface-variant rounded-b-xl" />

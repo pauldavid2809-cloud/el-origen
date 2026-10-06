@@ -37,7 +37,7 @@ export default function AdminScannerPage() {
           particleCount: 50,
           spread: 60,
           origin: { y: 0.7 },
-          colors: ["#7A2048", "#C9A84C", "#5C0531"],
+          colors: ["#7D2A46", "#C08A3E", "#5A1C31"],
         });
       }
     } catch {
@@ -69,8 +69,8 @@ export default function AdminScannerPage() {
       </header>
 
       {/* Double-Bezel Card */}
-      <div className="p-2 sm:p-2.5 rounded-[2.5rem] bg-black/[0.02] border border-black/[0.05]">
-        <div className="bg-white rounded-[calc(2.5rem-0.625rem)] p-6 sm:p-8 shadow-[0_8px_32px_rgba(122,32,72,0.04)] space-y-6">
+      <div className="p-2 sm:p-2.5 rounded-2xl bg-black/[0.02] border border-black/[0.05]">
+        <div className="bg-white rounded-xl p-6 sm:p-8 shadow-[0_8px_32px_rgba(125,42,70,0.04)] space-y-6">
           <form onSubmit={handleVerify} className="space-y-4">
             <div>
               <label className="block text-[11px] uppercase font-semibold tracking-wider text-on-surface-variant/70 mb-2">

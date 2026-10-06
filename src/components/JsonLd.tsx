@@ -7,7 +7,7 @@ export function JsonLd() {
     "name": "El Origen | Experiencias de Cata & Vinos de Colección",
     "alternateName": "El Origen Caracas",
     "url": "https://el-origen-two.vercel.app",
-    "logo": "https://el-origen-two.vercel.app/images/logo-color.png",
+    "logo": "https://el-origen-two.vercel.app/images/logo-color-full.png",
     "image": [
       "https://images.unsplash.com/photo-1510812431401-41d2bd2722f3?q=80&w=1200&auto=format&fit=crop",
       "https://images.unsplash.com/photo-1506377247377-2a5b3b417ebb?q=80&w=1200&auto=format&fit=crop"

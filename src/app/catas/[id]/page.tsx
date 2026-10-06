@@ -209,8 +209,8 @@ export default function TastingDetailPage() {
           {/* LEFT COLUMN: Details */}
           <div className="lg:col-span-7 space-y-10">
             {/* Main Header in Double-Bezel Frame */}
-            <div className="p-2 rounded-[2.5rem] bg-black/[0.02] border border-black/[0.05]">
-              <div className="relative rounded-[calc(2.5rem-0.5rem)] overflow-hidden aspect-[16/10] w-full bg-surface-container">
+            <div className="p-2 rounded-2xl bg-black/[0.02] border border-black/[0.05]">
+              <div className="relative rounded-xl overflow-hidden aspect-[16/10] w-full bg-surface-container">
                 <Image
                   src={tasting.imageUrl}
                   alt={tasting.title}
@@ -340,8 +340,8 @@ export default function TastingDetailPage() {
 
           {/* RIGHT COLUMN: 3-Step Checkout in Double-Bezel Card */}
           <div className="lg:col-span-5 sticky top-28">
-            <div className="p-2 rounded-[2.5rem] bg-black/[0.02] border border-black/[0.05]">
-              <div className="bg-white rounded-[calc(2.5rem-0.5rem)] p-6 sm:p-8 shadow-[0_8px_32px_rgba(122,32,72,0.04)]">
+            <div className="p-2 rounded-2xl bg-black/[0.02] border border-black/[0.05]">
+              <div className="bg-white rounded-xl p-6 sm:p-8 shadow-[0_8px_32px_rgba(125,42,70,0.04)]">
                 <div className="flex justify-between items-center border-b border-black/[0.05] pb-5 mb-6">
                   <div>
                     <span className="text-[10px] font-semibold uppercase tracking-widest text-on-surface-variant/60">

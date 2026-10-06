@@ -2,8 +2,8 @@
 
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
-import Image from "next/image";
 import { translations, Language } from "@/lib/i18n";
+import { Logo, AvilaRidge } from "@/components/Brand";
 
 interface NavbarProps {
   currentLang?: Language;
@@ -18,7 +18,8 @@ export function Navbar({ currentLang = "es", onLanguageChange }: NavbarProps) {
   const t = translations[lang].nav;
 
   useEffect(() => {
-    const handleScroll = () => setScrolled(window.scrollY > 20);
+    const handleScroll = () => setScrolled(window.scrollY > 12);
+    handleScroll();
     window.addEventListener("scroll", handleScroll, { passive: true });
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
@@ -28,6 +29,13 @@ export function Navbar({ currentLang = "es", onLanguageChange }: NavbarProps) {
       setLang(currentLang);
     }
   }, [currentLang]);
+
+  useEffect(() => {
+    document.body.style.overflow = mobileMenuOpen ? "hidden" : "";
+    return () => {
+      document.body.style.overflow = "";
+    };
+  }, [mobileMenuOpen]);
 
   const handleLangToggle = () => {
     const nextLang = lang === "es" ? "en" : "es";
@@ -39,134 +47,112 @@ export function Navbar({ currentLang = "es", onLanguageChange }: NavbarProps) {
   };
 
   const navLinks = [
-    { href: "/nosotros", label: t.bodega },
     { href: "/catas", label: t.experiencias },
     { href: "/privadas", label: t.privadas },
+    { href: "/nosotros", label: t.bodega },
     { href: "/#terroir", label: t.terroir },
     { href: "/#contacto", label: t.contacto },
   ];
 
   return (
     <>
-      {/* Floating Island Navbar (high-end-visual-design standard) */}
-      <header className="fixed top-0 inset-x-0 z-50 px-4 sm:px-6 pointer-events-none">
-        <div
-          className={`mx-auto max-w-5xl transition-all duration-700 ease-[cubic-bezier(0.16,1,0.3,1)] pointer-events-auto ${
-            scrolled ? "mt-3 sm:mt-4" : "mt-4 sm:mt-6"
-          }`}
-        >
-          {/* Outer Island Container */}
-          <div className="bg-white/85 backdrop-blur-2xl border border-black/[0.06] rounded-full px-4 sm:px-6 py-2.5 sm:py-3 shadow-[0_8px_32px_rgba(122,32,72,0.06)] flex items-center justify-between gap-4">
-            {/* Brand Logo & Name */}
-            <Link href="/" className="flex items-center gap-2.5 group">
-              <div className="relative w-8 h-8 flex-shrink-0 transition-transform duration-500 ease-[cubic-bezier(0.16,1,0.3,1)] group-hover:scale-105">
-                <Image
-                  src="/images/logo-color.png"
-                  alt="El Origen"
-                  fill
-                  className="object-contain"
-                  priority
-                />
-              </div>
-              <span className="font-serif text-xl sm:text-[22px] font-semibold text-primary tracking-tight">
-                El Origen
-              </span>
-            </Link>
+      <header
+        className={`fixed top-0 inset-x-0 z-50 transition-colors duration-500 ${
+          scrolled || mobileMenuOpen
+            ? "bg-paper/95 backdrop-blur-md border-b border-outline-variant"
+            : "bg-transparent border-b border-transparent"
+        }`}
+      >
+        <div className="max-w-[1320px] mx-auto px-4 sm:px-8 lg:px-12 h-16 sm:h-20 flex items-center justify-between gap-6">
+          {/* Marca */}
+          <Link href="/" className="flex items-center gap-3 group" onClick={() => setMobileMenuOpen(false)}>
+            <Logo variant="mark" className="w-12 sm:w-14 transition-transform duration-500 group-hover:-translate-y-0.5" priority />
+            <span className="font-serif text-[17px] sm:text-[19px] font-bold tracking-[0.14em] text-primary-container uppercase">
+              El Origen
+            </span>
+          </Link>
 
-            {/* Desktop Navigation */}
-            <nav className="hidden md:flex items-center gap-6 lg:gap-8">
-              {navLinks.map((link) => (
-                <Link
-                  key={link.href}
-                  href={link.href}
-                  className="text-[13px] font-medium text-on-surface-variant hover:text-primary transition-colors duration-300 relative py-1 after:absolute after:bottom-0 after:left-0 after:h-[1.5px] after:bg-primary after:transition-all after:duration-300 after:w-0 hover:after:w-full"
-                >
-                  {link.label}
-                </Link>
-              ))}
-              <Link
-                href="/admin"
-                className="text-[13px] font-medium text-on-surface-variant/60 hover:text-primary transition-colors flex items-center gap-1"
-              >
-                <span className="material-symbols-outlined text-[14px]">lock</span>
-                {t.admin}
-              </Link>
-            </nav>
-
-            {/* Actions: Lang toggle + Nested Island CTA */}
-            <div className="flex items-center gap-2.5">
-              <button
-                onClick={handleLangToggle}
-                className="text-[11px] font-semibold text-on-surface-variant/80 hover:text-primary bg-black/[0.03] hover:bg-black/[0.06] px-3 py-1.5 rounded-full transition-all duration-300"
-                title="Cambiar idioma / Switch language"
-              >
-                {lang.toUpperCase()}
-              </button>
-
-              {/* Nested CTA Button (Button-in-Button pattern) */}
-              <Link
-                href="/catas"
-                className="group hidden sm:inline-flex items-center gap-2.5 bg-primary-container hover:bg-primary text-white text-[12px] font-semibold pl-4 pr-1.5 py-1.5 rounded-full transition-all duration-500 ease-[cubic-bezier(0.16,1,0.3,1)] shadow-sm active:scale-[0.98]"
-              >
-                <span>{t.reservar}</span>
-                <span className="w-7 h-7 rounded-full bg-white/20 flex items-center justify-center transition-transform duration-300 group-hover:translate-x-0.5 group-hover:-translate-y-[0.5px]">
-                  <span className="material-symbols-outlined text-[15px]">arrow_forward</span>
-                </span>
-              </Link>
-
-              {/* Mobile Menu Trigger */}
-              <button
-                onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-                className="p-2 text-primary md:hidden rounded-full hover:bg-black/[0.04] transition-colors"
-                aria-label="Abrir menú"
-              >
-                <span className="material-symbols-outlined text-2xl">
-                  {mobileMenuOpen ? "close" : "menu"}
-                </span>
-              </button>
-            </div>
-          </div>
-        </div>
-      </header>
-
-      {/* Fullscreen Mobile Glass Overlay */}
-      {mobileMenuOpen && (
-        <div className="fixed inset-0 z-40 bg-surface/98 backdrop-blur-3xl flex flex-col justify-center items-center p-6 animate-fade-in md:hidden overflow-y-auto">
-          <nav className="flex flex-col items-center gap-6 sm:gap-7 w-full max-w-xs text-center my-auto">
+          {/* Navegación desktop */}
+          <nav className="hidden lg:flex items-center gap-8" aria-label="Principal">
             {navLinks.map((link) => (
               <Link
                 key={link.href}
                 href={link.href}
-                onClick={() => setMobileMenuOpen(false)}
-                className="font-serif text-2xl sm:text-3xl font-semibold text-on-surface hover:text-primary transition-colors"
+                className="text-[14px] font-medium text-on-surface/80 hover:text-primary-container transition-colors relative py-1 after:absolute after:-bottom-0.5 after:left-0 after:h-px after:bg-primary-container after:transition-all after:duration-300 after:w-0 hover:after:w-full"
               >
                 {link.label}
               </Link>
             ))}
-            <Link
-              href="/admin"
-              onClick={() => setMobileMenuOpen(false)}
-              className="text-xs font-semibold uppercase tracking-widest text-on-surface-variant/60 hover:text-primary pt-2"
+          </nav>
+
+          {/* Acciones */}
+          <div className="flex items-center gap-2 sm:gap-3">
+            <button
+              onClick={handleLangToggle}
+              className="h-9 px-2.5 text-[12px] font-semibold tracking-[0.12em] text-on-surface/70 hover:text-primary-container transition-colors"
+              aria-label={lang === "es" ? "Switch to English" : "Cambiar a español"}
             >
-              {t.admin}
+              <span className={lang === "es" ? "text-primary-container" : ""}>ES</span>
+              <span className="mx-1 text-outline">/</span>
+              <span className={lang === "en" ? "text-primary-container" : ""}>EN</span>
+            </button>
+
+            <Link
+              href="/catas"
+              className="hidden sm:inline-flex items-center gap-2 h-10 px-5 bg-primary-container hover:bg-primary text-white text-[13px] font-semibold tracking-wide rounded transition-colors"
+            >
+              {t.reservar}
+              <span className="material-symbols-outlined text-[16px]">arrow_forward</span>
             </Link>
 
-            <div className="pt-6 w-full">
+            <button
+              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+              className="lg:hidden w-11 h-11 flex items-center justify-center text-primary-container rounded hover:bg-primary-container/5"
+              aria-label={mobileMenuOpen ? "Cerrar menú" : "Abrir menú"}
+              aria-expanded={mobileMenuOpen}
+            >
+              <span className="material-symbols-outlined text-[26px]">{mobileMenuOpen ? "close" : "menu"}</span>
+            </button>
+          </div>
+        </div>
+      </header>
+
+      {/* Menú móvil */}
+      {mobileMenuOpen && (
+        <div className="fixed inset-0 z-40 bg-primary text-paper flex flex-col pt-24 animate-fade-in lg:hidden overflow-y-auto">
+          <nav className="flex flex-col px-6 sm:px-10" aria-label="Móvil">
+            {navLinks.map((link, i) => (
               <Link
-                href="/catas"
+                key={link.href}
+                href={link.href}
                 onClick={() => setMobileMenuOpen(false)}
-                className="w-full flex items-center justify-center gap-3 bg-primary-container text-white text-xs font-semibold py-4 rounded-full shadow-md"
+                className="flex items-baseline gap-4 py-4 border-b border-paper/15 font-serif text-[28px] sm:text-4xl hover:text-sun transition-colors"
               >
-                <span>{t.reservar}</span>
-                <span className="material-symbols-outlined text-sm">arrow_forward</span>
+                <span className="font-sans text-[11px] tracking-[0.2em] text-sun tabular-nums">0{i + 1}</span>
+                {link.label}
               </Link>
-            </div>
+            ))}
           </nav>
+
+          <div className="px-6 sm:px-10 pt-8">
+            <Link
+              href="/catas"
+              onClick={() => setMobileMenuOpen(false)}
+              className="w-full flex items-center justify-center gap-2 h-14 bg-paper text-primary text-[14px] font-semibold rounded"
+            >
+              {t.reservar}
+              <span className="material-symbols-outlined text-[18px]">arrow_forward</span>
+            </Link>
+          </div>
+
+          <div className="mt-auto pt-12 text-paper/40">
+            <AvilaRidge strokeWidth={1.5} showBirds className="h-24" />
+          </div>
         </div>
       )}
 
-      {/* Spacer to preserve layout flow under floating island */}
-      <div className="h-20 sm:h-24" />
+      {/* Espaciador bajo la barra fija */}
+      <div className="h-16 sm:h-20" />
     </>
   );
 }

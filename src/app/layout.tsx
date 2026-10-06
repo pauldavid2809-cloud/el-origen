@@ -4,7 +4,7 @@ import { WhatsAppConcierge } from "@/components/WhatsAppConcierge";
 import { JsonLd } from "@/components/JsonLd";
 
 export const viewport: Viewport = {
-  themeColor: "#5C0531",
+  themeColor: "#5A1C31",
   width: "device-width",
   initialScale: 1,
   maximumScale: 5,
@@ -69,6 +69,10 @@ export const metadata: Metadata = {
       "Catas guiadas de colección, copas de cristal y maridajes de autor en Caracas, Venezuela.",
     images: ["https://images.unsplash.com/photo-1510812431401-41d2bd2722f3?q=80&w=1200&auto=format&fit=crop"],
   },
+  icons: {
+    icon: "/images/icon-192.png",
+    apple: "/images/icon-192.png",
+  },
   robots: {
     index: true,
     follow: true,
@@ -99,7 +103,7 @@ export default function RootLayout({
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="" />
         <link
-          href="https://fonts.googleapis.com/css2?family=Manrope:wght@300;400;500;600;700;800&family=Playfair+Display:ital,wght@0,400;0,600;0,700;0,800;1,400;1,600&display=swap"
+          href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700&family=Gelasio:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500&display=swap"
           rel="stylesheet"
         />
         <link
@@ -107,7 +111,7 @@ export default function RootLayout({
           rel="stylesheet"
         />
       </head>
-      <body className="bg-background text-on-background antialiased min-h-screen flex flex-col selection:bg-primary-fixed selection:text-primary">
+      <body className="bg-background text-on-background antialiased min-h-screen flex flex-col">
         <JsonLd />
         {children}
         <WhatsAppConcierge />

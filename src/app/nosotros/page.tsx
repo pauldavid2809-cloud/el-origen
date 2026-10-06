@@ -5,7 +5,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
-import { TerroirDivider } from "@/components/TerroirDivider";
+import { PageHeader, Logo, SunBurst } from "@/components/Brand";
 import { translations, Language } from "@/lib/i18n";
 
 export default function NosotrosPage() {
@@ -25,119 +25,87 @@ export default function NosotrosPage() {
 
   const t = translations[lang];
 
+  const rows = [
+    {
+      badge: t.winery.section1Badge,
+      title: t.winery.section1Title,
+      p: [t.winery.section1P1, t.winery.section1P2],
+      img: "https://images.unsplash.com/photo-1506377247377-2a5b3b417ebb?q=80&w=1200&auto=format&fit=crop",
+      alt: lang === "es" ? "Copa de vino tinto frente a un viñedo" : "Glass of red wine overlooking a vineyard",
+    },
+    {
+      badge: t.winery.section2Badge,
+      title: t.winery.section2Title,
+      p: [t.winery.section2P1, t.winery.section2P2],
+      img: "https://images.unsplash.com/photo-1528823872057-9c018a7a7553?q=80&w=1200&auto=format&fit=crop",
+      alt: lang === "es" ? "Tanques de acero en una bodega" : "Steel tanks in a winery cellar",
+    },
+  ];
+
   return (
-    <div className="bg-background text-on-background min-h-screen flex flex-col selection:bg-primary/10 selection:text-primary">
+    <div className="bg-background text-on-background min-h-screen flex flex-col">
       <Navbar currentLang={lang} onLanguageChange={handleLanguageChange} />
 
       <main className="flex-grow">
-        {/* Header Hero */}
-        <section className="pt-20 sm:pt-28 pb-20 sm:pb-28 px-5 sm:px-8 lg:px-12 text-center max-w-4xl mx-auto">
-          <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-black/[0.03] border border-black/[0.06] mb-6">
-            <span className="text-[10px] font-semibold uppercase tracking-[0.2em] text-primary">
-              {t.winery.badge}
-            </span>
+        <PageHeader
+          eyebrow={t.winery.badge}
+          title={
+            <>
+              {t.winery.titleMain} <em className="italic font-normal text-primary-container">{t.winery.titleHighlight}</em>
+            </>
+          }
+          subtitle={t.winery.subtitle}
+        />
+
+        {/* El logo como manifiesto */}
+        <section className="px-5 sm:px-8 lg:px-12 max-w-[1320px] mx-auto w-full py-16 sm:py-24 grid grid-cols-1 md:grid-cols-12 gap-10 items-center">
+          <div className="md:col-span-5 flex justify-center">
+            <Logo variant="full" className="w-64 sm:w-80" />
           </div>
-
-          <h1 className="font-serif text-4xl sm:text-6xl md:text-7xl font-semibold text-on-surface tracking-tight leading-[1.08] mb-6 text-balance">
-            {t.winery.titleMain} <span className="italic text-primary font-normal">{t.winery.titleHighlight}</span>
-          </h1>
-
-          <p className="text-[15px] sm:text-lg text-on-surface-variant/80 max-w-2xl mx-auto leading-relaxed text-balance">
-            {t.winery.subtitle}
-          </p>
+          <blockquote className="md:col-span-7 md:pl-10 md:border-l border-outline-variant">
+            <p className="font-serif text-[1.65rem] sm:text-4xl leading-snug text-on-surface text-balance">
+              {lang === "es"
+                ? "La montaña, el sol y la copa: volver al origen de cada vino, con Caracas como punto de partida."
+                : "The mountain, the sun and the glass: going back to the origin of every wine, with Caracas as our starting point."}
+            </p>
+          </blockquote>
         </section>
 
-        {/* Gallery / Story Grid in Double-Bezel Frames */}
-        <section className="py-12 px-5 sm:px-8 lg:px-12 max-w-[1320px] mx-auto space-y-24">
-          {/* Row 1: The Mountain & Soil */}
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 lg:gap-16 items-center">
-            <div className="lg:col-span-6 p-2 rounded-[2.5rem] bg-black/[0.02] border border-black/[0.05]">
-              <div className="relative rounded-[calc(2.5rem-0.5rem)] overflow-hidden aspect-[4/3] w-full bg-surface-container">
-                <Image
-                  src="https://images.unsplash.com/photo-1506377247377-2a5b3b417ebb?q=80&w=1200&auto=format&fit=crop"
-                  alt="Curaduría de vinos El Origen Caracas"
-                  fill
-                  className="object-cover"
-                />
+        <section className="px-5 sm:px-8 lg:px-12 max-w-[1320px] mx-auto w-full pb-12 space-y-24 sm:space-y-32">
+          {rows.map((row, i) => (
+            <div key={i} className="grid grid-cols-1 lg:grid-cols-12 gap-12 lg:gap-16 items-center">
+              <div className={`lg:col-span-5 ${i % 2 ? "lg:order-2 lg:col-start-8" : ""}`}>
+                <div className="relative arch overflow-hidden aspect-[4/5] max-w-md mx-auto bg-surface-container border border-outline-variant">
+                  <Image src={row.img} alt={row.alt} fill sizes="(min-width: 1024px) 35vw, 90vw" className="object-cover" />
+                </div>
+              </div>
+
+              <div className={`lg:col-span-6 ${i % 2 ? "lg:order-1 lg:col-start-1" : "lg:col-start-7"} space-y-5`}>
+                <p className="eyebrow">{row.badge}</p>
+                <h2 className="font-serif text-[2rem] sm:text-5xl leading-[1.1] text-on-surface text-balance">{row.title}</h2>
+                {row.p.map((para, j) => (
+                  <p key={j} className="text-[16px] text-on-surface-variant leading-relaxed">
+                    {para}
+                  </p>
+                ))}
               </div>
             </div>
-
-            <div className="lg:col-span-6 space-y-5">
-              <span className="text-[10px] font-semibold uppercase tracking-[0.2em] text-primary block">
-                {t.winery.section1Badge}
-              </span>
-
-              <h2 className="font-serif text-3xl sm:text-4xl font-semibold text-on-surface tracking-tight leading-tight">
-                {t.winery.section1Title}
-              </h2>
-
-              <p className="text-[14px] sm:text-base text-on-surface-variant/80 leading-relaxed font-normal">
-                {t.winery.section1P1}
-              </p>
-
-              <p className="text-[14px] sm:text-base text-on-surface-variant/80 leading-relaxed font-normal">
-                {t.winery.section1P2}
-              </p>
-            </div>
-          </div>
-
-          <TerroirDivider />
-
-          {/* Row 2: The Cellar & Craft */}
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 lg:gap-16 items-center">
-            <div className="lg:col-span-6 lg:order-2 p-2 rounded-[2.5rem] bg-black/[0.02] border border-black/[0.05]">
-              <div className="relative rounded-[calc(2.5rem-0.5rem)] overflow-hidden aspect-[4/3] w-full bg-surface-container">
-                <Image
-                  src="https://images.unsplash.com/photo-1510812431401-41d2bd2722f3?q=80&w=1200&auto=format&fit=crop"
-                  alt="Degustación y maridaje de autor en Caracas"
-                  fill
-                  className="object-cover"
-                />
-              </div>
-            </div>
-
-            <div className="lg:col-span-6 lg:order-1 space-y-5">
-              <span className="text-[10px] font-semibold uppercase tracking-[0.2em] text-primary block">
-                {t.winery.section2Badge}
-              </span>
-
-              <h2 className="font-serif text-3xl sm:text-4xl font-semibold text-on-surface tracking-tight leading-tight">
-                {t.winery.section2Title}
-              </h2>
-
-              <p className="text-[14px] sm:text-base text-on-surface-variant/80 leading-relaxed font-normal">
-                {t.winery.section2P1}
-              </p>
-
-              <p className="text-[14px] sm:text-base text-on-surface-variant/80 leading-relaxed font-normal">
-                {t.winery.section2P2}
-              </p>
-            </div>
-          </div>
+          ))}
         </section>
 
-        {/* CTA Banner */}
-        <section className="py-20 sm:py-28 px-5 sm:px-8 lg:px-12 max-w-[1320px] mx-auto w-full text-center">
-          <div className="p-2 sm:p-2.5 rounded-[2.5rem] bg-black/[0.02] border border-black/[0.05]">
-            <div className="bg-white rounded-[calc(2.5rem-0.625rem)] p-8 sm:p-14 max-w-3xl mx-auto space-y-5">
-              <h2 className="font-serif text-3xl sm:text-4xl font-semibold text-on-surface tracking-tight">
-                {t.winery.ctaTitle}
-              </h2>
-              <p className="text-[14px] sm:text-base text-on-surface-variant/80 max-w-xl mx-auto">
-                {t.winery.ctaSubtitle}
-              </p>
-              <div className="pt-3">
-                <Link
-                  href="/catas"
-                  className="group inline-flex items-center gap-3 bg-primary-container hover:bg-primary text-white text-[13px] font-semibold pl-6 pr-2 py-2 rounded-full transition-all duration-300 shadow-sm"
-                >
-                  <span>{t.winery.ctaButton}</span>
-                  <span className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center transition-transform group-hover:translate-x-0.5">
-                    <span className="material-symbols-outlined text-[16px]">arrow_forward</span>
-                  </span>
-                </Link>
-              </div>
-            </div>
+        {/* CTA */}
+        <section className="px-5 sm:px-8 lg:px-12 max-w-[1320px] mx-auto w-full py-24 sm:py-32">
+          <div className="relative overflow-hidden rounded-2xl bg-primary-container text-paper text-center px-6 py-16 sm:py-20">
+            <SunBurst className="w-20 mx-auto text-sun mb-6" />
+            <h2 className="font-serif text-[2rem] sm:text-5xl leading-tight max-w-2xl mx-auto text-balance">{t.winery.ctaTitle}</h2>
+            <p className="mt-5 text-[15px] sm:text-base text-paper/80 max-w-xl mx-auto">{t.winery.ctaSubtitle}</p>
+            <Link
+              href="/catas"
+              className="mt-9 inline-flex items-center justify-center gap-2 h-[52px] px-7 bg-paper text-primary hover:bg-white text-[14px] font-semibold rounded transition-colors"
+            >
+              {t.winery.ctaButton}
+              <span className="material-symbols-outlined text-[18px]">arrow_forward</span>
+            </Link>
           </div>
         </section>
       </main>

@@ -1,7 +1,7 @@
 import React from "react";
 import Link from "next/link";
-import Image from "next/image";
 import { Language, translations } from "@/lib/i18n";
+import { Logo, AvilaRidge } from "@/components/Brand";
 
 interface FooterProps {
   currentLang?: Language;
@@ -9,85 +9,91 @@ interface FooterProps {
 
 export function Footer({ currentLang = "es" }: FooterProps) {
   const t = translations[currentLang];
+  const es = currentLang === "es";
+
+  const contact = [
+    { href: "https://wa.me/584141074007", icon: "chat", label: "WhatsApp", value: "+58 414-107 4007" },
+    { href: "https://www.instagram.com/elorigen.vzla", icon: "photo_camera", label: "Instagram", value: "@elorigen.vzla" },
+    { href: "mailto:experiencias@elorigen.com", icon: "mail", label: "Email", value: "experiencias@elorigen.com" },
+  ];
 
   return (
-    <footer className="border-t border-outline-variant/40 mt-auto">
-      <div className="w-full px-5 sm:px-8 lg:px-12 max-w-[1320px] mx-auto py-16 sm:py-20">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-12 md:gap-8">
-          {/* Brand */}
-          <div className="space-y-4">
-            <Link href="/" className="flex items-center gap-2.5">
-              <div className="relative w-7 h-7">
-                <Image src="/images/logo-color.png" alt="El Origen" fill className="object-contain" />
+    <footer className="mt-auto text-paper">
+      {/* Silueta del Ávila como transición */}
+      <AvilaRidge fill="var(--wine-deep)" stroke="var(--wine-deep)" showValley={false} className="h-16 sm:h-24 -mb-px" />
+
+      <div className="bg-primary">
+        <div className="max-w-[1320px] mx-auto px-5 sm:px-8 lg:px-12 pt-10 sm:pt-14 pb-24 sm:pb-10">
+          <div className="grid grid-cols-1 md:grid-cols-12 gap-12 md:gap-8">
+            {/* Marca */}
+            <div className="md:col-span-5 space-y-6">
+              <Link href="/" className="inline-block" aria-label="El Origen — inicio">
+                <Logo tone="white" variant="full" className="w-40 sm:w-48" />
+              </Link>
+              <p className="text-[15px] text-paper/70 leading-relaxed max-w-sm">{t.footer.description}</p>
+            </div>
+
+            {/* Enlaces */}
+            <div className="md:col-span-3 grid grid-cols-2 md:grid-cols-1 gap-8">
+              <div>
+                <p className="eyebrow !text-sun mb-4">{t.footer.explore}</p>
+                <nav className="flex flex-col gap-2.5">
+                  {[
+                    { href: "/catas", label: t.nav.experiencias },
+                    { href: "/privadas", label: t.nav.privadas },
+                    { href: "/nosotros", label: t.nav.bodega },
+                    { href: "/Dossier-El-Origen-Caracas.pdf", label: es ? "Dossier comercial" : "Commercial dossier" },
+                  ].map((l) => (
+                    <Link key={l.href} href={l.href} className="text-[14px] text-paper/80 hover:text-sun transition-colors">
+                      {l.label}
+                    </Link>
+                  ))}
+                </nav>
               </div>
-              <span className="font-serif text-lg font-semibold text-primary tracking-tight">
-                El Origen
-              </span>
-            </Link>
-            <p className="text-[13px] text-on-surface-variant/70 leading-relaxed max-w-[280px]">
-              {t.footer.description}
-            </p>
-          </div>
-
-          {/* Links */}
-          <div className="flex flex-col sm:flex-row gap-8 sm:gap-12">
-            <div className="space-y-3">
-              <span className="text-[11px] font-semibold text-on-surface-variant/50 uppercase tracking-wider">
-                {t.footer.explore}
-              </span>
-              <nav className="flex flex-col gap-2">
-                <Link href="/nosotros" className="text-[13px] text-on-surface-variant/80 hover:text-primary transition-colors duration-300">
-                  {t.nav.bodega}
-                </Link>
-                <Link href="/catas" className="text-[13px] text-on-surface-variant/80 hover:text-primary transition-colors duration-300">
-                  {t.nav.experiencias}
-                </Link>
-                <Link href="/privadas" className="text-[13px] text-on-surface-variant/80 hover:text-primary transition-colors duration-300">
-                  {t.nav.privadas}
-                </Link>
-              </nav>
             </div>
-            <div className="space-y-3">
-              <span className="text-[11px] font-semibold text-on-surface-variant/50 uppercase tracking-wider">
-                {t.footer.legal}
-              </span>
-              <nav className="flex flex-col gap-2">
-                <Link href="#" className="text-[13px] text-on-surface-variant/80 hover:text-primary transition-colors duration-300">
-                  {t.footer.privacy}
-                </Link>
-                <Link href="#" className="text-[13px] text-on-surface-variant/80 hover:text-primary transition-colors duration-300">
-                  {t.footer.terms}
-                </Link>
-                <Link href="#" className="text-[13px] text-on-surface-variant/80 hover:text-primary transition-colors duration-300">
-                  {t.footer.sustainability}
-                </Link>
-              </nav>
+
+            {/* Contacto */}
+            <div className="md:col-span-4">
+              <p className="eyebrow !text-sun mb-4">{t.nav.contacto}</p>
+              <ul className="space-y-3">
+                {contact.map((c) => (
+                  <li key={c.icon}>
+                    <a
+                      href={c.href}
+                      target={c.href.startsWith("http") ? "_blank" : undefined}
+                      rel={c.href.startsWith("http") ? "noopener noreferrer" : undefined}
+                      className="group flex items-center gap-3 text-[14px] text-paper/80 hover:text-sun transition-colors"
+                    >
+                      <span className="w-9 h-9 rounded-full border border-paper/20 group-hover:border-sun flex items-center justify-center transition-colors">
+                        <span className="material-symbols-outlined text-[17px]">{c.icon}</span>
+                      </span>
+                      <span>
+                        <span className="sr-only">{c.label}: </span>
+                        {c.value}
+                      </span>
+                    </a>
+                  </li>
+                ))}
+                <li className="flex items-center gap-3 text-[14px] text-paper/60 pl-0.5">
+                  <span className="w-9 h-9 flex items-center justify-center">
+                    <span className="material-symbols-outlined text-[17px]">location_on</span>
+                  </span>
+                  Caracas, Venezuela
+                </li>
+              </ul>
             </div>
           </div>
 
-          {/* Contact & Social */}
-          <div className="space-y-4 md:text-right">
-            <div className="flex gap-2 md:justify-end">
-              {[
-                { href: "mailto:experiencias@elorigen.com", icon: "mail", label: "Email" },
-                { href: "https://wa.me/584141074007", icon: "chat", label: "WhatsApp" },
-                { href: "https://maps.google.com", icon: "location_on", label: "Maps" },
-              ].map((s) => (
-                <a
-                  key={s.icon}
-                  href={s.href}
-                  target={s.href.startsWith("http") ? "_blank" : undefined}
-                  rel={s.href.startsWith("http") ? "noopener noreferrer" : undefined}
-                  className="w-9 h-9 rounded-full bg-surface-container/60 hover:bg-primary-container hover:text-white text-on-surface-variant/60 flex items-center justify-center transition-all duration-300"
-                  title={s.label}
-                >
-                  <span className="material-symbols-outlined text-[16px]">{s.icon}</span>
-                </a>
-              ))}
+          <div className="mt-14 pt-6 border-t border-paper/15 flex flex-col sm:flex-row gap-3 sm:items-center justify-between text-[12px] text-paper/50">
+            <p>{t.footer.copyright}</p>
+            <div className="flex gap-5">
+              <Link href="#" className="hover:text-paper transition-colors">{t.footer.privacy}</Link>
+              <Link href="#" className="hover:text-paper transition-colors">{t.footer.terms}</Link>
+              <Link href="/admin" className="hover:text-paper transition-colors inline-flex items-center gap-1">
+                <span className="material-symbols-outlined text-[13px]">lock</span>
+                {t.nav.admin}
+              </Link>
             </div>
-            <p className="text-[11px] text-on-surface-variant/40">
-              {t.footer.copyright}
-            </p>
           </div>
         </div>
       </div>

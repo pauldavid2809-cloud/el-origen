@@ -145,8 +145,8 @@ export default function ConfirmationPage() {
         </div>
 
         {/* Double-Bezel Ticket Card */}
-        <div className="p-2 sm:p-2.5 rounded-[2.5rem] bg-black/[0.02] border border-black/[0.05]">
-          <div className="bg-white rounded-[calc(2.5rem-0.625rem)] p-7 sm:p-9 shadow-[0_8px_32px_rgba(122,32,72,0.04)] relative overflow-hidden">
+        <div className="p-2 sm:p-2.5 rounded-2xl bg-black/[0.02] border border-black/[0.05]">
+          <div className="bg-white rounded-xl p-7 sm:p-9 shadow-[0_8px_32px_rgba(125,42,70,0.04)] relative overflow-hidden">
             <div className="text-center border-b border-black/[0.05] pb-5 mb-6">
               <span className="text-[10px] font-semibold uppercase tracking-widest text-on-surface-variant/60 block mb-1">
                 Experiencia Seleccionada

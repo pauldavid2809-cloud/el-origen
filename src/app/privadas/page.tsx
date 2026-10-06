@@ -3,7 +3,7 @@
 import React, { useState } from "react";
 import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
-import { TerroirDivider } from "@/components/TerroirDivider";
+import { PageHeader } from "@/components/Brand";
 
 export default function PrivateEventsPage() {
   const [companyOrName, setCompanyOrName] = useState("");
@@ -49,34 +49,61 @@ export default function PrivateEventsPage() {
     }
   };
 
+  const included = [
+    { icon: "wine_bar", title: "Sommelier dedicado", text: "Guía la velada y adapta la selección al perfil de sus invitados." },
+    { icon: "restaurant", title: "Maridaje de autor", text: "Con nuestros aliados gastronómicos de Caracas." },
+    { icon: "inventory_2", title: "Llave en mano", text: "Cristalería, montaje, fichas de cata y co-branding opcional." },
+    { icon: "groups", title: "De 4 a 100 personas", text: "Directorios, clientes VIP, equipos y celebraciones." },
+  ];
+
+  const field =
+    "w-full h-12 bg-surface-container-lowest border border-outline-variant rounded px-3.5 text-[15px] text-on-surface placeholder:text-on-surface-variant/60 focus:border-primary-container focus:outline-none transition-colors";
+  const labelCls = "block text-[12px] font-semibold uppercase tracking-[0.12em] text-on-surface-variant mb-2";
+
   return (
-    <div className="bg-background text-on-background min-h-screen flex flex-col selection:bg-primary/10 selection:text-primary">
+    <div className="bg-background text-on-background min-h-screen flex flex-col">
       <Navbar />
 
-      <main className="flex-grow py-16 sm:py-24 px-5 sm:px-8 lg:px-12 max-w-4xl mx-auto w-full">
-        <div className="text-center mb-14">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-black/[0.03] border border-black/[0.06] mb-4">
-            <span className="text-[10px] font-semibold uppercase tracking-[0.2em] text-primary">
-              Servicios B2B & Exclusivos
-            </span>
-          </div>
+      <main className="flex-grow">
+        <PageHeader
+          eyebrow="Servicios B2B & exclusivos"
+          title={<>Catas privadas & <em className="italic font-normal text-primary-container">eventos corporativos</em></>}
+          subtitle="Diseñamos experiencias enológicas a medida para empresas, reuniones de directorio, agasajos a clientes VIP y celebraciones privadas."
+        />
 
-          <h1 className="font-serif text-4xl sm:text-5xl font-semibold text-on-surface tracking-tight mb-4">
-            Catas Privadas & Eventos Corporativos
-          </h1>
+        <div className="px-5 sm:px-8 lg:px-12 max-w-[1320px] mx-auto w-full pt-10 sm:pt-14 pb-24 grid grid-cols-1 lg:grid-cols-12 gap-12 lg:gap-16">
+          <aside className="lg:col-span-4">
+            <p className="eyebrow mb-6">Qué incluye</p>
+            <ul className="border-t border-outline-variant">
+              {included.map((it) => (
+                <li key={it.title} className="flex gap-4 py-5 border-b border-outline-variant">
+                  <span className="material-symbols-outlined text-primary-container text-[22px] mt-0.5">{it.icon}</span>
+                  <span>
+                    <span className="block font-serif text-lg text-on-surface">{it.title}</span>
+                    <span className="block text-[14px] text-on-surface-variant leading-relaxed mt-0.5">{it.text}</span>
+                  </span>
+                </li>
+              ))}
+            </ul>
+            <a
+              href="https://wa.me/584141074007?text=Hola%20El%20Origen,%20quisiera%20cotizar%20una%20cata%20privada"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="mt-8 inline-flex items-center gap-2 text-[14px] font-semibold text-primary-container"
+            >
+              <span className="material-symbols-outlined text-[18px]">chat</span>
+              ¿Prefiere conversarlo? Escríbanos por WhatsApp
+            </a>
+          </aside>
 
-          <p className="text-[14px] sm:text-base text-on-surface-variant/80 max-w-xl mx-auto leading-relaxed">
-            Diseñamos experiencias enológicas a medida para empresas, reuniones de directorio, agasajos a clientes VIP y celebraciones privadas con la cava en exclusiva.
-          </p>
-        </div>
-
+          <div className="lg:col-span-8">
         {submitted ? (
-          <div className="p-2 sm:p-2.5 rounded-[2.5rem] bg-black/[0.02] border border-black/[0.05]">
-            <div className="bg-white rounded-[calc(2.5rem-0.625rem)] p-10 sm:p-14 text-center space-y-4 animate-fade-in">
+          <div>
+            <div className="bg-surface-container-lowest border border-outline-variant rounded-2xl p-10 sm:p-14 text-center space-y-4 animate-fade-in">
               <div className="w-14 h-14 rounded-full bg-emerald-50 text-emerald-800 flex items-center justify-center mx-auto border border-emerald-200">
                 <span className="material-symbols-outlined text-2xl">check_circle</span>
               </div>
-              <h2 className="font-serif text-2xl sm:text-3xl font-semibold text-on-surface">
+              <h2 className="font-serif text-3xl text-on-surface">
                 ¡Solicitud Recibida!
               </h2>
               <p className="text-[13px] sm:text-sm text-on-surface-variant/80 max-w-md mx-auto leading-relaxed">
@@ -85,7 +112,7 @@ export default function PrivateEventsPage() {
               <div className="pt-4">
                 <button
                   onClick={() => setSubmitted(false)}
-                  className="text-[12px] font-semibold text-primary underline"
+                  className="text-[14px] font-semibold text-primary-container underline underline-offset-4"
                 >
                   Enviar otra solicitud
                 </button>
@@ -93,14 +120,14 @@ export default function PrivateEventsPage() {
             </div>
           </div>
         ) : (
-          <div className="p-2 sm:p-2.5 rounded-[2.5rem] bg-black/[0.02] border border-black/[0.05]">
+          <div>
             <form
               onSubmit={handleSubmit}
-              className="bg-white rounded-[calc(2.5rem-0.625rem)] p-8 sm:p-12 shadow-[0_8px_32px_rgba(122,32,72,0.03)] space-y-6 animate-fade-in text-[13px]"
+              className="bg-surface-container-lowest border border-outline-variant rounded-2xl p-6 sm:p-10 space-y-7 animate-fade-in"
             >
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-5 gap-y-6">
                 <div>
-                  <label className="block text-[11px] uppercase font-semibold tracking-wider text-on-surface-variant/70 mb-1.5">
+                  <label className={labelCls}>
                     Empresa o Nombre del Anfitrión *
                   </label>
                   <input
@@ -109,18 +136,18 @@ export default function PrivateEventsPage() {
                     value={companyOrName}
                     onChange={(e) => setCompanyOrName(e.target.value)}
                     placeholder="Ej: Estudio Jurídico / Familia Rossi"
-                    className="w-full bg-surface-container-low border border-black/[0.06] rounded-xl p-3 text-on-surface focus:border-primary focus:outline-none transition-colors"
+                    className={field}
                   />
                 </div>
 
                 <div>
-                  <label className="block text-[11px] uppercase font-semibold tracking-wider text-on-surface-variant/70 mb-1.5">
+                  <label className={labelCls}>
                     Tipo de Evento
                   </label>
                   <select
                     value={eventType}
                     onChange={(e) => setEventType(e.target.value as any)}
-                    className="w-full bg-surface-container-low border border-black/[0.06] rounded-xl p-3 text-on-surface focus:border-primary focus:outline-none transition-colors"
+                    className={field}
                   >
                     <option value="corporate">Evento Corporativo / Directorio</option>
                     <option value="vip">Agasajo a Clientes VIP</option>
@@ -130,7 +157,7 @@ export default function PrivateEventsPage() {
                 </div>
 
                 <div>
-                  <label className="block text-[11px] uppercase font-semibold tracking-wider text-on-surface-variant/70 mb-1.5">
+                  <label className={labelCls}>
                     Correo Electrónico de Contacto *
                   </label>
                   <input
@@ -139,12 +166,12 @@ export default function PrivateEventsPage() {
                     value={contactEmail}
                     onChange={(e) => setContactEmail(e.target.value)}
                     placeholder="contacto@empresa.com"
-                    className="w-full bg-surface-container-low border border-black/[0.06] rounded-xl p-3 text-on-surface focus:border-primary focus:outline-none transition-colors"
+                    className={field}
                   />
                 </div>
 
                 <div>
-                  <label className="block text-[11px] uppercase font-semibold tracking-wider text-on-surface-variant/70 mb-1.5">
+                  <label className={labelCls}>
                     Teléfono / WhatsApp *
                   </label>
                   <input
@@ -153,12 +180,12 @@ export default function PrivateEventsPage() {
                     value={contactPhone}
                     onChange={(e) => setContactPhone(e.target.value)}
                     placeholder="+58 414 123-4567"
-                    className="w-full bg-surface-container-low border border-black/[0.06] rounded-xl p-3 text-on-surface focus:border-primary focus:outline-none transition-colors"
+                    className={field}
                   />
                 </div>
 
                 <div>
-                  <label className="block text-[11px] uppercase font-semibold tracking-wider text-on-surface-variant/70 mb-1.5">
+                  <label className={labelCls}>
                     Cantidad Estimada de Asistentes
                   </label>
                   <input
@@ -167,36 +194,36 @@ export default function PrivateEventsPage() {
                     max="100"
                     value={estimatedGuests}
                     onChange={(e) => setEstimatedGuests(Number(e.target.value))}
-                    className="w-full bg-surface-container-low border border-black/[0.06] rounded-xl p-3 text-on-surface focus:border-primary focus:outline-none transition-colors"
+                    className={field}
                   />
                 </div>
 
                 <div>
-                  <label className="block text-[11px] uppercase font-semibold tracking-wider text-on-surface-variant/70 mb-1.5">
+                  <label className={labelCls}>
                     Fecha Tentativa
                   </label>
                   <input
                     type="date"
                     value={preferredDate}
                     onChange={(e) => setPreferredDate(e.target.value)}
-                    className="w-full bg-surface-container-low border border-black/[0.06] rounded-xl p-3 text-on-surface focus:border-primary focus:outline-none transition-colors"
+                    className={field}
                   />
                 </div>
               </div>
 
               <div className="space-y-3 pt-2">
-                <label className="block text-[11px] uppercase font-semibold tracking-wider text-on-surface-variant/70">
+                <label className={labelCls}>
                   Servicios Adicionales Requeridos
                 </label>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <label className="flex items-center gap-3 p-3.5 rounded-2xl border border-black/[0.06] bg-surface-container-low cursor-pointer">
+                  <label className="flex items-center gap-3 h-12 px-3.5 rounded border border-outline-variant bg-surface-container-lowest cursor-pointer">
                     <input
                       type="checkbox"
                       checked={transportRequired}
                       onChange={(e) => setTransportRequired(e.target.checked)}
-                      className="rounded text-primary focus:ring-primary h-4 w-4"
+                      className="h-4 w-4 accent-[#7D2A46]"
                     />
-                    <span className="text-[12px] font-medium text-on-surface">
+                    <span className="text-[14px] text-on-surface">
                       Servicio de traslado privado en Caracas
                     </span>
                   </label>
@@ -204,7 +231,7 @@ export default function PrivateEventsPage() {
                   <select
                     value={pairingPreference}
                     onChange={(e) => setPairingPreference(e.target.value as any)}
-                    className="w-full bg-surface-container-low border border-black/[0.06] rounded-2xl p-3.5 text-[12px] font-medium focus:border-primary focus:outline-none transition-colors"
+                    className={field}
                   >
                     <option value="standard">Maridaje de Quesos Sowi & Charcutería</option>
                     <option value="premium">Menú Degustación con Maratea Trattoria</option>
@@ -214,35 +241,34 @@ export default function PrivateEventsPage() {
               </div>
 
               <div>
-                <label className="block text-[11px] uppercase font-semibold tracking-wider text-on-surface-variant/70 mb-1.5">
+                <label className={labelCls}>
                   Requerimientos Específicos o Notas
                 </label>
                 <textarea
-                  rows={3}
+                  rows={4}
                   value={budgetNotes}
                   onChange={(e) => setBudgetNotes(e.target.value)}
                   placeholder="Indique si requiere botellas grabadas con logo corporativo, proyector para presentaciones, etc..."
-                  className="w-full bg-surface-container-low border border-black/[0.06] rounded-xl p-3 text-on-surface focus:border-primary focus:outline-none transition-colors"
+                  className={`${field} h-auto py-3`}
                 />
               </div>
 
-              <div className="pt-3">
+              <div className="pt-1">
                 <button
                   type="submit"
                   disabled={loading}
-                  className="group w-full flex items-center justify-between pl-7 pr-2 py-2.5 bg-primary-container hover:bg-primary text-white text-[13px] font-semibold rounded-full transition-all duration-300 shadow-sm active:scale-[0.98] disabled:opacity-50"
+                  className="w-full flex items-center justify-center gap-2 h-14 bg-primary-container hover:bg-primary text-white text-[15px] font-semibold rounded transition-colors disabled:opacity-50"
                 >
-                  <span>{loading ? "Enviando solicitud..." : "Solicitar Cotización y Propuesta"}</span>
-                  <span className="w-9 h-9 rounded-full bg-white/20 flex items-center justify-center transition-transform group-hover:translate-x-0.5">
-                    <span className="material-symbols-outlined text-[18px]">send</span>
-                  </span>
+                  {loading ? "Enviando solicitud..." : "Solicitar cotización y propuesta"}
+                  <span className="material-symbols-outlined text-[18px]">send</span>
                 </button>
               </div>
             </form>
           </div>
         )}
 
-        <TerroirDivider className="my-20" />
+          </div>
+        </div>
       </main>
 
       <Footer />
