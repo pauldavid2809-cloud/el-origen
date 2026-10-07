@@ -1,26 +1,43 @@
 import "server-only";
 import QRCode from "qrcode";
-import { Resend } from "resend";
-import type { Order, DeliveryStatus } from "./orders";
+import type { Order, DeliveryStatus, Ticket } from "./orders";
 import { CONTACT } from "./contact";
+import { sendMail, type MailAttachment } from "./mailer";
+import { policiesEmailHtml, policiesPlainText } from "./policies";
 
-/* Notificaciones al cliente: correo (Resend) y WhatsApp (Meta Cloud API). */
+/* Notificaciones al cliente: correo (Gmail SMTP o Resend, vía mailer.ts) y WhatsApp
+   (API de Meta o cola del bot propio). Cada persona recibe su propia entrada con QR. */
 
 export function appUrl(): string {
   return (process.env.NEXT_PUBLIC_APP_URL || "https://el-origen-two.vercel.app").replace(/\/+$/, "");
 }
 
 export const orderUrl = (o: Pick<Order, "token">) => `${appUrl()}/orden/${o.token}`;
-export const checkinUrl = (o: Pick<Order, "token">) => `${appUrl()}/verificar/${o.token}`;
+/** Lo que codifica el QR de cada entrada: la página de validación con el token del ticket. */
+export const ticketCheckinUrl = (t: Pick<Ticket, "token">) => `${appUrl()}/verificar/${t.token}`;
 
-export function qrPng(o: Pick<Order, "token">): Promise<Buffer> {
-  return QRCode.toBuffer(checkinUrl(o), {
+export function qrPng(data: string): Promise<Buffer> {
+  return QRCode.toBuffer(data, {
     width: 480,
     margin: 2,
     errorCorrectionLevel: "M",
     color: { dark: "#2A1519", light: "#FFFFFF" },
   });
 }
+
+/* ─── Etiquetas ─── */
+
+export const PAYMENT_METHOD_LABEL: Record<string, string> = {
+  pago_movil: "Pago Móvil",
+  transferencia: "Transferencia",
+  binance_usdt: "Binance USDT",
+  efectivo: "Efectivo",
+};
+
+const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
+
+/** "Entrada 2 de 3 · EO-7KQ2M-2" */
+export const ticketLabel = (t: Pick<Ticket, "number" | "code">, total: number) => `Entrada ${t.number} de ${total} · ${t.code}`;
 
 function esc(v: unknown): string {
   return String(v ?? "")
@@ -31,11 +48,7 @@ function esc(v: unknown): string {
     .replace(/'/g, "&#39;");
 }
 
-const FROM = () => process.env.RESEND_FROM_EMAIL || "El Origen <onboarding@resend.dev>";
-
-function resend(): Resend | null {
-  return process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null;
-}
+/* ─── Plantilla de correo ─── */
 
 function shell(title: string, body: string): string {
   return `<!DOCTYPE html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${esc(title)}</title></head>
@@ -44,105 +57,126 @@ function shell(title: string, body: string): string {
 <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:560px;background:#FFFCF7;border:1px solid #DACDBC;border-radius:12px;overflow:hidden">
 <tr><td style="background:#7D2A46;padding:28px 28px 24px;text-align:center">
 <p style="margin:0;font-family:Georgia,serif;font-size:26px;letter-spacing:4px;color:#F6F0E7;font-weight:bold">EL ORIGEN</p>
-<p style="margin:6px 0 0;font-size:11px;letter-spacing:3px;text-transform:uppercase;color:#D9A35A">Catas de vino · Caracas</p>
+<p style="margin:6px 0 0;font-size:11px;letter-spacing:3px;text-transform:uppercase;color:#D9A35A">Catas guiadas · ${esc(CONTACT.city)}</p>
 </td></tr>
 <tr><td style="padding:28px">${body}</td></tr>
 <tr><td style="border-top:1px solid #DACDBC;padding:18px 28px;text-align:center;font-size:12px;color:#6A5650">
-Atención al cliente: <a href="https://wa.me/${CONTACT.whatsappNumber}" style="color:#7D2A46">${CONTACT.phoneDisplay}</a> · ${esc(CONTACT.instagramHandle)}<br>${esc(CONTACT.email)}
+Atención al cliente: ${esc(CONTACT.ownerName)} · <a href="https://wa.me/${CONTACT.whatsappNumber}" style="color:#7D2A46">${esc(CONTACT.phoneDisplay)}</a> · ${esc(CONTACT.instagramHandle)}<br>${esc(CONTACT.email)}
 </td></tr></table></td></tr></table></body></html>`;
 }
+
+const button = (href: string, label: string) =>
+  `<div style="text-align:center"><a href="${esc(href)}" style="display:inline-block;background:#7D2A46;color:#ffffff;text-decoration:none;font-weight:600;font-size:15px;padding:13px 26px;border-radius:6px">${esc(label)}</a></div>`;
 
 function detailsTable(o: Order): string {
   const row = (k: string, v: string) =>
     `<tr><td style="padding:6px 0;font-size:13px;color:#6A5650;width:120px;vertical-align:top">${k}</td><td style="padding:6px 0;font-size:14px;color:#2A1519;font-weight:600">${v}</td></tr>`;
   return `<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#F2EADF;border-radius:8px;padding:14px 16px;margin:18px 0">
 ${row("Cata", esc(o.tastingTitle))}${row("Fecha", esc(o.tastingDate))}${row("Hora", esc(o.tastingTime))}${row("Lugar", esc(o.tastingLocation))}
-${row("Cupos", `${o.spotsCount} persona${o.spotsCount === 1 ? "" : "s"}`)}${row("Código", esc(o.code))}</table>`;
+${row("Cupos", esc(plural(o.spotsCount, "persona", "personas")))}${row("Código", esc(o.code))}</table>`;
 }
 
-/* ─── Correo con la entrada aprobada ─── */
+/** Un bloque por entrada: rótulo, nombre del asistente (si lo hay) y su QR en línea. */
+function ticketBlocks(tickets: Ticket[]): string {
+  const total = tickets.length;
+  return tickets
+    .map(
+      (t) => `<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="border:1px solid #DACDBC;border-radius:10px;margin:0 0 14px"><tr><td style="padding:16px;text-align:center">
+<p style="margin:0;font-size:11px;letter-spacing:2px;text-transform:uppercase;color:#7D2A46;font-weight:bold">Entrada ${t.number} de ${total}</p>
+<p style="margin:4px 0 12px;font-size:15px;font-weight:600;color:#2A1519">${esc(t.code)}${t.attendeeName ? ` · ${esc(t.attendeeName)}` : ""}</p>
+<img src="cid:qr-${t.number}" width="200" height="200" alt="Código QR de la entrada ${esc(t.code)}" style="display:inline-block;border:1px solid #DACDBC;border-radius:8px">
+</td></tr></table>`
+    )
+    .join("");
+}
 
-export async function sendTicketEmail(o: Order): Promise<DeliveryStatus> {
-  const client = resend();
-  if (!client) return "disabled";
+/* ─── Correo con las entradas aprobadas ─── */
+
+/** Envía el correo con un QR por persona. Recibe las entradas ya creadas (`ensureTickets`). */
+export async function sendTicketEmail(o: Order, tickets: Ticket[]): Promise<DeliveryStatus> {
+  if (!tickets.length) return "failed";
   const link = orderUrl(o);
+  const many = tickets.length > 1;
   const html = shell(
-    `Tu reserva en El Origen está confirmada`,
+    "Tu reserva en El Origen está confirmada",
     `<p style="margin:0 0 12px;font-size:16px">Hola <strong>${esc(o.customerName)}</strong>,</p>
-<p style="margin:0;font-size:15px;line-height:1.6;color:#4A3A36">Verificamos tu pago y tu reserva está <strong style="color:#2E7D4F">confirmada</strong>. Presenta este código QR al llegar; es válido para ${o.spotsCount} persona${o.spotsCount === 1 ? "" : "s"}.</p>
+<p style="margin:0;font-size:15px;line-height:1.6;color:#4A3A36">Verificamos tu pago y tu reserva está <strong style="color:#2E7D4F">confirmada</strong>. ${
+      many
+        ? `Aquí tienes ${tickets.length} entradas: <strong>cada persona presenta su propio código QR</strong> al llegar. Puedes reenviar a cada invitado la suya desde el enlace de tu orden.`
+        : "Presenta este código QR al llegar."
+    }</p>
 ${detailsTable(o)}
-<div style="text-align:center;margin:8px 0 20px"><img src="cid:qr-entrada" width="220" height="220" alt="Código QR de tu entrada ${esc(o.code)}" style="display:inline-block;border:1px solid #DACDBC;border-radius:8px"></div>
-<div style="text-align:center"><a href="${link}" style="display:inline-block;background:#7D2A46;color:#ffffff;text-decoration:none;font-weight:600;font-size:15px;padding:13px 26px;border-radius:6px">Ver mi entrada</a></div>
-<p style="margin:18px 0 0;font-size:12px;color:#6A5650;text-align:center">Si el botón no abre, copia este enlace: <a href="${link}" style="color:#7D2A46;word-break:break-all">${link}</a></p>`
+${ticketBlocks(tickets)}
+${button(link, many ? "Ver y compartir mis entradas" : "Ver mi entrada")}
+<p style="margin:18px 0 0;font-size:12px;color:#6A5650;text-align:center">Si el botón no abre, copia este enlace: <a href="${esc(link)}" style="color:#7D2A46;word-break:break-all">${esc(link)}</a></p>
+${policiesEmailHtml("es")}`
   );
-  try {
-    const { error } = await client.emails.send({
-      from: FROM(),
-      to: [o.customerEmail],
-      replyTo: CONTACT.email,
-      subject: `Tu entrada para ${o.tastingTitle} · ${o.code}`,
-      html,
-      attachments: [{ filename: `entrada-${o.code}.png`, content: await qrPng(o), contentId: "qr-entrada" }],
-    });
-    if (error) throw new Error(error.message);
-    return "sent";
-  } catch (err) {
-    console.error("[notify] Error enviando correo:", err);
-    return "failed";
-  }
+
+  const attachments: MailAttachment[] = await Promise.all(
+    tickets.map(async (t) => ({
+      filename: `entrada-${t.code}.png`,
+      content: await qrPng(ticketCheckinUrl(t)),
+      cid: `qr-${t.number}`,
+      contentType: "image/png",
+    }))
+  );
+
+  return sendMail({
+    to: o.customerEmail,
+    replyTo: CONTACT.email,
+    subject: `${many ? "Tus entradas" : "Tu entrada"} para ${o.tastingTitle} · ${o.code}`,
+    html,
+    attachments,
+  });
 }
 
 export async function sendRejectionEmail(o: Order, reason: string): Promise<DeliveryStatus> {
-  const client = resend();
-  if (!client) return "disabled";
   const html = shell(
     "No pudimos verificar tu pago",
     `<p style="margin:0 0 12px;font-size:16px">Hola <strong>${esc(o.customerName)}</strong>,</p>
-<p style="margin:0 0 12px;font-size:15px;line-height:1.6;color:#4A3A36">No pudimos verificar el pago de tu reserva <strong>${esc(o.code)}</strong>.</p>
+<p style="margin:0 0 12px;font-size:15px;line-height:1.6;color:#4A3A36">No pudimos verificar el pago de tu reserva <strong>${esc(o.code)}</strong> para <strong>${esc(o.tastingTitle)}</strong>.</p>
 <p style="margin:0 0 18px;font-size:14px;line-height:1.6;background:#F9DEDC;color:#8C1D18;padding:12px 14px;border-radius:6px">Motivo: ${esc(reason)}</p>
-<p style="margin:0 0 18px;font-size:15px;line-height:1.6;color:#4A3A36">Puedes volver a reportar el pago desde tu orden o escribirnos por WhatsApp.</p>
-<div style="text-align:center"><a href="${orderUrl(o)}" style="display:inline-block;background:#7D2A46;color:#ffffff;text-decoration:none;font-weight:600;font-size:15px;padding:13px 26px;border-radius:6px">Ir a mi orden</a></div>`
+<p style="margin:0 0 18px;font-size:15px;line-height:1.6;color:#4A3A36">Puedes volver a reportar el pago desde tu orden o escribirnos por WhatsApp al <a href="https://wa.me/${CONTACT.whatsappNumber}" style="color:#7D2A46">${esc(CONTACT.phoneDisplay)}</a>.</p>
+${button(orderUrl(o), "Ir a mi orden")}
+${policiesEmailHtml("es")}`
   );
-  try {
-    const { error } = await client.emails.send({
-      from: FROM(),
-      to: [o.customerEmail],
-      replyTo: CONTACT.email,
-      subject: `Revisa el pago de tu reserva ${o.code}`,
-      html,
-    });
-    if (error) throw new Error(error.message);
-    return "sent";
-  } catch (err) {
-    console.error("[notify] Error enviando correo de rechazo:", err);
-    return "failed";
-  }
+  return sendMail({
+    to: o.customerEmail,
+    replyTo: CONTACT.email,
+    subject: `Revisa el pago de tu reserva ${o.code}`,
+    html,
+  });
 }
 
-/** Aviso interno: llegó un comprobante para revisar. */
+/** Resumen del pago reportado, según el método (para el aviso interno). */
+function paymentSummary(o: Order): string {
+  const method = PAYMENT_METHOD_LABEL[o.paymentMethod ?? ""] ?? "Pago";
+  if (o.paymentMethod === "efectivo") return `${method}: el cliente indica que coordinó la entrega · Total: $${o.totalUsd} USD`;
+  const amount =
+    o.paymentAmountBs === null ? "—" : o.paymentMethod === "binance_usdt" ? `${o.paymentAmountBs} USDT` : `Bs ${o.paymentAmountBs}`;
+  return `${method} · Referencia: <strong>${esc(o.paymentReference)}</strong> · Monto: ${esc(amount)} · Total: $${o.totalUsd} USD`;
+}
+
+/** Aviso interno: llegó un pago para revisar. */
 export async function sendProofAlert(o: Order): Promise<void> {
-  const client = resend();
   const to = process.env.ADMIN_NOTIFY_EMAIL || CONTACT.email;
-  if (!client || !to) return;
-  try {
-    await client.emails.send({
-      from: FROM(),
-      to: [to],
-      subject: `Comprobante por revisar · ${o.code} · ${o.customerName}`,
-      html: shell(
-        "Comprobante por revisar",
-        `<p style="margin:0 0 8px;font-size:15px"><strong>${esc(o.customerName)}</strong> reportó un pago.</p>
-<p style="margin:0;font-size:14px;color:#4A3A36">Referencia: <strong>${esc(o.paymentReference)}</strong> · Monto: Bs ${esc(o.paymentAmountBs)} · Total: $${o.totalUsd} USD</p>
+  if (!to) return;
+  await sendMail({
+    to,
+    subject: `Pago por revisar · ${o.code} · ${o.customerName}`,
+    html: shell(
+      "Pago por revisar",
+      `<p style="margin:0 0 8px;font-size:15px"><strong>${esc(o.customerName)}</strong> reportó un pago.</p>
+<p style="margin:0;font-size:14px;color:#4A3A36">${paymentSummary(o)}</p>
+${o.paymentNote ? `<p style="margin:8px 0 0;font-size:14px;color:#4A3A36">Nota del cliente: ${esc(o.paymentNote)}</p>` : ""}
+${o.couponCode ? `<p style="margin:8px 0 0;font-size:14px;color:#4A3A36">Cupón: <strong>${esc(o.couponCode)}</strong></p>` : ""}
 ${detailsTable(o)}
-<div style="text-align:center"><a href="${appUrl()}/admin/reservas" style="display:inline-block;background:#7D2A46;color:#ffffff;text-decoration:none;font-weight:600;font-size:15px;padding:13px 26px;border-radius:6px">Revisar en el panel</a></div>`
-      ),
-    });
-  } catch (err) {
-    console.error("[notify] Error enviando aviso interno:", err);
-  }
+${button(`${appUrl()}/admin/reservas`, "Revisar en el panel")}`
+    ),
+  });
 }
 
-/* ─── WhatsApp (Meta Cloud API) ─── */
+/* ─── WhatsApp ─── */
 
 /** 0414-123.45.67 → 584141234567 */
 export function normalizeVePhone(phone: string): string {
@@ -168,9 +202,11 @@ const CLOSINGS = [
   "Será un placer recibirte.",
 ];
 
+/** Mensaje principal de la entrada (sin políticas): va como texto de la primera imagen. */
 export function buildTicketWhatsAppMessage(o: Order): string {
   const seed = Array.from(o.code).reduce((acc, ch) => acc + ch.charCodeAt(0), 0);
   const first = o.customerName.trim().split(/\s+/)[0] || o.customerName;
+  const many = o.spotsCount > 1;
   return [
     GREETINGS[seed % GREETINGS.length](first),
     "",
@@ -180,15 +216,20 @@ export function buildTicketWhatsAppMessage(o: Order): string {
     `📅 ${o.tastingDate}`,
     `🕖 ${o.tastingTime}`,
     `📍 ${o.tastingLocation}`,
-    `👥 ${o.spotsCount} persona${o.spotsCount === 1 ? "" : "s"} · Código *${o.code}*`,
+    `👥 ${plural(o.spotsCount, "persona", "personas")} · Código *${o.code}*`,
     "",
-    "Presenta el código QR de esta imagen al llegar. También puedes verlo aquí:",
+    many
+      ? `Te enviamos ${o.spotsCount} entradas, una por persona: cada invitado presenta su propio QR al llegar. Puedes reenviarle a cada uno la suya. También las ves aquí:`
+      : "Presenta el código QR de esta imagen al llegar. También puedes verlo aquí:",
     orderUrl(o),
     "",
     "Si tienes alguna duda, responde a este mensaje.",
     CLOSINGS[seed % CLOSINGS.length],
   ].join("\n");
 }
+
+/** Políticas de la experiencia con formato de WhatsApp (texto literal del cliente). */
+export const ticketWhatsAppPolicies = () => policiesPlainText("es", { whatsapp: true });
 
 /** Hay bot propio (Baileys) consultando la cola. */
 export function whatsappQueueEnabled(): boolean {
@@ -200,9 +241,9 @@ function metaConfigured(): boolean {
 }
 
 /**
- * Envío del WhatsApp de la entrada:
- *  1. API oficial de Meta, si está configurada.
- *  2. Si no, se deja en cola para el bot propio (carpeta whatsapp-bot/), que la consulta cada pocos segundos.
+ * Envío del WhatsApp de las entradas:
+ *  1. API oficial de Meta, si está configurada (texto con el enlace a las entradas).
+ *  2. Si no, se deja en cola para el bot propio (carpeta whatsapp-bot/), que envía una imagen por entrada.
  */
 export async function sendTicketWhatsApp(o: Order): Promise<DeliveryStatus> {
   if (metaConfigured()) {
@@ -245,7 +286,7 @@ async function sendViaMeta(o: Order): Promise<DeliveryStatus> {
         messaging_product: "whatsapp",
         to,
         type: "text",
-        text: { preview_url: true, body: buildTicketWhatsAppMessage(o) },
+        text: { preview_url: true, body: `${buildTicketWhatsAppMessage(o)}\n\n${ticketWhatsAppPolicies()}` },
       };
 
   try {

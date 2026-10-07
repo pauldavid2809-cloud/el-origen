@@ -1,43 +1,31 @@
 import { NextResponse } from "next/server";
-import { db } from "@/lib/db";
-import { requireAdmin } from "@/lib/auth";
+import { normalizeCouponCode, validateCouponForEmail } from "@/lib/coupons";
 
+export const dynamic = "force-dynamic";
+
+/**
+ * Valida un cupón para el checkout: `GET /api/coupons?code=X&email=Y`.
+ * Nunca lista cupones (la administración está en `/api/admin/coupons`).
+ * `reason` (not_found | inactive | members_only | exhausted) permite traducir el mensaje en la interfaz.
+ */
 export async function GET(request: Request) {
-  try {
-    const { searchParams } = new URL(request.url);
-    const code = searchParams.get("code");
-
-    if (code) {
-      const coupon = await db.validateCoupon(code);
-      if (!coupon) {
-        return NextResponse.json({ success: false, message: "Cupón inválido o expirado." });
-      }
-      return NextResponse.json({ success: true, coupon });
-    }
-
-    const denied = requireAdmin();
-    if (denied) return denied;
-    const coupons = await db.getCoupons();
-    return NextResponse.json({ success: true, coupons });
-  } catch (error) {
-    return NextResponse.json(
-      { success: false, message: (error as Error).message },
-      { status: 500 }
-    );
+  const { searchParams } = new URL(request.url);
+  const code = normalizeCouponCode(searchParams.get("code") ?? "").slice(0, 40);
+  const email = (searchParams.get("email") ?? "").trim().slice(0, 200);
+  if (!code) {
+    return NextResponse.json({ success: false, message: "Ingrese un código de cupón." }, { status: 400 });
   }
-}
-
-export async function POST(request: Request) {
-  const denied = requireAdmin();
-  if (denied) return denied;
   try {
-    const body = await request.json();
-    const newCoupon = await db.createCoupon(body);
-    return NextResponse.json({ success: true, coupon: newCoupon });
+    const result = await validateCouponForEmail(code, email);
+    if (!result.ok) {
+      return NextResponse.json({ success: false, reason: result.code, message: result.reason });
+    }
+    return NextResponse.json({
+      success: true,
+      coupon: { code: result.coupon.code, discountPercent: result.coupon.discountPercent },
+    });
   } catch (error) {
-    return NextResponse.json(
-      { success: false, message: (error as Error).message },
-      { status: 400 }
-    );
+    console.error("[coupons] No se pudo validar el cupón:", error);
+    return NextResponse.json({ success: false, message: "No se pudo validar el cupón. Intente de nuevo." }, { status: 500 });
   }
 }

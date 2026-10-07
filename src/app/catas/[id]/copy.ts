@@ -1,0 +1,224 @@
+import type { Language } from "@/lib/i18n";
+import type { TastingCategory, RateCurrency } from "@/types";
+
+/* Textos del detalle de cata y su compra (ES/EN). */
+
+const es = {
+  loading: "Cargando experiencia…",
+  notFoundTitle: "Esta cata no está disponible",
+  notFoundText: "Puede que ya haya pasado o que el enlace no sea correcto. Mira nuestras próximas catas.",
+  notFoundCta: "Ver próximas catas",
+  breadcrumb: { home: "Inicio", tastings: "Catas" },
+  category: {
+    degustacion: "Degustación guiada",
+    reserva: "Reserva de cava",
+    atardecer: "Atardecer",
+    blancos: "Blancos",
+    privada: "Privada",
+    icono: "Ícono",
+  } satisfies Record<TastingCategory, string>,
+
+  // Datos de la cata
+  date: "Fecha",
+  time: "Horario",
+  place: "Lugar",
+  directions: "Cómo llegar",
+  products: "Productos a degustar",
+  vintage: "Añada",
+  pairings: "Armonías y menú",
+  sommeliers: (n: number): string => (n === 1 ? "Tu sommelier" : "Tus sommeliers"),
+  readMore: "Leer más",
+  readLess: "Ver menos",
+  instagram: "En Instagram",
+  instagramAria: (handle: string) => `Abrir ${handle} en Instagram`,
+
+  // Compra
+  checkoutEyebrow: "Reserva tu cupo",
+  checkoutTitle: "Comprar cupos",
+  perPerson: "por persona",
+  bsApprox: (bs: string) => `≈ Bs ${bs}`,
+  rateNote: (currency: RateCurrency) => `Tasa BCV ${currency === "EUR" ? "del euro" : "del dólar"} del día`,
+  noRate: "En bolívares a tasa BCV del día",
+  steps: ["Cupos", "Datos", "Confirmar"],
+  stepAria: (n: number, label: string) => `Paso ${n}: ${label}`,
+  spotsLabel: "Cantidad de cupos",
+  persons: (n: number) => `${n} ${n === 1 ? "persona" : "personas"}`,
+  fewer: "Quitar un cupo",
+  more: "Agregar un cupo",
+  available: (n: number) => `Quedan ${n} ${n === 1 ? "cupo" : "cupos"} para esta fecha.`,
+  maxPerOrder: (n: number) => `Máximo ${n} cupos por reserva.`,
+  soldOutTitle: "Cupos agotados",
+  soldOutText: "Escríbenos por WhatsApp para quedar en lista de espera o conocer la próxima fecha.",
+  soldOutCta: "Lista de espera por WhatsApp",
+  soldOutMessage: (title: string) => `Hola, quisiera quedar en lista de espera para la cata «${title}» de El Origen.`,
+  addOnQty: (title: string) => `Cantidad de ${title}`,
+  addOnLess: (title: string) => `Quitar ${title}`,
+  addOnMore: (title: string) => `Agregar ${title}`,
+  next: "Continuar con tus datos",
+  review: "Revisar y confirmar",
+  back: "Volver",
+
+  // Datos del comprador
+  name: "Nombre completo *",
+  namePlaceholder: "Ej: Laura Rossi",
+  docId: "Cédula de identidad *",
+  docIdPlaceholder: "Ej: V-12345678",
+  email: "Correo electrónico *",
+  emailHint: "Aquí recibirás tus entradas con código QR.",
+  phone: "WhatsApp *",
+  phoneHint: "También te enviamos las entradas por WhatsApp.",
+  phonePlaceholder: "Ej: 0414-123-4567",
+  dietary: "Restricciones alimentarias o alergias",
+  dietaryPlaceholder: "Ej: vegetariano, sin gluten, alergia a frutos secos…",
+  memberPrefilled: "Completamos tus datos con tu Cuenta Origen.",
+  errRequired: "Este dato es obligatorio.",
+  errEmail: "Escribe un correo válido.",
+  errPhone: "Escribe un número de WhatsApp válido.",
+  errDocId: "Escribe una cédula válida.",
+  errFix: "Revisa los datos marcados.",
+
+  // Cupón
+  coupon: "Cupón de descuento",
+  couponPlaceholder: "Código",
+  apply: "Aplicar",
+  applying: "Validando…",
+  removeCoupon: "Quitar cupón",
+  couponApplied: (code: string, pct: number) => `Cupón ${code} aplicado: −${pct} %.`,
+  couponErrors: {
+    not_found: "Este cupón no existe.",
+    inactive: "Este cupón no está activo.",
+    members_only: "Este cupón es solo para miembros registrados. Crea tu Cuenta Origen con este correo para usarlo.",
+    exhausted: "Este cupón ya alcanzó su límite de usos.",
+  } as Record<string, string>,
+  couponMembersCta: "Crear mi Cuenta Origen",
+  couponError: "No se pudo validar el cupón.",
+
+  // Resumen y pago
+  howToPayTitle: "Cómo pagas",
+  howToPay:
+    "Pago Móvil o transferencia (tasa BCV del día), Binance USDT o efectivo con entrega previa acordada. Al continuar verás los datos de pago; tus cupos quedan apartados por 60 minutos mientras reportas el pago.",
+  lineSpots: (n: number, price: string) => `Cupos (${n} × ${price})`,
+  lineAddOns: "Adicionales",
+  lineDiscount: (code: string) => `Descuento ${code}`,
+  total: "Total",
+  termsLinks: { terms: "Términos y Condiciones", privacy: "Política de Privacidad" },
+  termsRequired: "Debes aceptar los Términos y Condiciones y la Política de Privacidad para continuar.",
+  submit: "Continuar al pago",
+  submitting: "Reservando…",
+  submitError: "No se pudo crear la reserva. Intenta de nuevo.",
+  connectionError: "Error de conexión. Revisa tu internet e intenta de nuevo.",
+};
+
+type TastingCopy = typeof es;
+
+const en: TastingCopy = {
+  loading: "Loading experience…",
+  notFoundTitle: "This tasting is not available",
+  notFoundText: "It may have already taken place or the link may be wrong. Take a look at our upcoming tastings.",
+  notFoundCta: "See upcoming tastings",
+  breadcrumb: { home: "Home", tastings: "Tastings" },
+  category: {
+    degustacion: "Guided tasting",
+    reserva: "Cellar reserve",
+    atardecer: "Sunset",
+    blancos: "White wines",
+    privada: "Private",
+    icono: "Icon",
+  },
+
+  date: "Date",
+  time: "Time",
+  place: "Venue",
+  directions: "Get directions",
+  products: "What you'll taste",
+  vintage: "Vintage",
+  pairings: "Pairings & menu",
+  sommeliers: (n) => (n === 1 ? "Your sommelier" : "Your sommeliers"),
+  readMore: "Read more",
+  readLess: "Show less",
+  instagram: "On Instagram",
+  instagramAria: (handle) => `Open ${handle} on Instagram`,
+
+  checkoutEyebrow: "Book your spot",
+  checkoutTitle: "Buy spots",
+  perPerson: "per person",
+  bsApprox: (bs) => `≈ Bs ${bs}`,
+  rateNote: (currency) => `BCV ${currency === "EUR" ? "euro" : "dollar"} rate of the day`,
+  noRate: "In bolívares at the BCV rate of the day",
+  steps: ["Spots", "Details", "Confirm"],
+  stepAria: (n, label) => `Step ${n}: ${label}`,
+  spotsLabel: "Number of spots",
+  persons: (n) => `${n} ${n === 1 ? "person" : "people"}`,
+  fewer: "Remove a spot",
+  more: "Add a spot",
+  available: (n) => `${n} ${n === 1 ? "spot" : "spots"} left for this date.`,
+  maxPerOrder: (n) => `Up to ${n} spots per reservation.`,
+  soldOutTitle: "Sold out",
+  soldOutText: "Message us on WhatsApp to join the waiting list or hear about the next date.",
+  soldOutCta: "Waiting list on WhatsApp",
+  soldOutMessage: (title) => `Hi, I'd like to join the waiting list for the El Origen tasting “${title}”.`,
+  addOnQty: (title) => `Quantity of ${title}`,
+  addOnLess: (title) => `Remove ${title}`,
+  addOnMore: (title) => `Add ${title}`,
+  next: "Continue to your details",
+  review: "Review and confirm",
+  back: "Back",
+
+  name: "Full name *",
+  namePlaceholder: "E.g. Laura Rossi",
+  docId: "ID number (cédula) *",
+  docIdPlaceholder: "E.g. V-12345678",
+  email: "Email *",
+  emailHint: "Your QR tickets will be sent here.",
+  phone: "WhatsApp *",
+  phoneHint: "We also send your tickets by WhatsApp.",
+  phonePlaceholder: "E.g. +58 414-123-4567",
+  dietary: "Dietary restrictions or allergies",
+  dietaryPlaceholder: "E.g. vegetarian, gluten-free, nut allergy…",
+  memberPrefilled: "We filled in your details from your Origen account.",
+  errRequired: "This field is required.",
+  errEmail: "Enter a valid email.",
+  errPhone: "Enter a valid WhatsApp number.",
+  errDocId: "Enter a valid ID number.",
+  errFix: "Please check the highlighted fields.",
+
+  coupon: "Discount code",
+  couponPlaceholder: "Code",
+  apply: "Apply",
+  applying: "Checking…",
+  removeCoupon: "Remove code",
+  couponApplied: (code, pct) => `Code ${code} applied: −${pct}%.`,
+  couponErrors: {
+    not_found: "This code does not exist.",
+    inactive: "This code is not active.",
+    members_only: "This code is for registered members only. Create your Origen account with this email to use it.",
+    exhausted: "This code has reached its usage limit.",
+  },
+  couponMembersCta: "Create my Origen account",
+  couponError: "The code could not be validated.",
+
+  howToPayTitle: "How you pay",
+  howToPay:
+    "Pago Móvil or bank transfer (BCV rate of the day), Binance USDT or cash with delivery arranged in advance. Next you'll see the payment details; your spots are held for 60 minutes while you report the payment.",
+  lineSpots: (n, price) => `Spots (${n} × ${price})`,
+  lineAddOns: "Add-ons",
+  lineDiscount: (code) => `Discount ${code}`,
+  total: "Total",
+  termsLinks: { terms: "Terms and Conditions", privacy: "Privacy Policy" },
+  termsRequired: "You must accept the Terms and Conditions and the Privacy Policy to continue.",
+  submit: "Continue to payment",
+  submitting: "Booking…",
+  submitError: "The reservation could not be created. Please try again.",
+  connectionError: "Connection error. Check your internet and try again.",
+};
+
+export const TASTING_COPY: Record<Language, TastingCopy> = { es, en };
+
+/** "2026-10-24" → "Saturday, October 24, 2026" (en); en español se usa `dateFull` del servidor. */
+export function formatTastingDate(date: string, lang: Language, fallback: string): string {
+  if (lang === "es" || !/^\d{4}-\d{2}-\d{2}$/.test(date)) return fallback;
+  const d = new Date(`${date}T12:00:00Z`);
+  return Number.isNaN(d.getTime())
+    ? fallback
+    : d.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", year: "numeric", timeZone: "UTC" });
+}

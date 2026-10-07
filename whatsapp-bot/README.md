@@ -8,9 +8,13 @@ corre en una computadora.
 ## Cómo funciona
 
 1. Al aprobar una reserva, el sitio deja el WhatsApp **en cola**.
-2. El bot consulta la cola cada 10 segundos (`/api/whatsapp/queue`) y envía cada entrada:
-   **imagen del QR + mensaje** con los datos de la cata y el enlace a la entrada.
+2. El bot consulta la cola cada 10 segundos (`/api/whatsapp/queue`) y envía **una imagen con
+   código QR por persona** (una reserva de 3 cupos = 3 imágenes, para que cada invitado tenga la suya):
+   - la primera imagen lleva el mensaje con los datos de la cata, el enlace a las entradas y las
+     políticas de la experiencia (si el texto es muy largo, las políticas salen en un mensaje aparte);
+   - las demás dicen "Entrada 2 de 3 · EO-XXXXX-2" (y el nombre del asistente, si el comprador lo puso).
 3. Avisa al sitio si se envió o falló; el panel muestra el estado de cada orden y si el bot está conectado.
+   Si falla a mitad de una orden, el panel la marca como fallida: "Reenviar QR" vuelve a enviarla completa.
 
 No usa túneles ni direcciones públicas: es la computadora la que consulta al sitio, y el
 panel del bot solo se abre desde esa misma computadora.

@@ -1,314 +1,370 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
-import Image from "next/image";
-import { Tasting } from "@/types";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
+import type { Tasting } from "@/types";
+import { getTeamMember } from "@/lib/team";
+import { CATEGORY_LABEL, CataForm, STATUS_LABEL } from "./CataForm";
+
+interface TastingOrderStats {
+  orders: number;
+  approvedSpots: number;
+  approvedUsd: number;
+  inReviewSpots: number;
+  pendingSpots: number;
+}
+
+type AdminTasting = Tasting & { heldSpots: number; stats: TastingOrderStats };
+
+type Editor = { mode: "create" | "edit" | "duplicate"; source: AdminTasting | null };
+type Filter = "current" | "draft" | "past" | "archived";
+
+const FILTERS: { id: Filter; label: string }[] = [
+  { id: "current", label: "Próximas" },
+  { id: "draft", label: "Borradores" },
+  { id: "past", label: "Realizadas" },
+  { id: "archived", label: "Archivadas" },
+];
+
+const STATUS_CLS: Record<Tasting["status"], string> = {
+  draft: "bg-surface-container-high text-on-surface-variant",
+  active: "bg-emerald-100 text-emerald-900",
+  sold_out: "bg-primary-fixed text-on-primary-fixed-variant",
+  archived: "bg-surface-container-high text-on-surface-variant",
+};
+
+const usd = (n: number) => `$${Number.isInteger(n) ? n : n.toFixed(2)}`;
+
+/** Fecha de hoy en Caracas (YYYY-MM-DD), igual que el servidor. */
+const todayCaracas = () =>
+  new Intl.DateTimeFormat("en-CA", { timeZone: "America/Caracas", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
 
 export default function AdminCatasPage() {
-  const [tastings, setTastings] = useState<Tasting[]>([]);
+  const [tastings, setTastings] = useState<AdminTasting[]>([]);
   const [loading, setLoading] = useState(true);
-  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [filter, setFilter] = useState<Filter>("current");
+  const [editor, setEditor] = useState<Editor | null>(null);
+  const [busy, setBusy] = useState<string | null>(null);
+  const [toast, setToast] = useState<{ text: string; ok: boolean } | null>(null);
+  const [rates, setRates] = useState<{ USD: number | null; EUR: number | null }>({ USD: null, EUR: null });
 
-  // Form state
-  const [title, setTitle] = useState("");
-  const [subtitle, setSubtitle] = useState("");
-  const [description, setDescription] = useState("");
-  const [date, setDate] = useState("");
-  const [dateDisplay, setDateDisplay] = useState("");
-  const [timeStart, setTimeStart] = useState("18:00");
-  const [timeEnd, setTimeEnd] = useState("20:30");
-  const [price, setPrice] = useState(45000);
-  const [totalSpots, setTotalSpots] = useState(20);
-  const [imageUrl, setImageUrl] = useState(
-    "https://images.unsplash.com/photo-1510812431401-41d2bd2722f3?q=80&w=1200&auto=format&fit=crop"
-  );
-  const [category, setCategory] = useState<"reserva" | "atardecer" | "blancos">("reserva");
-
-  useEffect(() => {
-    async function loadTastings() {
-      try {
-        const res = await fetch("/api/tastings");
-        const data = await res.json();
-        if (data.success) {
-          setTastings(data.tastings);
-        }
-      } catch {
-        // ignore
-      } finally {
-        setLoading(false);
-      }
+  const load = useCallback(async () => {
+    setLoading(true);
+    setLoadError(null);
+    try {
+      const res = await fetch("/api/admin/catas", { cache: "no-store" });
+      const data = await res.json();
+      if (!data.success) throw new Error(data.message);
+      setTastings(data.tastings);
+    } catch (err) {
+      setLoadError((err as Error).message || "No se pudieron cargar las catas.");
+    } finally {
+      setLoading(false);
     }
-    loadTastings();
   }, []);
 
-  const handleCreateTasting = async (e: React.FormEvent) => {
-    e.preventDefault();
+  useEffect(() => {
+    load();
+    fetch("/api/rates")
+      .then((r) => r.json())
+      .then((d) => d.success && setRates({ USD: d.USD?.rate ?? null, EUR: d.EUR?.rate ?? null }))
+      .catch(() => undefined);
+    // /admin/catas?nueva=1 abre directamente el formulario (enlace del dashboard).
+    if (new URLSearchParams(window.location.search).get("nueva") === "1") {
+      setEditor({ mode: "create", source: null });
+      window.history.replaceState(null, "", "/admin/catas");
+    }
+  }, [load]);
+
+  const notify = (text: string, ok = true) => {
+    setToast({ text, ok });
+    setTimeout(() => setToast(null), 4000);
+  };
+
+  const today = todayCaracas();
+  const counts = useMemo(() => {
+    const c: Record<Filter, number> = { current: 0, draft: 0, past: 0, archived: 0 };
+    tastings.forEach((t) => (c[bucket(t, today)] += 1));
+    return c;
+  }, [tastings, today]);
+  const list = tastings.filter((t) => bucket(t, today) === filter);
+
+  const patch = async (t: AdminTasting, body: Partial<Tasting>, message: string) => {
+    setBusy(t.id);
     try {
-      const slug = title.toLowerCase().replace(/[^a-z0-9]+/g, "-");
-      const res = await fetch("/api/tastings", {
-        method: "POST",
+      const res = await fetch(`/api/admin/catas/${t.id}`, {
+        method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          slug,
-          title,
-          subtitle,
-          description,
-          date,
-          dateDisplay: dateDisplay || "PRÓX",
-          dateFull: `Fecha: ${date}`,
-          timeStart,
-          timeEnd,
-          location: "El Origen, Caracas, Venezuela",
-          price: Number(price),
-          priceFormatted: `$${Number(price)} USD`,
-          totalSpots: Number(totalSpots),
-          availableSpots: Number(totalSpots),
-          imageUrl,
-          imageAlt: title,
-          category,
-          wines: [
-            {
-              name: `${title} - Selección Especial`,
-              vintage: "2022",
-              type: "Cosecha Limitada",
-              description: "Vino emblemático de altura con notas minerales.",
-              aromaProfile: ["Frutos Rojos", "Roble Francés"],
-              audioStory: "Historia del viñedo en las laderas andinas.",
-            },
-          ],
-          pairings: ["Tabla de quesos madurados", "Chocolates artesanales"],
-          sommelier: {
-            name: "Jaifred Pastran",
-            role: "Head Sommelier & Admin",
-            bio: "Especialista en maridaje y terroir de altura.",
-            avatarUrl: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?q=80&w=400&auto=format&fit=crop",
-          },
-          status: "active",
-        }),
+        body: JSON.stringify(body),
       });
       const data = await res.json();
-      if (data.success) {
-        setTastings([data.tasting, ...tastings]);
-        setIsModalOpen(false);
-        // Reset
-        setTitle("");
-        setDescription("");
-      }
-    } catch {
-      alert("Error al crear la cata.");
+      if (!data.success) throw new Error(data.message);
+      notify(message);
+      await load();
+    } catch (err) {
+      notify((err as Error).message || "No se pudo actualizar la cata.", false);
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const remove = async (t: AdminTasting) => {
+    if (!confirm(`¿Eliminar "${t.title}"? Esta acción no se puede deshacer.`)) return;
+    setBusy(t.id);
+    try {
+      const res = await fetch(`/api/admin/catas/${t.id}`, { method: "DELETE" });
+      const data = await res.json();
+      if (!data.success) throw new Error(data.message);
+      notify("Cata eliminada.");
+      await load();
+    } catch (err) {
+      notify((err as Error).message || "No se pudo eliminar la cata.", false);
+    } finally {
+      setBusy(null);
     }
   };
 
   return (
-    <div className="p-6 sm:p-10 max-w-7xl mx-auto space-y-8">
-      {/* Header */}
-      <header className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b border-surface-variant pb-6">
+    <div className="p-5 sm:p-8 lg:p-10 max-w-6xl mx-auto space-y-6">
+      {toast && (
+        <div
+          role="status"
+          className={`fixed top-5 right-5 left-5 sm:left-auto z-[60] sm:max-w-sm rounded-lg px-4 py-3 text-[14px] shadow-elevated ${
+            toast.ok ? "bg-ink text-paper" : "bg-error text-white"
+          }`}
+        >
+          {toast.text}
+        </div>
+      )}
+
+      <header className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
         <div>
-          <p className="text-xs uppercase font-bold tracking-[0.2em] text-secondary mb-1">
-            Gestión de Experiencias
-          </p>
-          <h2 className="font-serif text-2xl sm:text-3xl font-bold text-on-surface">
-            Catas & Cupos
-          </h2>
+          <p className="eyebrow mb-2">Panel</p>
+          <h1 className="font-serif text-3xl sm:text-4xl">Catas</h1>
+          <p className="text-[14px] text-on-surface-variant mt-1">Crea, publica y archiva las catas del sitio. Los cupos se descuentan solos con cada reserva.</p>
         </div>
         <button
-          onClick={() => setIsModalOpen(true)}
-          className="flex items-center gap-2 px-5 py-3 bg-primary-container text-white rounded-xl text-xs font-bold uppercase tracking-wider hover:bg-primary transition-all shadow-md active:scale-95"
+          type="button"
+          onClick={() => setEditor({ mode: "create", source: null })}
+          className="h-11 px-4 rounded bg-primary-container hover:bg-primary text-white text-[14px] font-semibold inline-flex items-center gap-2 self-start sm:self-auto"
         >
-          <span className="material-symbols-outlined text-[18px]">add</span>
-          Crear Nueva Cata
+          <span className="material-symbols-outlined text-[18px]" aria-hidden="true">add</span>
+          Nueva cata
         </button>
       </header>
 
-      {/* Grid of Tastings */}
-      {loading ? (
-        <div className="text-center py-20 text-secondary">
-          <span className="material-symbols-outlined animate-spin text-2xl mr-2">progress_activity</span>
-          Cargando catálogo...
+      <div className="flex gap-1.5 overflow-x-auto -mx-5 px-5 sm:mx-0 sm:px-0" role="tablist" aria-label="Filtrar catas">
+        {FILTERS.map((f) => (
+          <button
+            key={f.id}
+            type="button"
+            role="tab"
+            aria-selected={filter === f.id}
+            onClick={() => setFilter(f.id)}
+            className={`h-10 px-4 rounded-full border text-[13px] font-semibold whitespace-nowrap transition-colors ${
+              filter === f.id ? "bg-primary-container border-primary-container text-white" : "border-outline-variant text-on-surface-variant hover:border-primary-container"
+            }`}
+          >
+            {f.label}
+            <span className="ml-1.5 tabular-nums opacity-80">{counts[f.id]}</span>
+          </button>
+        ))}
+      </div>
+
+      {loading && !tastings.length ? (
+        <div className="py-20 text-center text-on-surface-variant">
+          <span className="material-symbols-outlined animate-spin" aria-hidden="true">progress_activity</span>
+          <span className="sr-only">Cargando…</span>
+        </div>
+      ) : loadError ? (
+        <div role="alert" className="rounded-lg border border-error/40 bg-error-container/50 p-4 text-[14px] text-on-error-container">
+          {loadError}
+        </div>
+      ) : list.length === 0 ? (
+        <div className="py-16 px-6 text-center border border-dashed border-outline-variant rounded-xl text-on-surface-variant space-y-3">
+          <p>{filter === "current" ? "No hay catas próximas publicadas." : "No hay catas en esta sección."}</p>
+          {filter === "current" && (
+            <button type="button" onClick={() => setEditor({ mode: "create", source: null })} className="text-[14px] font-semibold text-primary-container hover:underline">
+              Crear la primera cata
+            </button>
+          )}
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {tastings.map((t) => (
-            <div
+        <ul className="space-y-4">
+          {list.map((t) => (
+            <CataRow
               key={t.id}
-              className="bg-surface rounded-2xl border border-surface-variant soft-shadow overflow-hidden flex flex-col justify-between"
-            >
-              <div className="relative h-44 w-full bg-surface-container">
-                <Image src={t.imageUrl} alt={t.title} fill className="object-cover" />
-                <div className="absolute top-3 left-3 bg-primary-container text-white text-[10px] font-bold uppercase px-2.5 py-1 rounded-full">
-                  {t.dateDisplay}
-                </div>
-                <div className="absolute top-3 right-3 bg-surface/90 backdrop-blur-sm text-primary font-bold text-xs px-2.5 py-1 rounded">
-                  {t.availableSpots} / {t.totalSpots} cupos
-                </div>
-              </div>
-
-              <div className="p-5 flex-grow space-y-2">
-                <h3 className="font-serif text-lg font-bold text-on-surface">{t.title}</h3>
-                <p className="text-xs text-on-surface-variant line-clamp-2">{t.description}</p>
-                <div className="flex justify-between items-center text-xs pt-2 text-secondary">
-                  <span>{t.timeStart} - {t.timeEnd} hs</span>
-                  <span className="font-serif font-bold text-primary text-base">{t.priceFormatted}</span>
-                </div>
-              </div>
-
-              <div className="p-4 bg-surface-container-low border-t border-surface-variant flex justify-between items-center text-xs">
-                <span className={`font-bold uppercase text-[10px] px-2 py-0.5 rounded ${
-                  t.status === "active" ? "bg-emerald-100 text-emerald-800" : "bg-red-100 text-red-800"
-                }`}>
-                  {t.status === "active" ? "Publicada" : "Agotada"}
-                </span>
-                <div className="flex gap-2">
-                  <a
-                    href={`/catas/${t.slug || t.id}`}
-                    target="_blank"
-                    className="text-primary font-bold hover:underline"
-                  >
-                    Ver en vivo ↗
-                  </a>
-                </div>
-              </div>
-            </div>
+              t={t}
+              past={t.date < today}
+              busy={busy === t.id}
+              onEdit={() => setEditor({ mode: "edit", source: t })}
+              onDuplicate={() => setEditor({ mode: "duplicate", source: t })}
+              onPublish={() => patch(t, { status: "active" }, "Cata publicada.")}
+              onArchive={() => patch(t, { status: "archived" }, "Cata archivada: ya no se muestra en el sitio.")}
+              onRestore={() => patch(t, { status: "draft" }, "Cata restaurada como borrador.")}
+              onDelete={() => remove(t)}
+            />
           ))}
-        </div>
+        </ul>
       )}
 
-      {/* Modal to create Tasting */}
-      {isModalOpen && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-surface border border-surface-variant rounded-3xl max-w-lg w-full p-6 sm:p-8 soft-shadow max-h-[90vh] overflow-y-auto animate-fade-in-up">
-            <div className="flex justify-between items-center border-b border-surface-variant pb-4 mb-6">
-              <h3 className="font-serif text-xl font-bold text-on-surface">Crear Nueva Experiencia de Cata</h3>
-              <button onClick={() => setIsModalOpen(false)} className="text-secondary hover:text-primary">
-                <span className="material-symbols-outlined">close</span>
-              </button>
-            </div>
-
-            <form onSubmit={handleCreateTasting} className="space-y-4 text-xs">
-              <div>
-                <label className="block uppercase font-bold tracking-wider text-secondary mb-1">Título de la Cata *</label>
-                <input
-                  type="text"
-                  required
-                  value={title}
-                  onChange={(e) => setTitle(e.target.value)}
-                  placeholder="Ej: Cata Vertical Malbec Ícono"
-                  className="w-full bg-surface-container-low border border-surface-variant rounded-xl p-3 text-on-surface focus:border-primary focus:outline-none"
-                />
-              </div>
-
-              <div>
-                <label className="block uppercase font-bold tracking-wider text-secondary mb-1">Subtítulo / Tagline</label>
-                <input
-                  type="text"
-                  value={subtitle}
-                  onChange={(e) => setSubtitle(e.target.value)}
-                  placeholder="Ej: Recorrido por las mejores añadas de la década"
-                  className="w-full bg-surface-container-low border border-surface-variant rounded-xl p-3 text-on-surface focus:border-primary focus:outline-none"
-                />
-              </div>
-
-              <div>
-                <label className="block uppercase font-bold tracking-wider text-secondary mb-1">Descripción</label>
-                <textarea
-                  rows={3}
-                  required
-                  value={description}
-                  onChange={(e) => setDescription(e.target.value)}
-                  placeholder="Detalla en qué consiste la experiencia..."
-                  className="w-full bg-surface-container-low border border-surface-variant rounded-xl p-3 text-on-surface focus:border-primary focus:outline-none"
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block uppercase font-bold tracking-wider text-secondary mb-1">Fecha</label>
-                  <input
-                    type="date"
-                    required
-                    value={date}
-                    onChange={(e) => setDate(e.target.value)}
-                    className="w-full bg-surface-container-low border border-surface-variant rounded-xl p-3 text-on-surface focus:border-primary focus:outline-none"
-                  />
-                </div>
-
-                <div>
-                  <label className="block uppercase font-bold tracking-wider text-secondary mb-1">Etiqueta Fecha</label>
-                  <input
-                    type="text"
-                    value={dateDisplay}
-                    onChange={(e) => setDateDisplay(e.target.value)}
-                    placeholder="Ej: 15 NOV"
-                    className="w-full bg-surface-container-low border border-surface-variant rounded-xl p-3 text-on-surface focus:border-primary focus:outline-none"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block uppercase font-bold tracking-wider text-secondary mb-1">Horario Inicio</label>
-                  <input
-                    type="text"
-                    value={timeStart}
-                    onChange={(e) => setTimeStart(e.target.value)}
-                    placeholder="18:00"
-                    className="w-full bg-surface-container-low border border-surface-variant rounded-xl p-3 text-on-surface focus:border-primary focus:outline-none"
-                  />
-                </div>
-
-                <div>
-                  <label className="block uppercase font-bold tracking-wider text-secondary mb-1">Horario Fin</label>
-                  <input
-                    type="text"
-                    value={timeEnd}
-                    onChange={(e) => setTimeEnd(e.target.value)}
-                    placeholder="20:30"
-                    className="w-full bg-surface-container-low border border-surface-variant rounded-xl p-3 text-on-surface focus:border-primary focus:outline-none"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block uppercase font-bold tracking-wider text-secondary mb-1">Precio ($)</label>
-                  <input
-                    type="number"
-                    value={price}
-                    onChange={(e) => setPrice(Number(e.target.value))}
-                    className="w-full bg-surface-container-low border border-surface-variant rounded-xl p-3 text-on-surface focus:border-primary focus:outline-none"
-                  />
-                </div>
-
-                <div>
-                  <label className="block uppercase font-bold tracking-wider text-secondary mb-1">Cupos Totales</label>
-                  <input
-                    type="number"
-                    value={totalSpots}
-                    onChange={(e) => setTotalSpots(Number(e.target.value))}
-                    className="w-full bg-surface-container-low border border-surface-variant rounded-xl p-3 text-on-surface focus:border-primary focus:outline-none"
-                  />
-                </div>
-              </div>
-
-              <div className="pt-4 flex gap-3">
-                <button
-                  type="button"
-                  onClick={() => setIsModalOpen(false)}
-                  className="bg-transparent border border-surface-variant text-secondary text-xs font-bold uppercase tracking-wider py-3 px-4 rounded-xl hover:bg-surface-variant"
-                >
-                  Cancelar
-                </button>
-                <button
-                  type="submit"
-                  className="flex-grow bg-primary-container text-white text-xs font-bold uppercase tracking-wider py-3 rounded-xl hover:bg-primary transition-all shadow-md"
-                >
-                  Guardar y Publicar Cata
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
+      {editor && (
+        <CataForm
+          key={`${editor.mode}-${editor.source?.id ?? "new"}`}
+          mode={editor.mode}
+          source={editor.source}
+          heldSpots={editor.mode === "edit" ? editor.source?.heldSpots ?? 0 : 0}
+          rates={rates}
+          onClose={() => setEditor(null)}
+          onSaved={async (saved, message) => {
+            setEditor(null);
+            notify(message);
+            setFilter(saved.status === "archived" ? "archived" : saved.status === "draft" ? "draft" : saved.date < today ? "past" : "current");
+            await load();
+          }}
+        />
       )}
     </div>
+  );
+}
+
+function bucket(t: Tasting, today: string): Filter {
+  if (t.status === "archived") return "archived";
+  if (t.status === "draft") return "draft";
+  return t.date < today ? "past" : "current";
+}
+
+interface RowProps {
+  t: AdminTasting;
+  past: boolean;
+  busy: boolean;
+  onEdit: () => void;
+  onDuplicate: () => void;
+  onPublish: () => void;
+  onArchive: () => void;
+  onRestore: () => void;
+  onDelete: () => void;
+}
+
+function CataRow({ t, past, busy, onEdit, onDuplicate, onPublish, onArchive, onRestore, onDelete }: RowProps) {
+  const { stats } = t;
+  const others = Math.max(0, t.heldSpots - stats.approvedSpots);
+  const free = Math.max(0, t.totalSpots - t.heldSpots);
+  const soldPct = t.totalSpots ? Math.min(100, (stats.approvedSpots / t.totalSpots) * 100) : 0;
+  const heldPct = t.totalSpots ? Math.min(100 - soldPct, (others / t.totalSpots) * 100) : 0;
+  const sommeliers = t.sommelierIds.map((id) => getTeamMember(id)?.name).filter(Boolean).join(", ");
+  const isPublic = t.status === "active" || t.status === "sold_out";
+  const actionBtn =
+    "h-10 px-3 rounded border border-outline-variant text-[13px] font-semibold inline-flex items-center gap-1.5 hover:border-primary-container disabled:opacity-50";
+
+  return (
+    <li className="rounded-xl border border-outline-variant bg-surface-container-lowest overflow-hidden">
+      <div className="grid grid-cols-1 sm:grid-cols-[176px_minmax(0,1fr)] gap-0">
+        <div className="relative aspect-[4/3] sm:aspect-auto sm:min-h-[150px] bg-surface-container">
+          {t.imageUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={t.imageUrl} alt="" className="absolute inset-0 w-full h-full object-cover" />
+          ) : (
+            <span className="absolute inset-0 flex items-center justify-center text-on-surface-variant">
+              <span className="material-symbols-outlined text-3xl" aria-hidden="true">image</span>
+            </span>
+          )}
+          <span className="absolute top-2 left-2 bg-primary-container text-white text-[11px] font-semibold uppercase px-2 py-0.5 rounded">
+            {t.dateDisplay}
+          </span>
+        </div>
+
+        <div className="p-4 sm:p-5 space-y-3 min-w-0">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className={`text-[11px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-full ${STATUS_CLS[t.status]}`}>
+              {STATUS_LABEL[t.status]}
+            </span>
+            {past && t.status !== "archived" && (
+              <span className="text-[11px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-full bg-surface-container-high text-on-surface-variant">Realizada</span>
+            )}
+            <span className="text-[12px] text-on-surface-variant">{CATEGORY_LABEL[t.category]}</span>
+            {t.rateCurrency === "EUR" && <span className="text-[12px] text-on-surface-variant">· tasa EUR</span>}
+          </div>
+          <div>
+            <h2 className="font-serif text-xl break-words">{t.title}</h2>
+            <p className="text-[13px] text-on-surface-variant mt-0.5">
+              {t.dateFull} · {t.timeStart}
+              {t.timeEnd && `–${t.timeEnd}`} · {t.location}
+            </p>
+            <p className="text-[13px] text-on-surface-variant">
+              {t.priceFormatted}
+              {sommeliers && <> · {sommeliers}</>}
+              {t.addOns.length > 0 && <> · {t.addOns.length} {t.addOns.length === 1 ? "adicional" : "adicionales"}</>}
+            </p>
+          </div>
+
+          <div className="space-y-1.5">
+            <div
+              className="flex h-2 rounded-full bg-surface-variant overflow-hidden"
+              role="img"
+              aria-label={`${stats.approvedSpots} vendidos, ${others} apartados o en revisión, ${free} libres de ${t.totalSpots}`}
+            >
+              <div className="h-full bg-primary-container" style={{ width: `${soldPct}%` }} />
+              <div className="h-full bg-tertiary-container" style={{ width: `${heldPct}%` }} />
+            </div>
+            <p className="text-[13px] text-on-surface-variant">
+              <strong className="text-on-surface">{stats.approvedSpots} vendidos</strong>
+              {stats.inReviewSpots > 0 && <> · {stats.inReviewSpots} en revisión</>}
+              {stats.pendingSpots > 0 && <> · {stats.pendingSpots} apartados</>} · {free} libres de {t.totalSpots}
+              {stats.approvedUsd > 0 && <> · {usd(stats.approvedUsd)} en ventas</>}
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <div className="flex flex-wrap gap-2 border-t border-outline-variant bg-surface-container-low/60 px-4 sm:px-5 py-3">
+        <button type="button" disabled={busy} onClick={onEdit} className={actionBtn}>
+          <span className="material-symbols-outlined text-[18px]" aria-hidden="true">edit</span>
+          Editar
+        </button>
+        <button type="button" disabled={busy} onClick={onDuplicate} className={actionBtn}>
+          <span className="material-symbols-outlined text-[18px]" aria-hidden="true">content_copy</span>
+          Duplicar
+        </button>
+        {t.status === "draft" && (
+          <button type="button" disabled={busy} onClick={onPublish} className={`${actionBtn} border-emerald-700 text-emerald-800`}>
+            <span className="material-symbols-outlined text-[18px]" aria-hidden="true">publish</span>
+            Publicar
+          </button>
+        )}
+        {isPublic && (
+          <a href={`/catas/${t.slug || t.id}`} target="_blank" rel="noopener noreferrer" className={actionBtn}>
+            <span className="material-symbols-outlined text-[18px]" aria-hidden="true">open_in_new</span>
+            Ver en el sitio
+          </a>
+        )}
+        {t.status === "archived" ? (
+          <button type="button" disabled={busy} onClick={onRestore} className={actionBtn}>
+            <span className="material-symbols-outlined text-[18px]" aria-hidden="true">unarchive</span>
+            Restaurar
+          </button>
+        ) : (
+          <button
+            type="button"
+            disabled={busy}
+            onClick={() => confirm(`¿Archivar "${t.title}"? Se oculta del sitio y conserva sus reservas.`) && onArchive()}
+            className={actionBtn}
+          >
+            <span className="material-symbols-outlined text-[18px]" aria-hidden="true">archive</span>
+            Archivar
+          </button>
+        )}
+        {stats.orders === 0 ? (
+          <button type="button" disabled={busy} onClick={onDelete} className="h-10 px-3 rounded text-[13px] font-semibold text-on-surface-variant hover:text-error ml-auto inline-flex items-center gap-1.5">
+            <span className="material-symbols-outlined text-[18px]" aria-hidden="true">delete</span>
+            Eliminar
+          </button>
+        ) : (
+          <span className="ml-auto self-center text-[12px] text-on-surface-variant">
+            {stats.orders} {stats.orders === 1 ? "orden" : "órdenes"} · no se puede eliminar
+          </span>
+        )}
+      </div>
+    </li>
   );
 }

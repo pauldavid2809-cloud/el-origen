@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/auth";
 import { countWhatsAppQueue, getSetting } from "@/lib/orders";
+import { mailProvider } from "@/lib/mailer";
 import { whatsappQueueEnabled } from "@/lib/notify";
 
 export const dynamic = "force-dynamic";
@@ -11,7 +12,7 @@ interface BotHeartbeat {
   lastSeen: string;
 }
 
-/** Estado del WhatsApp para el panel: proveedor, último latido del bot y mensajes en cola. */
+/** Estado de los envíos para el panel: proveedor de WhatsApp, último latido del bot, mensajes en cola y canal de correo. */
 export async function GET() {
   const denied = requireAdmin();
   if (denied) return denied;
@@ -27,5 +28,6 @@ export async function GET() {
     provider: meta ? "meta" : queue ? "bot" : "none",
     bot: bot ? { ...bot, running, online } : null,
     queued,
+    mail: mailProvider() ?? "none",
   });
 }

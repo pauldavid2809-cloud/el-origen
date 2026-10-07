@@ -1,9 +1,15 @@
 "use client";
 
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import type { Order } from "@/lib/orders";
+import type { Order, Ticket } from "@/lib/orders";
 
-type AdminOrder = Order & { proofUrl: string | null };
+type AdminOrder = Order & {
+  proofUrl: string | null;
+  tickets: Ticket[];
+  couponReferrer: string | null;
+  /** Cuenta destino legible (resuelta en el servidor con la configuración de pagos). */
+  paymentDestination: string | null;
+};
 type Tab = "in_review" | "pending_payment" | "approved" | "rejected" | "cancelled";
 
 const TABS: { id: Tab; label: string }[] = [
@@ -22,6 +28,15 @@ const REJECT_REASONS = [
   "El pago aún no se refleja en la cuenta",
 ];
 
+const METHOD_LABEL: Record<string, string> = {
+  pago_movil: "Pago Móvil",
+  transferencia: "Transferencia",
+  binance_usdt: "Binance USDT",
+  efectivo: "Efectivo",
+};
+
+const MAIL_LABEL: Record<string, string> = { gmail: "Gmail", resend: "Resend" };
+
 const DELIVERY: Record<string, { label: string; cls: string }> = {
   sent: { label: "enviado", cls: "bg-emerald-100 text-emerald-900" },
   queued: { label: "en cola del bot", cls: "bg-tertiary-fixed text-on-tertiary-fixed-variant" },
@@ -31,6 +46,7 @@ const DELIVERY: Record<string, { label: string; cls: string }> = {
 };
 
 const bs = (n: number) => n.toLocaleString("es-VE", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const usd = (n: number) => `$${Number.isInteger(n) ? n : n.toFixed(2)} USD`;
 const when = (iso: string | null) =>
   iso ? new Date(iso).toLocaleString("es-VE", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" }) : "—";
 
@@ -45,11 +61,7 @@ export default function AdminReservationsPage() {
   const [rejecting, setRejecting] = useState<AdminOrder | null>(null);
   const [reason, setReason] = useState(REJECT_REASONS[0]);
   const [toast, setToast] = useState<{ text: string; ok: boolean } | null>(null);
-  const [wa, setWa] = useState<{
-    provider: "meta" | "bot" | "none";
-    bot: { phone: string | null; running: boolean; online: boolean; lastSeen: string } | null;
-    queued: number;
-  } | null>(null);
+  const [wa, setWa] = useState<DeliveryInfo | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -87,10 +99,15 @@ export default function AdminReservationsPage() {
       const data = await res.json();
       if (!data.success) throw new Error(data.message);
       const u: Order = data.order;
+      const entries = Array.isArray(data.tickets) ? data.tickets.length : u.spotsCount;
+      const sent = `${entries} entrada${entries === 1 ? "" : "s"}. Correo: ${DELIVERY[u.emailStatus].label} · WhatsApp: ${DELIVERY[u.whatsappStatus].label}.`;
       const msg: Record<string, string> = {
-        approve: `Aprobada ${u.code}. Correo: ${DELIVERY[u.emailStatus].label} · WhatsApp: ${DELIVERY[u.whatsappStatus].label}.`,
-        reject: `Rechazada ${u.code}. Se avisó al cliente por correo.`,
-        resend: `Reenvío ${u.code}. Correo: ${DELIVERY[u.emailStatus].label} · WhatsApp: ${DELIVERY[u.whatsappStatus].label}.`,
+        approve: `Aprobada ${u.code}: ${sent}`,
+        reject:
+          data.emailStatus === "sent"
+            ? `Rechazada ${u.code}. Se avisó al cliente por correo.`
+            : `Rechazada ${u.code}. ${data.emailStatus === "disabled" ? "El correo no está configurado" : "No se pudo enviar el correo"}: avísele por WhatsApp.`,
+        resend: `Reenvío ${u.code}: ${sent}`,
         cancel: `Anulada ${u.code}. Los cupos quedaron libres.`,
       };
       notify(msg[action]);
@@ -121,12 +138,20 @@ export default function AdminReservationsPage() {
     .filter((o) => {
       const s = q.trim().toLowerCase();
       if (!s) return true;
-      return [o.code, o.customerName, o.customerDocId, o.customerEmail, o.paymentReference ?? ""].some((v) => v.toLowerCase().includes(s));
+      return [
+        o.code,
+        o.customerName,
+        o.customerDocId,
+        o.customerEmail,
+        o.paymentReference ?? "",
+        o.couponCode ?? "",
+        ...o.tickets.flatMap((t) => [t.code, t.attendeeName ?? ""]),
+      ].some((v) => v.toLowerCase().includes(s));
     });
 
-  const approvedSpots = orders
-    .filter((o) => o.status === "approved" && (!tasting || o.tastingId === tasting))
-    .reduce((s, o) => s + o.spotsCount, 0);
+  const approvedOrders = orders.filter((o) => o.status === "approved" && (!tasting || o.tastingId === tasting));
+  const approvedSpots = approvedOrders.reduce((s, o) => s + o.spotsCount, 0);
+  const checkedIn = approvedOrders.reduce((s, o) => s + o.tickets.filter((t) => t.checkedInAt).length, 0);
 
   return (
     <div className="p-5 sm:p-8 lg:p-10 max-w-6xl mx-auto space-y-6">
@@ -146,7 +171,8 @@ export default function AdminReservationsPage() {
           <p className="eyebrow mb-2">Panel</p>
           <h1 className="font-serif text-3xl sm:text-4xl">Reservas y pagos</h1>
           <p className="text-[14px] text-on-surface-variant mt-1">
-            {approvedSpots} cupos confirmados{tasting ? " en esta cata" : ""} · {counts.in_review ?? 0} comprobantes por revisar
+            {approvedSpots} cupos confirmados{tasting ? " en esta cata" : ""} · {checkedIn} ingresaron · {counts.in_review ?? 0} pagos por
+            revisar
           </p>
         </div>
         <div className="flex gap-2">
@@ -164,12 +190,13 @@ export default function AdminReservationsPage() {
         </div>
       </header>
 
-      {wa && <WhatsAppStatus wa={wa} />}
+      {wa && <DeliveryStatus wa={wa} />}
 
       {!persistent && (
         <div className="rounded-lg border border-tertiary/40 bg-tertiary-fixed/60 p-4 text-[14px] text-on-tertiary-fixed-variant">
           <strong>Modo de prueba:</strong> Supabase no está configurado, las reservas se guardan en memoria y se pierden al reiniciar.
-          Configure <code>NEXT_PUBLIC_SUPABASE_URL</code> y <code>SUPABASE_SERVICE_ROLE_KEY</code> y ejecute <code>supabase/orders.sql</code>.
+          Configure <code>NEXT_PUBLIC_SUPABASE_URL</code> y <code>SUPABASE_SERVICE_ROLE_KEY</code> y ejecute <code>supabase/orders.sql</code> y{" "}
+          <code>supabase/v2.sql</code>.
         </div>
       )}
 
@@ -201,7 +228,7 @@ export default function AdminReservationsPage() {
             type="search"
             value={q}
             onChange={(e) => setQ(e.target.value)}
-            placeholder="Nombre, código, cédula o referencia"
+            placeholder="Nombre, código, cédula, referencia o cupón"
             className="h-11 rounded border border-outline-variant bg-surface-container-lowest px-3 text-[14px] sm:flex-1"
           />
         </div>
@@ -218,8 +245,6 @@ export default function AdminReservationsPage() {
       ) : (
         <ul className="space-y-4">
           {list.map((o) => {
-            const expectedBs = o.bcvRate ? o.totalUsd * o.bcvRate : null;
-            const mismatch = expectedBs !== null && o.paymentAmountBs !== null && Math.abs(o.paymentAmountBs - expectedBs) > Math.max(1, expectedBs * 0.01);
             const isPdf = o.proofPath?.endsWith(".pdf");
             return (
               <li key={o.id} className="rounded-xl border border-outline-variant bg-surface-container-lowest overflow-hidden">
@@ -229,6 +254,7 @@ export default function AdminReservationsPage() {
                       <span className="font-serif text-xl">{o.customerName}</span>
                       <span className="text-[13px] font-semibold tracking-wider text-primary-container">{o.code}</span>
                       <span className="text-[12px] text-on-surface-variant">creada {when(o.createdAt)}</span>
+                      {o.memberId && <span className="text-[11px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-full bg-surface-container-high text-on-surface-variant">Miembro</span>}
                     </div>
                     <p className="text-[14px] text-on-surface-variant">
                       <strong className="text-on-surface">{o.spotsCount} cupo{o.spotsCount === 1 ? "" : "s"}</strong> · {o.tastingTitle} · {o.tastingDate}
@@ -238,45 +264,28 @@ export default function AdminReservationsPage() {
                       C.I. {o.customerDocId} · {o.customerPhone} · {o.customerEmail}
                       {o.dietaryRestrictions && <> · Dieta: {o.dietaryRestrictions}</>}
                     </p>
-
-                    {o.paymentReference && (
-                      <dl className="grid grid-cols-2 sm:grid-cols-4 gap-3 rounded-lg bg-surface-container-low p-3 text-[13px]">
-                        <div>
-                          <dt className="text-on-surface-variant">Total</dt>
-                          <dd className="font-semibold">${o.totalUsd} USD</dd>
-                          {expectedBs !== null && <dd className="text-on-surface-variant">≈ Bs {bs(expectedBs)}</dd>}
-                        </div>
-                        <div>
-                          <dt className="text-on-surface-variant">Pagado</dt>
-                          <dd className={`font-semibold ${mismatch ? "text-error" : ""}`}>
-                            Bs {o.paymentAmountBs != null ? bs(o.paymentAmountBs) : "—"}
-                            {mismatch && <span className="block text-[11px] font-normal">no coincide</span>}
-                          </dd>
-                        </div>
-                        <div>
-                          <dt className="text-on-surface-variant">Referencia</dt>
-                          <dd className="font-semibold tabular-nums break-all">{o.paymentReference}</dd>
-                        </div>
-                        <div>
-                          <dt className="text-on-surface-variant">{o.paymentMethod === "pago_movil" ? "Pago Móvil" : "Transferencia"}</dt>
-                          <dd className="font-semibold">{o.payerBank}</dd>
-                          <dd className="text-on-surface-variant">→ {o.paymentBank}</dd>
-                        </div>
-                      </dl>
+                    {o.couponCode && (
+                      <p className="text-[13px] text-on-surface-variant flex items-center gap-1.5">
+                        <span className="material-symbols-outlined text-[16px]" aria-hidden="true">sell</span>
+                        Cupón <strong className="text-on-surface">{o.couponCode}</strong> · −{usd(o.discountUsd)}
+                        {o.couponReferrer && <> · Referente: <strong className="text-on-surface">{o.couponReferrer}</strong></>}
+                      </p>
                     )}
+
+                    {o.paymentMethod && <PaymentSummary o={o} />}
 
                     {o.rejectionReason && o.status === "rejected" && (
                       <p className="text-[13px] text-error">Motivo: {o.rejectionReason}</p>
                     )}
 
                     {o.status === "approved" && (
-                      <div className="flex flex-wrap gap-2 text-[12px]">
-                        <span className={`px-2.5 py-1 rounded-full ${DELIVERY[o.emailStatus].cls}`}>Correo {DELIVERY[o.emailStatus].label}</span>
-                        <span className={`px-2.5 py-1 rounded-full ${DELIVERY[o.whatsappStatus].cls}`}>WhatsApp {DELIVERY[o.whatsappStatus].label}</span>
-                        <span className={`px-2.5 py-1 rounded-full ${o.checkedInAt ? "bg-emerald-100 text-emerald-900" : "bg-surface-container-high text-on-surface-variant"}`}>
-                          {o.checkedInAt ? `Ingresó ${when(o.checkedInAt)}` : "Sin ingresar"}
-                        </span>
-                      </div>
+                      <>
+                        <div className="flex flex-wrap gap-2 text-[12px]">
+                          <span className={`px-2.5 py-1 rounded-full ${DELIVERY[o.emailStatus].cls}`}>Correo {DELIVERY[o.emailStatus].label}</span>
+                          <span className={`px-2.5 py-1 rounded-full ${DELIVERY[o.whatsappStatus].cls}`}>WhatsApp {DELIVERY[o.whatsappStatus].label}</span>
+                        </div>
+                        <TicketList tickets={o.tickets} spots={o.spotsCount} />
+                      </>
                     )}
                   </div>
 
@@ -308,13 +317,13 @@ export default function AdminReservationsPage() {
                     <button
                       disabled={busy === o.id}
                       onClick={() => {
-                        if (o.status !== "in_review" && !confirm("Esta orden no tiene un comprobante en revisión. ¿Aprobar de todos modos?")) return;
+                        if (o.status !== "in_review" && !confirm("Esta orden no tiene un pago reportado en revisión. ¿Aprobar de todos modos?")) return;
                         act(o, "approve");
                       }}
                       className="h-10 px-4 rounded bg-emerald-700 hover:bg-emerald-800 text-white text-[13px] font-semibold inline-flex items-center gap-1.5 disabled:opacity-60"
                     >
                       <span className="material-symbols-outlined text-[18px]">check</span>
-                      Aprobar y enviar QR
+                      Aprobar y enviar {o.spotsCount === 1 ? "QR" : `${o.spotsCount} QR`}
                     </button>
                   )}
                   {o.status === "in_review" && (
@@ -407,11 +416,33 @@ export default function AdminReservationsPage() {
   );
 }
 
-function WhatsAppStatus({
-  wa,
-}: {
-  wa: { provider: "meta" | "bot" | "none"; bot: { phone: string | null; running: boolean; online: boolean; lastSeen: string } | null; queued: number };
-}) {
+type DeliveryInfo = {
+  provider: "meta" | "bot" | "none";
+  bot: { phone: string | null; running: boolean; online: boolean; lastSeen: string } | null;
+  queued: number;
+  mail: "gmail" | "resend" | "none";
+};
+
+function DeliveryStatus({ wa }: { wa: DeliveryInfo }) {
+  return (
+    <div className="space-y-2">
+      {wa.mail === "none" ? (
+        <div className="rounded-lg border border-outline-variant bg-surface-container-low p-4 text-[14px] text-on-surface-variant">
+          <strong className="text-on-surface">Correo sin configurar.</strong> Defina <code>GMAIL_USER</code> y <code>GMAIL_APP_PASSWORD</code>{" "}
+          (contraseña de aplicación de Google) para enviar las entradas y los avisos por correo.
+        </div>
+      ) : (
+        <p className="text-[14px] text-on-surface-variant flex items-center gap-2">
+          <span className="w-2 h-2 rounded-full bg-emerald-600" />
+          Correo: {MAIL_LABEL[wa.mail]}.
+        </p>
+      )}
+      <WhatsAppStatus wa={wa} />
+    </div>
+  );
+}
+
+function WhatsAppStatus({ wa }: { wa: DeliveryInfo }) {
   if (wa.provider === "meta") {
     return (
       <p className="text-[14px] text-on-surface-variant flex items-center gap-2">
@@ -452,6 +483,100 @@ function WhatsAppStatus({
             : `Encienda el bot en la computadora para enviar la cola${seen ? ` (última conexión: ${seen})` : ""}.`}
         </span>
       )}
+    </div>
+  );
+}
+
+/** Resumen del pago reportado según el método (Bs, USDT o efectivo), con alerta si el monto no coincide. */
+function PaymentSummary({ o }: { o: AdminOrder }) {
+  const method = METHOD_LABEL[o.paymentMethod ?? ""] ?? o.paymentMethod;
+  const cash = o.paymentMethod === "efectivo";
+  const usdt = o.paymentMethod === "binance_usdt";
+  const expected = usdt ? o.totalUsd : o.bcvRate ? o.totalUsd * o.bcvRate : null;
+  const paid = o.paymentAmountBs;
+  const mismatch = !cash && expected !== null && paid !== null && Math.abs(paid - expected) > Math.max(usdt ? 0.5 : 1, expected * 0.01);
+  const amount = (n: number) => (usdt ? `${bs(n)} USDT` : `Bs ${bs(n)}`);
+
+  return (
+    <div className="space-y-2">
+      <dl className="grid grid-cols-2 sm:grid-cols-4 gap-3 rounded-lg bg-surface-container-low p-3 text-[13px]">
+        <div>
+          <dt className="text-on-surface-variant">Total</dt>
+          <dd className="font-semibold">{usd(o.totalUsd)}</dd>
+          {!usdt && !cash && expected !== null && (
+            <dd className="text-on-surface-variant">
+              ≈ Bs {bs(expected)}
+              {o.rateCurrency === "EUR" && " (tasa EUR)"}
+            </dd>
+          )}
+        </div>
+        {cash ? (
+          <div className="col-span-1 sm:col-span-3">
+            <dt className="text-on-surface-variant">Efectivo</dt>
+            <dd className="font-semibold">Entrega previa acordada por WhatsApp</dd>
+            <dd className="text-on-surface-variant">Apruebe cuando haya recibido el dinero.</dd>
+          </div>
+        ) : (
+          <>
+            <div>
+              <dt className="text-on-surface-variant">Pagado</dt>
+              <dd className={`font-semibold ${mismatch ? "text-error" : ""}`}>
+                {paid != null ? amount(paid) : "—"}
+                {mismatch && <span className="block text-[11px] font-normal">no coincide</span>}
+              </dd>
+            </div>
+            <div>
+              <dt className="text-on-surface-variant">{usdt ? "Order ID / TxID" : "Referencia"}</dt>
+              <dd className="font-semibold tabular-nums break-all">{o.paymentReference ?? "—"}</dd>
+            </div>
+            <div>
+              <dt className="text-on-surface-variant">{method}</dt>
+              {o.payerBank && <dd className="font-semibold">{o.payerBank}</dd>}
+              {o.payerDocId && <dd className="text-on-surface-variant">C.I. {o.payerDocId}</dd>}
+              {!usdt && o.paymentDestination && <dd className="text-on-surface-variant">→ {o.paymentDestination}</dd>}
+            </div>
+          </>
+        )}
+      </dl>
+      {o.paymentNote && (
+        <p className="text-[13px] text-on-surface-variant">
+          <strong className="text-on-surface">Nota del cliente:</strong> {o.paymentNote}
+        </p>
+      )}
+    </div>
+  );
+}
+
+/** Entradas de una orden aprobada: código, asistente y si ya ingresó. */
+function TicketList({ tickets, spots }: { tickets: Ticket[]; spots: number }) {
+  if (!tickets.length) return null;
+  const inside = tickets.filter((t) => t.checkedInAt).length;
+  return (
+    <div>
+      <p className="text-[12px] font-semibold uppercase tracking-wider text-on-surface-variant mb-2">
+        Entradas · {inside} de {spots} ingresaron
+      </p>
+      <ul className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+        {tickets.map((t) => (
+          <li
+            key={t.id}
+            className={`flex items-center gap-2 rounded border px-3 py-2 text-[13px] ${
+              t.checkedInAt ? "border-emerald-300 bg-emerald-50 text-emerald-950" : "border-outline-variant"
+            }`}
+          >
+            <span className="material-symbols-outlined text-[18px]" aria-hidden="true">
+              {t.checkedInAt ? "how_to_reg" : "confirmation_number"}
+            </span>
+            <span className="min-w-0">
+              <span className="font-semibold tabular-nums">{t.code}</span>
+              {t.attendeeName && <span className="text-on-surface-variant"> · {t.attendeeName}</span>}
+              <span className="block text-[12px] text-on-surface-variant">
+                {t.checkedInAt ? `Ingresó ${when(t.checkedInAt)}${t.checkedInBy ? ` · ${t.checkedInBy}` : ""}` : "Sin ingresar"}
+              </span>
+            </span>
+          </li>
+        ))}
+      </ul>
     </div>
   );
 }

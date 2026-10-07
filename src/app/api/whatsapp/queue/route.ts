@@ -1,7 +1,13 @@
-import crypto from "crypto";
 import { NextResponse } from "next/server";
-import { getOrderById, listWhatsAppQueue, setSetting, updateOrder } from "@/lib/orders";
-import { buildTicketWhatsAppMessage, checkinUrl, normalizeVePhone } from "@/lib/notify";
+import { safeEqual } from "@/lib/auth";
+import { ensureTickets, getOrderById, listWhatsAppQueue, setSetting, updateOrder } from "@/lib/orders";
+import {
+  buildTicketWhatsAppMessage,
+  normalizeVePhone,
+  ticketCheckinUrl,
+  ticketLabel,
+  ticketWhatsAppPolicies,
+} from "@/lib/notify";
 
 export const dynamic = "force-dynamic";
 
@@ -12,14 +18,16 @@ export const dynamic = "force-dynamic";
 function authorized(request: Request): boolean {
   const secret = process.env.WHATSAPP_QUEUE_SECRET;
   const token = request.headers.get("x-queue-token");
-  if (!secret || !token) return false;
-  const a = Buffer.from(token);
-  const b = Buffer.from(secret);
-  return a.length === b.length && crypto.timingSafeEqual(a, b);
+  return Boolean(secret && token) && safeEqual(token as string, secret as string);
 }
 
 const unauthorized = () => NextResponse.json({ success: false, message: "Token de cola inválido." }, { status: 401 });
 
+/**
+ * Entradas por enviar. Cada elemento trae una imagen por persona (`tickets`):
+ * la primera va con `message` + `policies`; las demás con su `caption` ("Entrada 2 de 3 · EO-XXXXX-2").
+ * `qrData` (primera entrada) se mantiene para bots antiguos que envían una sola imagen.
+ */
 export async function GET(request: Request) {
   if (!authorized(request)) return unauthorized();
 
@@ -30,17 +38,28 @@ export async function GET(request: Request) {
   await setSetting("whatsapp_bot", { ...bot, lastSeen: new Date().toISOString() });
 
   const orders = await listWhatsAppQueue(10);
-  return NextResponse.json({
-    success: true,
-    queue: orders.map((o) => ({
-      orderId: o.id,
-      code: o.code,
-      name: o.customerName,
-      phone: normalizeVePhone(o.customerPhone),
-      message: buildTicketWhatsAppMessage(o),
-      qrData: checkinUrl(o),
-    })),
-  });
+  const queue = await Promise.all(
+    orders.map(async (o) => {
+      const tickets = (await ensureTickets(o)).map((t, _i, all) => ({
+        qrData: ticketCheckinUrl(t),
+        code: t.code,
+        number: t.number,
+        attendeeName: t.attendeeName,
+        caption: [ticketLabel(t, all.length), t.attendeeName].filter(Boolean).join("\n"),
+      }));
+      return {
+        orderId: o.id,
+        code: o.code,
+        name: o.customerName,
+        phone: normalizeVePhone(o.customerPhone),
+        message: buildTicketWhatsAppMessage(o),
+        policies: ticketWhatsAppPolicies(),
+        tickets,
+        qrData: tickets[0]?.qrData ?? null,
+      };
+    })
+  );
+  return NextResponse.json({ success: true, queue });
 }
 
 /** Acuse del bot: { orderId, status: "sent" | "failed", error? } */

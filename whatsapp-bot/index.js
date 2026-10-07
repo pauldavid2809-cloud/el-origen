@@ -1,7 +1,7 @@
 /* ─────────────────────────────────────────────────────────────
    Bot de WhatsApp de El Origen
    Conecta un WhatsApp como "dispositivo vinculado" (Baileys) y envía
-   las entradas aprobadas en el panel. Funciona en MODO COLA: el bot
+   las entradas aprobadas en el panel (una imagen con QR por persona). Funciona en MODO COLA: el bot
    consulta al sitio cada pocos segundos, así que no necesita túneles
    ni direcciones públicas. Basado en el bot del Congreso AMCJ.
    ───────────────────────────────────────────────────────────── */
@@ -80,20 +80,51 @@ async function typeLikeHuman(jid, length = 120) {
   }
 }
 
-/** Envía la imagen del QR con el mensaje como texto al pie. */
-async function sendTicket(item) {
-  const jid = toJid(item.phone);
-  const [exists] = await sock.onWhatsApp(jid);
-  if (!exists?.exists) throw new Error(`El número ${item.phone} no tiene WhatsApp`);
+/** Límite prudente del texto al pie de una imagen (la API oficial de WhatsApp admite 1024). */
+const CAPTION_MAX = 1024;
 
-  await typeLikeHuman(exists.jid, item.message.length);
-  const qr = await QRCode.toBuffer(item.qrData, {
+function qrImage(data) {
+  return QRCode.toBuffer(data, {
     width: 640,
     margin: 3,
     errorCorrectionLevel: "M",
     color: { dark: "#2A1519", light: "#FFFFFF" },
   });
-  return sock.sendMessage(exists.jid, { image: qr, caption: item.message, mimetype: "image/png" });
+}
+
+/**
+ * Envía las entradas de una orden: una imagen con QR por persona.
+ * La primera lleva el mensaje completo y las políticas; las demás, "Entrada 2 de 3 · EO-XXXXX-2".
+ * Si el texto no cabe al pie de la imagen, las políticas salen en un mensaje aparte.
+ */
+async function sendTicket(item) {
+  const jid = toJid(item.phone);
+  const [exists] = await sock.onWhatsApp(jid);
+  if (!exists?.exists) throw new Error(`El número ${item.phone} no tiene WhatsApp`);
+
+  // Compatibilidad con la cola anterior (una sola imagen por orden).
+  const tickets = item.tickets?.length ? item.tickets : [{ qrData: item.qrData, code: item.code, number: 1 }];
+  const label = (t) => t.caption || `Entrada ${t.number} de ${tickets.length} · ${t.code}`;
+  // Con varias entradas, la primera imagen también dice cuál es ("Entrada 1 de 3 · …").
+  const message = tickets.length > 1 ? `${label(tickets[0])}\n\n${item.message}` : item.message;
+  const policies = item.policies ? String(item.policies) : "";
+  const full = policies ? `${message}\n\n${policies}` : message;
+  const policiesApart = full.length > CAPTION_MAX;
+
+  for (let i = 0; i < tickets.length; i++) {
+    const ticket = tickets[i];
+    const caption = i === 0 ? (policiesApart ? message : full) : label(ticket);
+    if (i > 0) await sleep(jitter(1500, 3500));
+    await typeLikeHuman(exists.jid, i === 0 ? caption.length : 40);
+    await sock.sendMessage(exists.jid, { image: await qrImage(ticket.qrData), caption, mimetype: "image/png" });
+
+    if (i === 0 && policiesApart) {
+      await sleep(jitter(1200, 2500));
+      await typeLikeHuman(exists.jid, policies.length);
+      await sock.sendMessage(exists.jid, { text: policies });
+    }
+  }
+  return tickets.length;
 }
 
 /* ─── Cola ─── */
@@ -126,17 +157,17 @@ async function drainQueue() {
     stats.message = !connected
       ? "Esperando vinculación de WhatsApp…"
       : queue.length
-        ? `Enviando ${queue.length} entrada(s)…`
+        ? `Enviando ${queue.length} orden(es)…`
         : "Cola al día";
 
     for (let i = 0; i < queue.length; i++) {
       if (!connected) break;
       const item = queue[i];
       try {
-        await sendTicket(item);
+        const count = await sendTicket(item);
         await api("POST", { orderId: item.orderId, status: "sent" });
         stats.sent++;
-        remember(`✅ ${item.code} enviada a ${item.name} (+${item.phone})`);
+        remember(`✅ ${item.code}: ${count} entrada${count === 1 ? "" : "s"} enviada${count === 1 ? "" : "s"} a ${item.name} (+${item.phone})`);
       } catch (err) {
         stats.failed++;
         remember(`❌ ${item.code} (${item.name}): ${err.message}`);
@@ -264,7 +295,7 @@ app.get("/", (req, res) => {
   const body = connected
     ? `<div class="state on"><span class="dot"></span><div><strong>WhatsApp conectado</strong><br>Número: +${esc(myPhone)}</div></div>
        <dl class="stats">
-         <div><dt>Enviadas</dt><dd>${stats.sent}</dd></div>
+         <div><dt>Órdenes enviadas</dt><dd>${stats.sent}</dd></div>
          <div><dt>Fallidas</dt><dd>${stats.failed}</dd></div>
          <div><dt>En cola</dt><dd>${stats.pending}</dd></div>
        </dl>
