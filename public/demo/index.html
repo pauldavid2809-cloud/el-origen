@@ -1,0 +1,279 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<link rel="icon" href="/demo/img/logo.png">
+<title>Demo El Origen</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700&family=Gelasio:ital,wght@0,400;0,500;0,600;1,400;1,500&display=swap">
+<style>
+/* Layout: una columna editorial; cada paso alterna texto y pantallas (celular, tablet o computadora). */
+:root {
+  --paper: #F6F0E7;
+  --surface: #FFFCF7;
+  --ink: #2A1519;
+  --muted: #6A5650;
+  --wine: #7D2A46;
+  --gold: #9A6A2C;
+  --line: #DACDBC;
+  --bezel: #1E1517;
+  --wash: #EFE4D6;
+  --display: "Gelasio", Georgia, "Times New Roman", serif;
+  --body: "Figtree", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper: #171012; --surface: #221819; --ink: #F3EAE0; --muted: #C2B2A8; --wine: #E39AB1;
+    --gold: #D9A35A; --line: #3B2D30; --bezel: #050304; --wash: #2A1E20; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --paper: #171012; --surface: #221819; --ink: #F3EAE0; --muted: #C2B2A8; --wine: #E39AB1;
+  --gold: #D9A35A; --line: #3B2D30; --bezel: #050304; --wash: #2A1E20; color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body { background: var(--paper); color: var(--ink); font: 400 17px/1.6 var(--body); }
+.wrap { max-width: 1120px; margin: 0 auto; padding-inline: clamp(16px, 4vw, 40px); padding-block: 28px 72px; }
+h1, h2, h3 { font-family: var(--display); font-weight: 500; text-wrap: balance; margin: 0; }
+p { margin: 0; }
+.eyebrow { font-size: 12.5px; font-weight: 600; letter-spacing: .18em; text-transform: uppercase; color: var(--wine); }
+
+header.top { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; padding-bottom: 22px; border-bottom: 1px solid var(--line); }
+.brand { display: flex; align-items: center; gap: 12px; }
+.brand img { height: 58px; width: auto; }
+.stamp { font-size: 14px; color: var(--muted); }
+
+.hero { display: grid; gap: 28px; padding-block: 44px 20px; }
+.hero h1 { font-size: clamp(36px, 6vw, 62px); line-height: 1.05; }
+.hero h1 em { color: var(--wine); font-style: italic; }
+.lead { font-size: clamp(17px, 2vw, 20px); color: var(--muted); max-width: 62ch; }
+.player { border-radius: 14px; overflow: hidden; border: 1px solid var(--line); background: #000; aspect-ratio: 16 / 9; max-width: 100%; }
+.player video { display: block; width: 100%; height: 100%; }
+.note { display: flex; gap: 10px; align-items: flex-start; font-size: 15px; color: var(--muted); background: var(--wash); border-radius: 10px; padding: 12px 16px; }
+.note b { color: var(--ink); font-weight: 600; }
+
+.toc { display: flex; flex-wrap: wrap; gap: 8px; padding-block: 8px 4px; }
+.toc a { font-size: 14px; color: var(--ink); text-decoration: none; border: 1px solid var(--line); border-radius: 999px; padding: 6px 12px; background: var(--surface); }
+.toc a:hover, .toc a:focus-visible { border-color: var(--wine); color: var(--wine); outline: none; }
+
+section.step { padding-block: 56px 8px; border-top: 1px solid var(--line); margin-top: 48px; scroll-margin-top: 16px; }
+.step-head { display: grid; grid-template-columns: auto 1fr; gap: 6px 18px; align-items: baseline; max-width: 780px; }
+.num { font-family: var(--display); font-size: 44px; line-height: 1; color: var(--gold); font-variant-numeric: tabular-nums; grid-row: span 2; }
+.step-head h2 { font-size: clamp(26px, 3.4vw, 36px); line-height: 1.15; }
+.step-head p { grid-column: 2; color: var(--muted); margin-top: 6px; max-width: 64ch; }
+
+.shots { display: flex; gap: 22px; overflow-x: auto; padding: 26px 4px 18px; scroll-snap-type: x mandatory; }
+.shots figure { margin: 0; flex: 0 0 auto; scroll-snap-align: start; display: grid; gap: 12px; align-content: start; }
+figcaption { font-size: 14px; color: var(--muted); line-height: 1.4; }
+figcaption b { display: block; color: var(--ink); font-weight: 600; font-size: 14.5px; }
+
+.phone { width: 236px; max-width: 70vw; border-radius: 34px; padding: 8px; background: var(--bezel); box-shadow: 0 14px 34px rgba(42, 21, 25, .18); }
+.phone img { display: block; width: 100%; height: auto; border-radius: 27px; aspect-ratio: 390 / 844; object-fit: cover; object-position: top; }
+.shots figure:has(.phone) figcaption { width: 236px; max-width: 70vw; }
+
+.desk { border-radius: 12px; overflow: hidden; border: 1px solid var(--line); background: var(--surface); box-shadow: 0 12px 30px rgba(42, 21, 25, .12); }
+.desk .bar { display: flex; gap: 6px; padding: 9px 12px; border-bottom: 1px solid var(--line); background: var(--wash); }
+.desk .bar i { width: 9px; height: 9px; border-radius: 50%; background: var(--line); }
+.desk img { display: block; width: 100%; height: auto; }
+.grid-desk { display: grid; gap: 26px; padding-top: 26px; grid-template-columns: repeat(auto-fit, minmax(min(100%, 420px), 1fr)); }
+.grid-desk figure { margin: 0; display: grid; gap: 12px; align-content: start; min-width: 0; }
+.wide { grid-column: 1 / -1; }
+
+.tablet { border-radius: 22px; padding: 12px; background: var(--bezel); box-shadow: 0 14px 34px rgba(42, 21, 25, .18); }
+.tablet img { display: block; width: 100%; height: auto; border-radius: 10px; }
+
+.launch { margin-top: 64px; padding: clamp(22px, 4vw, 40px); border-radius: 18px; background: var(--surface); border: 1px solid var(--line); display: grid; gap: 22px; }
+.launch h2 { font-size: clamp(28px, 4vw, 40px); }
+.launch ol { margin: 0; padding: 0; list-style: none; display: grid; gap: 14px; grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr)); }
+.launch li { display: grid; grid-template-columns: auto 1fr; gap: 4px 14px; align-items: baseline; padding: 16px 18px; border-radius: 12px; background: var(--paper); border: 1px solid var(--line); }
+.launch li span { font-family: var(--display); font-size: 26px; color: var(--wine); grid-row: span 2; line-height: 1; }
+.launch li b { font-weight: 600; }
+.launch li p { color: var(--muted); font-size: 15.5px; grid-column: 2; }
+.pending { display: grid; gap: 8px; }
+.pending h3 { font-size: 22px; }
+.pending ul { margin: 0; padding-left: 20px; color: var(--muted); display: grid; gap: 6px; }
+.pending ul b { color: var(--ink); font-weight: 600; }
+footer { margin-top: 48px; font-size: 14px; color: var(--muted); display: flex; gap: 8px 18px; flex-wrap: wrap; justify-content: space-between; }
+
+@media (max-width: 640px) {
+  .num { font-size: 34px; }
+  .shots { gap: 16px; }
+}
+@media (prefers-reduced-motion: reduce) { .shots { scroll-behavior: auto; } }
+</style>
+<style>html{color-scheme:light}body{margin:0}img{max-width:100%}[hidden]{display:none!important}</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <div class="brand"><img src="/demo/img/logo.png" alt="El Origen"></div>
+    <p class="stamp">Demostración · 8 de octubre de 2026</p>
+  </header>
+
+  <div class="hero">
+    <div class="eyebrow">El nuevo sitio de El Origen</div>
+    <h1>De la reserva <em>a la puerta</em></h1>
+    <p class="lead">El cliente reserva y paga desde su celular. Ustedes verifican el pago con un clic. Cada invitado recibe su entrada con código QR por correo y WhatsApp, y la tablet de la puerta la escanea al llegar.</p>
+    <div class="player">
+      <video id="demo-video" controls playsinline preload="metadata" poster="/demo/img/poster.jpg">
+        <source src="/demo/demo-el-origen.mp4" type="video/mp4">
+      </video>
+    </div>
+    <p class="note"><span aria-hidden="true">ⓘ</span><span><b>Todo lo que se ve son datos de ejemplo.</b> Las catas, los clientes, los pagos y los comprobantes son de prueba. Los datos de pago y de contacto sí son los de El Origen.</span></p>
+    <nav class="toc" aria-label="Pasos del recorrido">
+      <a href="#portada">1. Portada</a>
+      <a href="#reserva">2. Reserva</a>
+      <a href="#verificacion">3. Verificación</a>
+      <a href="#entradas">4. Entradas</a>
+      <a href="#mensajes">5. Correo y WhatsApp</a>
+      <a href="#puerta">6. Puerta</a>
+      <a href="#panel">7. Panel</a>
+      <a href="#sitio">8. Más del sitio</a>
+    </nav>
+  </div>
+
+  <section class="step" id="portada">
+    <div class="step-head">
+      <span class="num">1</span>
+      <h2>La portada</h2>
+      <p>Las próximas catas con su fecha, lugar y precio en dólares y en bolívares a la tasa BCV del día, los sommeliers que las dirigen y los aliados.</p>
+    </div>
+    <div class="grid-desk">
+      <figure class="wide"><div class="desk"><div class="bar"><i></i><i></i><i></i></div><img src="/demo/img/d00-portada.jpg" alt="Portada del sitio en computadora" loading="lazy"></div></figure>
+      <figure><div class="desk"><div class="bar"><i></i><i></i><i></i></div><img src="/demo/img/d00b-proximas-catas.jpg" alt="Próximas catas en la portada" loading="lazy"></div><figcaption><b>Próximas catas</b>Se publican desde el panel; el sitio las muestra solas.</figcaption></figure>
+      <figure><div class="desk"><div class="bar"><i></i><i></i><i></i></div><img src="/demo/img/d00c-sommeliers.jpg" alt="Sommeliers en la portada" loading="lazy"></div><figcaption><b>Quienes dirigen cada cata</b>Belkis Croquer, Fabián Lugo, Juan Carlos Arias y Raiza Navarro.</figcaption></figure>
+    </div>
+  </section>
+
+  <section class="step" id="reserva">
+    <div class="step-head">
+      <span class="num">2</span>
+      <h2>El cliente reserva desde su celular</h2>
+      <p>Crea su Cuenta Origen, elige la cata, los cupos y los adicionales, aplica su cupón de bienvenida y paga por Pago Móvil, transferencia, Binance o efectivo. Desliza para ver cada pantalla.</p>
+    </div>
+    <div class="shots" tabindex="0" aria-label="Pantallas de la reserva">
+      <figure><div class="phone"><img src="/demo/img/m01-registro.jpg" alt="Registro de Cuenta Origen" loading="lazy"></div><figcaption><b>Registro sencillo</b>Nombre, correo, WhatsApp y contraseña.</figcaption></figure>
+      <figure><div class="phone"><img src="/demo/img/m02-bienvenida.jpg" alt="Bienvenida con cupón 2ORIGEN" loading="lazy"></div><figcaption><b>Cupón de bienvenida</b>2ORIGEN, solo para miembros.</figcaption></figure>
+      <figure><div class="phone"><img src="/demo/img/m04-detalle.jpg" alt="Detalle de la cata" loading="lazy"></div><figcaption><b>Detalle de la cata</b>Fecha, lugar, productos y maridaje.</figcaption></figure>
+      <figure><div class="phone"><img src="/demo/img/m05-cupos.jpg" alt="Selección de cupos y adicionales" loading="lazy"></div><figcaption><b>Cupos y adicionales</b>Total en dólares y en bolívares.</figcaption></figure>
+      <figure><div class="phone"><img src="/demo/img/m07-confirmar.jpg" alt="Confirmación con políticas" loading="lazy"></div><figcaption><b>Políticas y cupón</b>Acepta las políticas antes de pagar.</figcaption></figure>
+      <figure><div class="phone"><img src="/demo/img/m08-orden-pago.jpg" alt="Elección del método de pago" loading="lazy"></div><figcaption><b>Método de pago</b>El cupo queda apartado 60 minutos.</figcaption></figure>
+      <figure><div class="phone"><img src="/demo/img/m08b-datos-pago-movil.jpg" alt="Datos de Pago Móvil" loading="lazy"></div><figcaption><b>Datos para pagar</b>Con botón de copiar en cada dato.</figcaption></figure>
+      <figure><div class="phone"><img src="/demo/img/m09-comprobante.jpg" alt="Carga del comprobante" loading="lazy"></div><figcaption><b>Sube el comprobante</b>Referencia, monto y captura.</figcaption></figure>
+      <figure><div class="phone"><img src="/demo/img/m10-en-revision.jpg" alt="Pago en revisión" loading="lazy"></div><figcaption><b>Pago en revisión</b>La página se actualiza sola al aprobarse.</figcaption></figure>
+    </div>
+  </section>
+
+  <section class="step" id="verificacion">
+    <div class="step-head">
+      <span class="num">3</span>
+      <h2>Ustedes verifican el pago</h2>
+      <p>Cada comprobante llega al panel junto a la referencia, el monto en bolívares y el banco. Al aprobar, el sistema genera un QR por persona y lo envía por correo y por WhatsApp.</p>
+    </div>
+    <div class="grid-desk">
+      <figure class="wide"><div class="desk"><div class="bar"><i></i><i></i><i></i></div><img src="/demo/img/d01-resumen.jpg" alt="Resumen del panel" loading="lazy"></div><figcaption><b>Resumen</b>Ventas, cupos vendidos, entradas escaneadas, miembros y pagos por revisar.</figcaption></figure>
+      <figure><div class="desk"><div class="bar"><i></i><i></i><i></i></div><img src="/demo/img/d02-por-revisar.jpg" alt="Pago por revisar con comprobante" loading="lazy"></div><figcaption><b>Por revisar</b>El comprobante al lado de los datos del pago.</figcaption></figure>
+      <figure><div class="desk"><div class="bar"><i></i><i></i><i></i></div><img src="/demo/img/d03-aprobada.jpg" alt="Reserva aprobada" loading="lazy"></div><figcaption><b>Aprobada</b>Con el estado del correo y del WhatsApp.</figcaption></figure>
+    </div>
+  </section>
+
+  <section class="step" id="entradas">
+    <div class="step-head">
+      <span class="num">4</span>
+      <h2>El cliente recibe sus entradas</h2>
+      <p>Una entrada con código QR por persona. Puede descargarlas, compartir cada una con su invitado y verlas siempre en su cuenta.</p>
+    </div>
+    <div class="shots" tabindex="0" aria-label="Pantallas de las entradas">
+      <figure><div class="phone"><img src="/demo/img/m11-entradas.jpg" alt="Entradas confirmadas" loading="lazy"></div><figcaption><b>Reserva confirmada</b>Pago verificado.</figcaption></figure>
+      <figure><div class="phone"><img src="/demo/img/m11b-qr.jpg" alt="Código QR de una entrada" loading="lazy"></div><figcaption><b>Un QR por persona</b>Con el nombre del asistente, si lo desea.</figcaption></figure>
+      <figure><div class="phone"><img src="/demo/img/m12-mi-cuenta.jpg" alt="Mi cuenta con reservas" loading="lazy"></div><figcaption><b>Mi cuenta</b>Todas sus reservas y entradas.</figcaption></figure>
+    </div>
+  </section>
+
+  <section class="step" id="mensajes">
+    <div class="step-head">
+      <span class="num">5</span>
+      <h2>Correo y WhatsApp</h2>
+      <p>El correo sale desde la cuenta de El Origen y el WhatsApp desde el número de atención al cliente, con los datos de la cata y un QR por persona.</p>
+    </div>
+    <div class="shots" tabindex="0" aria-label="Correo y WhatsApp recibidos">
+      <figure><div class="phone"><img src="/demo/img/m13-correo.jpg" alt="Correo con las entradas" loading="lazy"></div><figcaption><b>Correo de confirmación</b>Con las entradas adjuntas.</figcaption></figure>
+      <figure><div class="phone"><img src="/demo/img/m14-whatsapp.jpg" alt="Mensaje de WhatsApp con las entradas" loading="lazy"></div><figcaption><b>WhatsApp</b>Una imagen con QR por persona.</figcaption></figure>
+    </div>
+  </section>
+
+  <section class="step" id="puerta">
+    <div class="step-head">
+      <span class="num">6</span>
+      <h2>En la puerta</h2>
+      <p>La tablet entra con su propia clave, que solo abre el escáner. Escanea el QR con la cámara, registra el ingreso y avisa si alguien intenta entrar de nuevo con la misma entrada.</p>
+    </div>
+    <div class="grid-desk">
+      <figure><div class="tablet"><img src="/demo/img/t01-valida.jpg" alt="Entrada válida en la puerta" loading="lazy"></div><figcaption><b>Entrada válida</b>Nombre, cata y cuántos del grupo ya entraron.</figcaption></figure>
+      <figure><div class="tablet"><img src="/demo/img/t02-registrado.jpg" alt="Ingreso registrado" loading="lazy"></div><figcaption><b>Ingreso registrado</b>Con un toque.</figcaption></figure>
+      <figure class="wide"><div class="tablet"><img src="/demo/img/t03-ya-usada.jpg" alt="Entrada ya utilizada" loading="lazy"></div><figcaption><b>Entrada ya utilizada</b>Muestra a qué hora entró.</figcaption></figure>
+    </div>
+  </section>
+
+  <section class="step" id="panel">
+    <div class="step-head">
+      <span class="num">7</span>
+      <h2>El panel de administración</h2>
+      <p>Desde aquí se crean las catas, se manejan los cupones, se consulta la base de datos de clientes y se exportan los asistentes a Excel.</p>
+    </div>
+    <div class="grid-desk">
+      <figure><div class="desk"><div class="bar"><i></i><i></i><i></i></div><img src="/demo/img/d05-nueva-cata.jpg" alt="Formulario de nueva cata" loading="lazy"></div><figcaption><b>Nueva cata</b>Foto de portada de 1600 × 1200 px, productos, adicionales y cupos.</figcaption></figure>
+      <figure><div class="desk"><div class="bar"><i></i><i></i><i></i></div><img src="/demo/img/d06-catas-con-nueva.jpg" alt="Lista de catas" loading="lazy"></div><figcaption><b>Catas</b>Cupos vendidos y libres de cada una.</figcaption></figure>
+      <figure><div class="desk"><div class="bar"><i></i><i></i><i></i></div><img src="/demo/img/d07-cupones.jpg" alt="Cupones" loading="lazy"></div><figcaption><b>Cupones</b>Porcentaje, límite de usos y referente.</figcaption></figure>
+      <figure><div class="desk"><div class="bar"><i></i><i></i><i></i></div><img src="/demo/img/d08-miembros.jpg" alt="Miembros" loading="lazy"></div><figcaption><b>Miembros</b>La base de datos de clientes, exportable a Excel.</figcaption></figure>
+      <figure><div class="desk"><div class="bar"><i></i><i></i><i></i></div><img src="/demo/img/d09-solicitudes.jpg" alt="Solicitudes" loading="lazy"></div><figcaption><b>Solicitudes</b>Eventos privados, marcas y sommeliers.</figcaption></figure>
+      <figure><div class="desk"><div class="bar"><i></i><i></i><i></i></div><img src="/demo/img/d10-config-pagos.jpg" alt="Configuración de pagos" loading="lazy"></div><figcaption><b>Datos de pago</b>Pago Móvil, cuentas, Binance y efectivo, editables.</figcaption></figure>
+    </div>
+  </section>
+
+  <section class="step" id="sitio">
+    <div class="step-head">
+      <span class="num">8</span>
+      <h2>Más del sitio</h2>
+      <p>La historia de El Origen, el equipo de sommeliers, las alianzas para marcas y restaurantes, y todo el sitio en español e inglés.</p>
+    </div>
+    <div class="shots" tabindex="0" aria-label="Otras páginas del sitio">
+      <figure><div class="phone"><img src="/demo/img/m16-raiza.jpg" alt="Equipo de sommeliers" loading="lazy"></div><figcaption><b>Nosotros</b>Con la presentación de cada sommelier.</figcaption></figure>
+      <figure><div class="phone"><img src="/demo/img/m17-alianzas.jpg" alt="Alianzas comerciales" loading="lazy"></div><figcaption><b>Alianzas</b>Para marcas que quieren estar en la mesa.</figcaption></figure>
+      <figure><div class="phone"><img src="/demo/img/m18-ingles.jpg" alt="Sitio en inglés" loading="lazy"></div><figcaption><b>English</b>Un toque cambia todo el sitio.</figcaption></figure>
+    </div>
+  </section>
+
+  <div class="launch" id="lanzar">
+    <div class="eyebrow">Para ponerlo en marcha</div>
+    <h2>Lo que falta para lanzar</h2>
+    <ol>
+      <li><span>1</span><b>Base de datos</b><p>Conectar Supabase para guardar catas, reservas y clientes.</p></li>
+      <li><span>2</span><b>Correo de ventas</b><p>Activar el envío de entradas desde el correo de El Origen.</p></li>
+      <li><span>3</span><b>WhatsApp</b><p>Dejar el bot vinculado al número de atención al cliente en una computadora.</p></li>
+      <li><span>4</span><b>Dominio</b><p>Elegir la dirección del sitio, por ejemplo elorigenvzla.com.</p></li>
+    </ol>
+    <div class="pending">
+      <h3>Datos por confirmar con El Origen</h3>
+      <ul>
+        <li><b>Pago Móvil:</b> si el número termina en 38.38 o en 38.48.</li>
+        <li><b>Binance:</b> Pay ID o correo y titular.</li>
+        <li><b>Titular</b> de las cuentas y si se muestra en la página.</li>
+        <li><b>Cupón 2ORIGEN:</b> el porcentaje de descuento definitivo.</li>
+        <li><b>Sommeliers:</b> fotos y cargo de cada uno.</li>
+        <li><b>Aliados:</b> usuarios de Instagram y el rubro de Empresa Paul.</li>
+        <li><b>Correo público:</b> experiencethewine22 o ventasorigen.</li>
+      </ul>
+    </div>
+  </div>
+
+  <footer>
+    <span>El Origen · Catas guiadas · Caracas</span>
+    <span>Atención al cliente: 0414-107-4007 · @elorigen.vzla</span>
+  </footer>
+</div>
+</body>
+</html>
