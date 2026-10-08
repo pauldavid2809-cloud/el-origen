@@ -168,14 +168,14 @@ export const translations = {
         subtitle:
           "Nos encontramos en constante búsqueda de sommeliers, especialistas en catas y embajadores de marca con pasión por la docencia sensorial y la maestría en mesa.",
         highlight: "Vinos · Whisky · Cocuy · Habanos",
-        cta: "Postularme",
+        cta: "Postularme como Sommelier",
       },
       private: {
         badge: "Privadas & corporativas",
         title: "Experiencias Privadas & Eventos Corporativos",
         subtitle: "Diseñamos veladas de cata a medida para marcas, empresas y celebraciones exclusivas.",
         highlight: "De 10 a 60 invitados",
-        cta: "Solicitar propuesta",
+        cta: "Solicitar Propuesta Privada",
       },
     },
     faq: {
@@ -242,6 +242,13 @@ export const translations = {
       privacy: "Política de Privacidad",
       terms: "Términos y Condiciones",
       copyright: (year: number) => `© ${year} El Origen.`,
+    },
+    notFound: {
+      eyebrow: "Error 404",
+      title: "No encontramos esta página",
+      subtitle: "Es posible que el enlace esté incompleto o que la página ya no exista. Te esperamos en la próxima cata.",
+      ctaPrimary: "Ver próximas catas",
+      ctaSecondary: "Volver al inicio",
     },
   },
   en: {
@@ -367,11 +374,11 @@ export const translations = {
       eyebrow: "Business Partnerships & Partner Brands",
       main: {
         badge: "For brands",
-        title: "Place your label at the right table.",
+        title: "Put your label on the right table.",
         subtitle: "We connect prestigious brands with a select audience through high-level gastronomic experiences.",
         modalitiesLabel: "Participation options",
         modalities: [
-          { key: "A", label: "Edition Lead Brand" },
+          { key: "A", label: "Featured Brand of the Edition" },
           { key: "B", label: "Experience Partner / Co-Sponsor" },
           { key: "C", label: "B2B Activations & Private Events" },
         ],
@@ -385,14 +392,14 @@ export const translations = {
         subtitle:
           "We are always looking for sommeliers, tasting specialists and brand ambassadors with a passion for sensory teaching and tableside mastery.",
         highlight: "Wine · Whisky · Cocuy · Cigars",
-        cta: "Apply",
+        cta: "Apply as a Sommelier",
       },
       private: {
         badge: "Private & corporate",
         title: "Private Experiences & Corporate Events",
         subtitle: "We design bespoke tasting evenings for brands, companies and exclusive celebrations.",
         highlight: "From 10 to 60 guests",
-        cta: "Request a proposal",
+        cta: "Request a Private Proposal",
       },
     },
     faq: {
@@ -457,6 +464,13 @@ export const translations = {
       privacy: "Privacy Policy",
       terms: "Terms and Conditions",
       copyright: (year: number) => `© ${year} El Origen.`,
+    },
+    notFound: {
+      eyebrow: "Error 404",
+      title: "We couldn't find this page",
+      subtitle: "The link may be incomplete, or the page may no longer exist. We look forward to seeing you at the next tasting.",
+      ctaPrimary: "See upcoming tastings",
+      ctaSecondary: "Back to home",
     },
   },
 };

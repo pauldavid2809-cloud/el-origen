@@ -1,7 +1,7 @@
 import "server-only";
 import crypto from "crypto";
 import { createClient, SupabaseClient } from "@supabase/supabase-js";
-import type { RateCurrency } from "@/types";
+import type { RateCurrency, Tasting } from "@/types";
 
 /* ─────────────────────────────────────────────────────────────
    Órdenes de reserva con pago verificado (tabla public.orders).
@@ -85,6 +85,11 @@ export function toPublicOrder(o: Order): PublicOrder {
 
 /** Minutos que una orden sin pago reportado retiene sus cupos. */
 export const HOLD_MINUTES = 60;
+/**
+ * Horas que una orden en efectivo ("Ya coordiné la entrega", sin comprobante) retiene sus cupos
+ * mientras el admin confirma el pago. Pasado ese tiempo los libera, igual que un apartado vencido.
+ */
+export const CASH_HOLD_HOURS = 24;
 
 const PROOF_BUCKET = "comprobantes";
 
@@ -107,6 +112,30 @@ export function getAdminClient(): SupabaseClient | null {
 
 export function isPersistent(): boolean {
   return getAdminClient() !== null;
+}
+
+/** Filas por página al leer tablas completas. */
+const PAGE_SIZE = 1000;
+/** Tope de seguridad (páginas) para no quedar en un bucle si algo falla. */
+const MAX_PAGES = 500;
+
+type PageResult<T> = PromiseLike<{ data: T[] | null; error: { message: string } | null }>;
+
+/**
+ * Lee todas las filas de una consulta paginando con `.range()`. PostgREST corta cada respuesta en
+ * `max_rows` (1000 por defecto en Supabase), así que una consulta sin paginar pierde filas en silencio.
+ * `page(from, to)` debe construir la consulta con un orden estable (p. ej. por fecha e id).
+ * Se avanza por las filas realmente recibidas, por si el servidor usa un `max_rows` menor que la página.
+ */
+export async function fetchAllRows<T>(page: (from: number, to: number) => PageResult<T>): Promise<T[]> {
+  const out: T[] = [];
+  for (let i = 0; i < MAX_PAGES; i++) {
+    const { data, error } = await page(out.length, out.length + PAGE_SIZE - 1);
+    if (error) throw new Error(error.message);
+    if (!data?.length) break;
+    out.push(...data);
+  }
+  return out;
 }
 
 /* ─── Mapeo fila ↔ objeto ─── */
@@ -177,11 +206,13 @@ export type NewOrder = Pick<
 > &
   Partial<Pick<Order, "memberId" | "acceptedTermsAt" | "rateCurrency">>;
 
-export async function createOrder(input: NewOrder): Promise<Order> {
+/** Orden nueva (pendiente de pago) con sus valores iniciales, aún sin guardar. */
+function buildOrder(input: NewOrder): Order {
   const now = new Date().toISOString();
-  const base: Order = {
+  return {
     ...input,
     customerEmail: input.customerEmail.trim().toLowerCase(),
+    couponCode: input.couponCode ? input.couponCode.trim().toUpperCase() : null,
     memberId: input.memberId ?? null,
     acceptedTermsAt: input.acceptedTermsAt ?? null,
     rateCurrency: input.rateCurrency ?? null,
@@ -195,15 +226,102 @@ export async function createOrder(input: NewOrder): Promise<Order> {
     checkedInAt: null, checkedInBy: null, emailStatus: "not_sent", whatsappStatus: "not_sent",
     createdAt: now, updatedAt: now,
   };
+}
 
+async function insertOrder(sb: SupabaseClient, base: Order): Promise<Order> {
+  const { data, error } = await sb.from("orders").insert({ ...toRow(base), id: base.id }).select().single();
+  if (error) throw new Error(`No se pudo crear la orden: ${error.message}`);
+  return fromRow(data);
+}
+
+/** Crea la orden sin comprobar cupos ni usos de cupón (ver `createOrderChecked`). */
+export async function createOrder(input: NewOrder): Promise<Order> {
+  const base = buildOrder(input);
   const sb = getAdminClient();
   if (!sb) {
     memOrders.set(base.id, base);
     return base;
   }
-  const { data, error } = await sb.from("orders").insert({ ...toRow(base), id: base.id }).select().single();
-  if (error) throw new Error(`No se pudo crear la orden: ${error.message}`);
-  return fromRow(data);
+  return insertOrder(sb, base);
+}
+
+export type CheckedOrderResult =
+  | { ok: true; order: Order }
+  | { ok: false; reason: "sold_out"; availableSpots: number }
+  | { ok: false; reason: "coupon_exhausted" };
+
+/** Usos vigentes de un cupón (órdenes que aún lo retienen, ver `holdsSpots`). */
+async function countCouponUses(code: string): Promise<number> {
+  const now = Date.now();
+  return (await listCouponOrders(code)).filter((r) => holdsSpots(r, now)).length;
+}
+
+let warnedNoRpc = false;
+
+/**
+ * Crea la orden solo si caben sus cupos en la cata (`totalSpots`) y, si lleva cupón con `maxUses`,
+ * si el cupón aún tiene usos. La comprobación y la inserción son atómicas:
+ *  - Supabase: función `create_order_checked` (supabase/v2.sql), que bloquea la cata y el cupón en la transacción.
+ *  - Memoria: sin `await` entre el conteo y la inserción.
+ * Si la función aún no existe en la base de datos, inserta, vuelve a contar y anula la orden si se pasó.
+ */
+export async function createOrderChecked(
+  input: NewOrder,
+  totalSpots: number,
+  maxUses: number | null = null
+): Promise<CheckedOrderResult> {
+  const base = buildOrder(input);
+  const coupon = base.couponCode;
+  const limitUses = coupon !== null && maxUses !== null;
+
+  const sb = getAdminClient();
+  if (!sb) {
+    const now = Date.now();
+    let held = 0;
+    let uses = 0;
+    memOrders.forEach((o) => {
+      if (!holdsSpots(o, now)) return;
+      if (o.tastingId === base.tastingId) held += o.spotsCount;
+      if (coupon && o.couponCode?.toUpperCase() === coupon) uses += 1;
+    });
+    if (held + base.spotsCount > totalSpots) return { ok: false, reason: "sold_out", availableSpots: Math.max(0, totalSpots - held) };
+    if (limitUses && uses >= (maxUses as number)) return { ok: false, reason: "coupon_exhausted" };
+    memOrders.set(base.id, base);
+    return { ok: true, order: base };
+  }
+
+  const { data, error } = await sb.rpc("create_order_checked", {
+    p_order: { ...toRow(base), id: base.id },
+    p_total_spots: totalSpots,
+    p_max_uses: limitUses ? maxUses : null,
+    p_hold_minutes: HOLD_MINUTES,
+    p_cash_hold_hours: CASH_HOLD_HOURS,
+  });
+  if (!error) return { ok: true, order: fromRow((Array.isArray(data) ? data[0] : data) as Row) };
+  if (error.message === "EO_SOLD_OUT") {
+    return { ok: false, reason: "sold_out", availableSpots: Math.max(0, Math.floor(Number(error.details)) || 0) };
+  }
+  if (error.message === "EO_COUPON_EXHAUSTED") return { ok: false, reason: "coupon_exhausted" };
+  // PGRST202 / 42883: la función no está creada (falta ejecutar supabase/v2.sql).
+  if (error.code !== "PGRST202" && error.code !== "42883") throw new Error(`No se pudo crear la orden: ${error.message}`);
+
+  if (!warnedNoRpc) {
+    warnedNoRpc = true;
+    console.warn("[orders] Falta la función create_order_checked (supabase/v2.sql): se usa insertar y volver a contar.");
+  }
+  const order = await insertOrder(sb, base);
+  const [held, uses] = await Promise.all([
+    heldSpotsByTasting([order.tastingId]).then((h) => h[order.tastingId] ?? 0),
+    limitUses ? countCouponUses(coupon as string) : Promise.resolve(0),
+  ]);
+  const overSpots = held > totalSpots;
+  const overUses = limitUses && uses > (maxUses as number);
+  if (!overSpots && !overUses) return { ok: true, order };
+  // Otra compra simultánea tomó lo último: se anula esta para no vender de más (el cliente puede reintentar).
+  await updateOrder(order.id, { status: "cancelled", reviewedAt: new Date().toISOString(), reviewedBy: "Sistema" });
+  return overSpots
+    ? { ok: false, reason: "sold_out", availableSpots: Math.max(0, totalSpots - (held - order.spotsCount)) }
+    : { ok: false, reason: "coupon_exhausted" };
 }
 
 export async function getOrderByToken(token: string): Promise<Order | null> {
@@ -238,9 +356,10 @@ export async function findOrderForCheckin(input: string): Promise<Order | null> 
 export async function listOrders(): Promise<Order[]> {
   const sb = getAdminClient();
   if (!sb) return Array.from(memOrders.values()).sort((a, b) => b.createdAt.localeCompare(a.createdAt));
-  const { data, error } = await sb.from("orders").select("*").order("created_at", { ascending: false }).limit(2000);
-  if (error) throw new Error(error.message);
-  return (data ?? []).map(fromRow);
+  const rows = await fetchAllRows<Row>((from, to) =>
+    sb.from("orders").select("*").order("created_at", { ascending: false }).order("id", { ascending: true }).range(from, to)
+  );
+  return rows.map(fromRow);
 }
 
 /** Órdenes de un correo (sin distinguir mayúsculas), las más recientes primero. */
@@ -291,6 +410,8 @@ export interface CouponOrderRow {
   spotsCount: number;
   totalUsd: number;
   createdAt: string;
+  paymentMethod: string | null;
+  proofSubmittedAt: string | null;
 }
 
 export async function listCouponOrders(code?: string): Promise<CouponOrderRow[]> {
@@ -305,24 +426,55 @@ export async function listCouponOrders(code?: string): Promise<CouponOrderRow[]>
         spotsCount: o.spotsCount,
         totalUsd: o.totalUsd,
         createdAt: o.createdAt,
+        paymentMethod: o.paymentMethod,
+        proofSubmittedAt: o.proofSubmittedAt,
       }));
   }
-  let query = sb.from("orders").select("coupon_code, status, spots_count, total_usd, created_at").not("coupon_code", "is", null);
-  if (target) query = query.eq("coupon_code", target);
-  const { data, error } = await query.limit(10000);
-  if (error) throw new Error(error.message);
-  return (data ?? []).map((r) => ({
+  const rows = await fetchAllRows<Row>((from, to) => {
+    let query = sb
+      .from("orders")
+      .select("id, coupon_code, status, spots_count, total_usd, created_at, payment_method, proof_submitted_at")
+      .not("coupon_code", "is", null);
+    if (target) query = query.eq("coupon_code", target);
+    return query.order("created_at", { ascending: true }).order("id", { ascending: true }).range(from, to);
+  });
+  return rows.map((r) => ({
     couponCode: String(r.coupon_code).toUpperCase(),
     status: r.status as OrderStatus,
     spotsCount: Number(r.spots_count),
     totalUsd: Number(r.total_usd),
     createdAt: String(r.created_at),
+    paymentMethod: (r.payment_method as string | null) ?? null,
+    proofSubmittedAt: (r.proof_submitted_at as string | null) ?? null,
   }));
 }
 
-/** Una orden pendiente de pago deja de retener cupos (y usos de cupón) al vencer su apartado. */
-export function holdExpired(o: { status: OrderStatus; createdAt: string }, now = Date.now()): boolean {
-  return o.status === "pending_payment" && Date.parse(o.createdAt) + HOLD_MINUTES * 60_000 < now;
+/** Datos de una orden que deciden si sigue reteniendo cupos (y usos de cupón). */
+export interface HoldInfo {
+  status: OrderStatus;
+  createdAt: string;
+  paymentMethod?: string | null;
+  proofSubmittedAt?: string | null;
+}
+
+/**
+ * La orden dejó de retener cupos (y usos de cupón) porque venció su apartado:
+ *  - pendiente de pago con más de HOLD_MINUTES desde que se creó;
+ *  - en revisión por efectivo (sin comprobante) con más de CASH_HOLD_HOURS desde que se reportó.
+ */
+export function holdExpired(o: HoldInfo, now = Date.now()): boolean {
+  if (o.status === "pending_payment") return Date.parse(o.createdAt) + HOLD_MINUTES * 60_000 < now;
+  if (o.status === "in_review" && o.paymentMethod === "efectivo") {
+    const since = o.proofSubmittedAt ? Date.parse(o.proofSubmittedAt) : NaN;
+    return !(since + CASH_HOLD_HOURS * 3_600_000 >= now);
+  }
+  return false;
+}
+
+/** La orden ocupa cupos de su cata: aprobada, o en revisión / pendiente sin vencer. */
+export function holdsSpots(o: HoldInfo, now = Date.now()): boolean {
+  if (o.status === "approved") return true;
+  return (o.status === "in_review" || o.status === "pending_payment") && !holdExpired(o, now);
 }
 
 export async function updateOrder(id: string, patch: Partial<Order>): Promise<Order> {
@@ -340,6 +492,29 @@ export async function updateOrder(id: string, patch: Partial<Order>): Promise<Or
     throw new Error(error.message);
   }
   return fromRow(data);
+}
+
+/**
+ * Cambio de estado condicionado: aplica `patch` solo si la orden sigue en uno de los estados `from`
+ * (compare-and-set). Devuelve null si otra petición la cambió antes (aprobación y anulación simultáneas,
+ * doble envío del comprobante, etc.), para responder 409 sin efectos secundarios.
+ */
+export async function transitionOrder(id: string, from: OrderStatus[], patch: Partial<Order>): Promise<Order | null> {
+  if (!from.length) return null;
+  const sb = getAdminClient();
+  if (!sb) {
+    const current = memOrders.get(id);
+    if (!current || !from.includes(current.status)) return null;
+    const next = { ...current, ...patch, updatedAt: new Date().toISOString() };
+    memOrders.set(id, next);
+    return next;
+  }
+  const { data, error } = await sb.from("orders").update(toRow(patch)).eq("id", id).in("status", from).select().maybeSingle();
+  if (error) {
+    if (error.code === "23505") throw new Error("Esa referencia de pago ya fue registrada en otra orden.");
+    throw new Error(error.message);
+  }
+  return data ? fromRow(data) : null;
 }
 
 /**
@@ -382,27 +557,113 @@ export async function referenceInUse(reference: string, exceptId: string): Promi
   return Boolean(data && data.length);
 }
 
-/** Cupos ocupados por cata: aprobadas, en revisión y pendientes recientes. */
-export async function heldSpotsByTasting(): Promise<Record<string, number>> {
-  const cutoff = new Date(Date.now() - HOLD_MINUTES * 60_000).toISOString();
+/* ─── Copia de los datos de la cata en cada orden ─── */
+
+/** Lo que cada orden guarda de su cata (lo que muestran la entrada, el correo, WhatsApp, la puerta y el export). */
+export type TastingSnapshot = Pick<Order, "tastingTitle" | "tastingDate" | "tastingTime" | "tastingLocation">;
+
+export function tastingSnapshot(
+  t: Pick<Tasting, "title" | "dateFull" | "dateDisplay" | "timeStart" | "timeEnd" | "location">
+): TastingSnapshot {
+  return {
+    tastingTitle: t.title,
+    tastingDate: t.dateFull || t.dateDisplay,
+    tastingTime: t.timeEnd ? `${t.timeStart} – ${t.timeEnd}` : t.timeStart,
+    tastingLocation: t.location,
+  };
+}
+
+const SNAPSHOT_KEYS: (keyof TastingSnapshot)[] = ["tastingTitle", "tastingDate", "tastingTime", "tastingLocation"];
+
+/**
+ * Actualiza la copia de la cata en sus órdenes (p. ej. al reprogramarla) para que la entrada, el reenvío,
+ * la puerta y el export muestren la fecha y el lugar vigentes. Devuelve cuántas órdenes cambiaron.
+ */
+export async function syncOrdersWithTasting(tastingId: string, snapshot: TastingSnapshot): Promise<number> {
+  const differs = (o: TastingSnapshot) => SNAPSHOT_KEYS.some((k) => o[k] !== snapshot[k]);
   const sb = getAdminClient();
-  let rows: { tasting_id: string; spots_count: number; status: string; created_at: string }[];
   if (!sb) {
-    rows = Array.from(memOrders.values()).map((o) => ({
-      tasting_id: o.tastingId, spots_count: o.spotsCount, status: o.status, created_at: o.createdAt,
-    }));
-  } else {
-    const { data, error } = await sb
-      .from("orders")
-      .select("tasting_id, spots_count, status, created_at")
-      .in("status", ["pending_payment", "in_review", "approved"]);
-    if (error) throw new Error(error.message);
-    rows = data ?? [];
+    const now = new Date().toISOString();
+    let changed = 0;
+    memOrders.forEach((o) => {
+      if (o.tastingId !== tastingId || !differs(o)) return;
+      memOrders.set(o.id, { ...o, ...snapshot, updatedAt: now });
+      changed += 1;
+    });
+    return changed;
   }
+  const rows = await fetchAllRows<Row>((from, to) =>
+    sb
+      .from("orders")
+      .select("id, tasting_title, tasting_date, tasting_time, tasting_location")
+      .eq("tasting_id", tastingId)
+      .order("id", { ascending: true })
+      .range(from, to)
+  );
+  const ids = rows
+    .filter((r) =>
+      differs({
+        tastingTitle: String(r.tasting_title),
+        tastingDate: String(r.tasting_date),
+        tastingTime: String(r.tasting_time),
+        tastingLocation: String(r.tasting_location),
+      })
+    )
+    .map((r) => String(r.id));
+  for (let i = 0; i < ids.length; i += 150) {
+    const { error } = await sb.from("orders").update(toRow(snapshot)).in("id", ids.slice(i, i + 150));
+    if (error) throw new Error(error.message);
+  }
+  return ids.length;
+}
+
+/**
+ * Cupos ocupados por cata (ver `holdsSpots`). Con `tastingIds` solo se leen las órdenes de esas catas;
+ * sin él, las de todas (paginado, para no perder filas por el tope de PostgREST).
+ */
+export async function heldSpotsByTasting(tastingIds?: string[]): Promise<Record<string, number>> {
+  const ids = tastingIds ? Array.from(new Set(tastingIds.filter(Boolean))) : null;
   const held: Record<string, number> = {};
+  if (ids && !ids.length) return held;
+
+  const now = Date.now();
+  const add = (o: HoldInfo & { tastingId: string; spotsCount: number }) => {
+    if (holdsSpots(o, now)) held[o.tastingId] = (held[o.tastingId] ?? 0) + Number(o.spotsCount);
+  };
+
+  const sb = getAdminClient();
+  if (!sb) {
+    const only = ids ? new Set(ids) : null;
+    memOrders.forEach((o) => {
+      if (!only || only.has(o.tastingId)) add(o);
+    });
+    return held;
+  }
+
+  const read = (chunk: string[] | null) =>
+    fetchAllRows<Row>((from, to) => {
+      let query = sb
+        .from("orders")
+        .select("id, tasting_id, spots_count, status, created_at, payment_method, proof_submitted_at")
+        .in("status", ["pending_payment", "in_review", "approved"]);
+      if (chunk) query = query.in("tasting_id", chunk);
+      return query.order("created_at", { ascending: true }).order("id", { ascending: true }).range(from, to);
+    });
+
+  const rows: Row[] = [];
+  if (!ids) rows.push(...(await read(null)));
+  // Lotes para no exceder el largo de la URL de PostgREST.
+  else for (let i = 0; i < ids.length; i += 150) rows.push(...(await read(ids.slice(i, i + 150))));
+
   for (const r of rows) {
-    const counts = r.status === "approved" || r.status === "in_review" || (r.status === "pending_payment" && r.created_at >= cutoff);
-    if (counts) held[r.tasting_id] = (held[r.tasting_id] ?? 0) + Number(r.spots_count);
+    add({
+      tastingId: String(r.tasting_id),
+      spotsCount: Number(r.spots_count),
+      status: r.status as OrderStatus,
+      createdAt: String(r.created_at),
+      paymentMethod: (r.payment_method as string | null) ?? null,
+      proofSubmittedAt: (r.proof_submitted_at as string | null) ?? null,
+    });
   }
   return held;
 }
@@ -666,16 +927,18 @@ export async function setTicketAttendee(ticketId: string, name: string | null): 
   return ticketFromRow(data);
 }
 
-/** Totales para el panel: entradas emitidas y escaneadas. */
+/** Totales para el panel: entradas vigentes (de órdenes aprobadas) y escaneadas. */
 export async function ticketStats(): Promise<{ issued: number; checkedIn: number }> {
   const sb = getAdminClient();
   if (!sb) {
-    const all = Array.from(memTickets.values());
-    return { issued: all.length, checkedIn: all.filter((t) => t.checkedInAt).length };
+    // Las entradas de órdenes anuladas o rechazadas siguen en la tabla, pero ya no valen.
+    const valid = Array.from(memTickets.values()).filter((t) => memOrders.get(t.orderId)?.status === "approved");
+    return { issued: valid.length, checkedIn: valid.filter((t) => t.checkedInAt).length };
   }
-  const [issued, checkedIn] = await Promise.all([
-    sb.from("tickets").select("id", { count: "exact", head: true }),
-    sb.from("tickets").select("id", { count: "exact", head: true }).not("checked_in_at", "is", null),
-  ]);
+  const approvedTickets = () =>
+    sb.from("tickets").select("id, orders!inner(status)", { count: "exact", head: true }).eq("orders.status", "approved");
+  const [issued, checkedIn] = await Promise.all([approvedTickets(), approvedTickets().not("checked_in_at", "is", null)]);
+  if (issued.error) throw new Error(issued.error.message);
+  if (checkedIn.error) throw new Error(checkedIn.error.message);
   return { issued: issued.count ?? 0, checkedIn: checkedIn.count ?? 0 };
 }

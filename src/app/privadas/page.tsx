@@ -5,6 +5,7 @@ import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
 import { PageHeader, SectionHeading } from "@/components/Brand";
 import { useLang } from "@/lib/useLang";
+import { useDocumentTitle } from "@/lib/useDocumentTitle";
 import { whatsappLink } from "@/lib/contact";
 import type { PrivateEventType, PrivateGuestRange, PrivateRestaurant } from "@/lib/leads";
 import {
@@ -30,6 +31,7 @@ type Field = "fullName" | "phone" | "email" | "eventType" | "guests";
 
 export default function PrivateEventsPage() {
   const [lang, setLang] = useLang();
+  useDocumentTitle(lang, { es: "Experiencias Privadas & Eventos Corporativos", en: "Private Experiences & Corporate Events" });
   const t = PRIVADAS_COPY[lang];
   const common = FORM_COPY[lang];
 

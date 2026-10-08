@@ -32,7 +32,7 @@ export function CommercialShowcase({ currentLang, index }: CommercialShowcasePro
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 sm:gap-6">
         {/* Marcas aliadas */}
         <div className="lg:col-span-7 relative overflow-hidden rounded-2xl bg-primary-container text-paper p-7 sm:p-12 flex flex-col">
-          <span className="text-[11px] font-semibold uppercase tracking-[0.2em] text-sun">{s.main.badge}</span>
+          <span className="text-[11px] font-semibold uppercase tracking-[0.2em] text-tertiary-fixed-dim">{s.main.badge}</span>
           <h2 className="font-serif text-[1.85rem] sm:text-[2.6rem] leading-[1.12] mt-4 text-balance">{s.main.title}</h2>
           <p className="mt-5 text-[15px] sm:text-base text-paper/80 leading-relaxed max-w-xl">{s.main.subtitle}</p>
 

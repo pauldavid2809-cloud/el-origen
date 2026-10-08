@@ -5,13 +5,15 @@ import type { PaymentMethodId } from "@/components/PaymentDetails";
 /* Textos de la página de la orden (ES/EN). */
 
 const es = {
-  loading: "Cargando su orden…",
+  loading: "Cargando tu orden…",
   notFoundTitle: "No encontramos esta orden",
-  notFoundText: "Revise el enlace que recibió o escríbanos por WhatsApp.",
+  notFoundText: "Revisa el enlace que recibiste o escríbenos por WhatsApp.",
   support: "Atención al cliente",
   orderLabel: (code: string) => `Orden ${code}`,
-  titleApproved: (n: number): string => (n === 1 ? "Su entrada" : "Sus entradas"),
-  titlePending: "Su reserva",
+  titleApproved: (n: number): string => (n === 1 ? "Tu entrada" : "Tus entradas"),
+  titlePending: "Tu reserva",
+  /** Título de la pestaña del navegador (el layout trae el de ES para buscadores). */
+  docTitle: "Tu reserva",
   status: {
     pending_payment: "Pendiente de pago",
     in_review: "Pago en revisión",
@@ -34,15 +36,15 @@ const es = {
 
   // Pago
   cancelledTitle: "Esta reserva fue anulada",
-  cancelledText: (code: string) => `Si cree que es un error, escríbanos a atención al cliente indicando el código ${code}.`,
-  rejectedTitle: "No pudimos verificar su pago",
+  cancelledText: (code: string) => `Si crees que es un error, escríbenos a atención al cliente indicando el código ${code}.`,
+  rejectedTitle: "No pudimos verificar tu pago",
   rejectedReason: "Motivo:",
-  rejectedText: "Revise los datos y vuelva a reportarlo abajo, o escríbanos a atención al cliente.",
-  holdExpired: "El tiempo de apartado de sus cupos terminó. Aún puede pagar y reportar: confirmaremos según disponibilidad.",
+  rejectedText: "Revisa los datos y vuelve a reportarlo abajo, o escríbenos a atención al cliente.",
+  holdExpired: "El tiempo de apartado de tus cupos terminó. Aún puedes pagar y reportar: confirmaremos según disponibilidad.",
   heldUntil: "Cupos apartados hasta las",
-  step1: "Paso 1 · Elija cómo pagar",
-  step2: "Paso 2 · Reporte su pago",
-  step2Text: "Le enviaremos una entrada con código QR por persona, por correo y WhatsApp, apenas verifiquemos el pago.",
+  step1: "Paso 1 · Elige cómo pagar",
+  step2: "Paso 2 · Reporta tu pago",
+  step2Text: "Te enviaremos una entrada con código QR por persona, por correo y WhatsApp, apenas verifiquemos el pago.",
   methodsLegend: "Método de pago",
   methods: {
     pago_movil: { title: "Pago Móvil", hint: "En bolívares, tasa BCV del día" },
@@ -54,8 +56,11 @@ const es = {
   rateLine: (usd: string, currency: string, rate: string) => `${usd} × tasa BCV ${currency} ${rate}`,
   eurNote: "Precio en divisa convertido con la tasa oficial del euro (BCV).",
   noRate: "En bolívares a la tasa BCV del día.",
-  usdtLine: "Pague exactamente este monto en USDT (red y datos de Binance arriba).",
-  cashLine: "Coordine con nosotros por WhatsApp el lugar y la hora de entrega.",
+  usdtLine: "Paga exactamente este monto en USDT a la cuenta de Binance indicada abajo.",
+  usdtLineNoDetails: "Paga exactamente este monto en USDT. Pídenos los datos de Binance por WhatsApp antes de pagar.",
+  cashLine: "Coordina con nosotros por WhatsApp el lugar y la hora de entrega.",
+  /** Igual a `DEFAULT_PAYMENT_CONFIG.efectivo.instructions` (settings.ts): permite mostrar su traducción en EN. */
+  cashInstructionsDefault: "Entrega previa acordada por WhatsApp",
 
   // Formulario de comprobante
   reference: "Número de referencia *",
@@ -63,25 +68,25 @@ const es = {
   binanceReference: "ID de la orden o transacción de Binance *",
   amountBs: "Monto pagado (Bs) *",
   amountUsdt: "Monto pagado (USDT) *",
-  payerBank: "Banco desde el que pagó *",
-  select: "Seleccione…",
+  payerBank: "Banco desde el que pagaste *",
+  select: "Selecciona…",
   payerDocId: "Cédula del titular *",
-  payerPhone: "Teléfono desde el que pagó",
+  payerPhone: "Teléfono desde el que pagaste",
   note: "Nota (opcional)",
-  notePlaceholder: "Algo que debamos saber sobre su pago",
+  notePlaceholder: "Algo que debamos saber sobre tu pago",
   proof: "Comprobante *",
-  proofCta: "Toque para subir la captura o PDF",
+  proofCta: "Toca para subir la captura o PDF",
   proofHint: "JPG, PNG, WEBP, HEIC o PDF · máximo 8 MB",
-  proofMissing: "Adjunte la captura o PDF del comprobante.",
+  proofMissing: "Adjunta la captura o PDF del comprobante.",
   send: "Enviar comprobante",
   sending: "Enviando…",
   sendError: "No se pudo enviar el comprobante.",
-  noMethods: "Los métodos de pago no están disponibles en este momento. Escríbanos por WhatsApp para completar su reserva.",
+  noMethods: "Los métodos de pago no están disponibles en este momento. Escríbenos por WhatsApp para completar tu reserva.",
 
   // Efectivo
   cashTitle: "Pago en efectivo",
-  cashStep1: "1. Escríbanos por WhatsApp para acordar la entrega.",
-  cashStep2: "2. Cuando la hayamos coordinado, avísenos aquí. Confirmaremos su reserva al recibir el pago.",
+  cashStep1: "1. Escríbenos por WhatsApp para acordar la entrega.",
+  cashStep2: "2. Cuando la hayamos coordinado, avísanos aquí. Confirmaremos tu reserva al recibir el pago.",
   cashWhatsapp: "Coordinar entrega por WhatsApp",
   cashMessage: (code: string, name: string, total: string) =>
     `Hola, soy ${name}. Quiero pagar en efectivo mi reserva ${code} de El Origen (${total}). ¿Cómo coordinamos la entrega?`,
@@ -90,27 +95,35 @@ const es = {
   cashDone: "Ya coordiné la entrega",
 
   // En revisión
-  reviewTitle: "Recibimos su reporte de pago",
+  reviewTitle: "Recibimos tu reporte de pago",
   reviewText: (email: string) =>
-    `Estamos verificando el pago. Cuando lo confirmemos le enviaremos sus entradas con código QR a ${email} y por WhatsApp. Esta página se actualiza sola.`,
+    `Estamos verificando el pago. Cuando lo confirmemos te enviaremos tus entradas con código QR a ${email} y por WhatsApp. Esta página se actualiza sola.`,
   reviewCashText: (email: string) =>
-    `Confirmaremos su reserva al recibir el efectivo. Luego le enviaremos sus entradas con código QR a ${email} y por WhatsApp. Esta página se actualiza sola.`,
+    `Confirmaremos tu reserva al recibir el efectivo. Luego te enviaremos tus entradas con código QR a ${email} y por WhatsApp. Esta página se actualiza sola.`,
   method: "Método",
   reportedReference: "Referencia",
   reportedAmount: "Monto reportado",
   questions: "¿Dudas? Atención al cliente",
   reportedMessage: (code: string) => `Hola, reporté el pago de mi reserva ${code} en El Origen.`,
 
+  // Sin costo (cupón del 100 %)
+  freeTitle: "Tu reserva no tiene costo",
+  freeText: "Tu cupón cubre el total: no hay nada que pagar ni comprobante que enviar. Envía la reserva a confirmación y te mandaremos tus entradas con código QR.",
+  freeSubmit: "Enviar a confirmación",
+  freeReviewTitle: "Estamos confirmando tu reserva",
+  freeReviewText: (email: string) =>
+    `Tu cupón cubre el total de la reserva. Cuando la confirmemos te enviaremos tus entradas con código QR a ${email} y por WhatsApp. Esta página se actualiza sola.`,
+
   // Aprobada
   approvedTitle: "Pago verificado",
   approvedText: (n: number) =>
     n === 1
-      ? "Esta es su entrada. Preséntela en la puerta al llegar."
-      : `Estas son sus ${n} entradas: una por persona. Puede descargarlas o compartirlas con cada invitado y, si lo desea, poner el nombre de quien usará cada una.`,
-  ticketsPending: "Estamos generando sus entradas. Actualice la página en unos segundos.",
+      ? "Esta es tu entrada. Preséntala en la puerta al llegar."
+      : `Estas son tus ${n} entradas: una por persona. Puedes descargarlas o compartirlas con cada invitado y, si lo deseas, poner el nombre de quien usará cada una.`,
+  ticketsPending: "Estamos generando tus entradas. Actualiza la página en unos segundos.",
   reload: "Actualizar",
   otherTastings: "Ver otras catas",
-  keepLink: (email: string) => `Guarde este enlace: aquí están sus entradas. También se las enviamos a ${email}.`,
+  keepLink: (email: string) => `Guarda este enlace: aquí están tus entradas. También te las enviamos a ${email}.`,
 };
 
 type OrderCopy = typeof es;
@@ -123,6 +136,7 @@ const en: OrderCopy = {
   orderLabel: (code) => `Order ${code}`,
   titleApproved: (n) => (n === 1 ? "Your ticket" : "Your tickets"),
   titlePending: "Your reservation",
+  docTitle: "Your reservation",
   status: {
     pending_payment: "Awaiting payment",
     in_review: "Payment under review",
@@ -163,7 +177,9 @@ const en: OrderCopy = {
   rateLine: (usd, currency, rate) => `${usd} × BCV ${currency} rate ${rate}`,
   eurNote: "Price converted with the official euro rate (BCV).",
   noRate: "In bolívares at the BCV rate of the day.",
-  usdtLine: "Pay exactly this amount in USDT (Binance details above).",
+  usdtLine: "Pay exactly this amount in USDT to the Binance account shown below.",
+  usdtLineNoDetails: "Pay exactly this amount in USDT. Ask us for the Binance details on WhatsApp before paying.",
+  cashInstructionsDefault: "Delivery arranged in advance on WhatsApp",
   cashLine: "Arrange the delivery place and time with us on WhatsApp.",
 
   reference: "Reference number *",
@@ -207,6 +223,13 @@ const en: OrderCopy = {
   questions: "Questions? Customer service",
   reportedMessage: (code) => `Hi, I reported the payment for my El Origen reservation ${code}.`,
 
+  freeTitle: "Your reservation is free of charge",
+  freeText: "Your coupon covers the full amount: there's nothing to pay and no receipt to send. Submit the reservation for confirmation and we'll send your QR tickets.",
+  freeSubmit: "Submit for confirmation",
+  freeReviewTitle: "We're confirming your reservation",
+  freeReviewText: (email) =>
+    `Your coupon covers the full reservation. Once we confirm it, we'll send your QR tickets to ${email} and by WhatsApp. This page updates automatically.`,
+
   approvedTitle: "Payment verified",
   approvedText: (n) =>
     n === 1
@@ -220,7 +243,7 @@ const en: OrderCopy = {
 
 export const ORDER_COPY: Record<Language, OrderCopy> = { es, en };
 
-/** Bancos venezolanos para "¿desde qué banco pagó?" (nombres propios: iguales en ambos idiomas, salvo "Otro"). */
+/** Bancos venezolanos para "¿desde qué banco pagaste?" (nombres propios: iguales en ambos idiomas, salvo "Otro"). */
 export const VE_BANKS = [
   "Banco de Venezuela", "Banesco", "Mercantil", "BBVA Provincial", "BNC", "Bancamiga", "Banco del Tesoro",
   "Bicentenario", "Bancaribe", "Banco Exterior", "Banco Plaza", "Banplus", "BFC Fondo Común", "Banco Activo",

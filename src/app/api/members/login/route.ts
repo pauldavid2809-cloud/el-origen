@@ -29,7 +29,7 @@ export async function POST(request: Request) {
   }
 
   resetLimit(accountKey);
-  setMemberSession(member.id);
+  await setMemberSession(member.id);
   await touchLogin(member.id);
   return NextResponse.json({ success: true, member: { fullName: member.fullName, email: member.email } });
 }

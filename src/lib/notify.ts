@@ -150,6 +150,7 @@ ${policiesEmailHtml("es")}`
 
 /** Resumen del pago reportado, según el método (para el aviso interno). */
 function paymentSummary(o: Order): string {
+  if (o.totalUsd <= 0) return "Sin monto que pagar (descuento del 100 %) · Total: $0 USD";
   const method = PAYMENT_METHOD_LABEL[o.paymentMethod ?? ""] ?? "Pago";
   if (o.paymentMethod === "efectivo") return `${method}: el cliente indica que coordinó la entrega · Total: $${o.totalUsd} USD`;
   const amount =
@@ -157,16 +158,47 @@ function paymentSummary(o: Order): string {
   return `${method} · Referencia: <strong>${esc(o.paymentReference)}</strong> · Monto: ${esc(amount)} · Total: $${o.totalUsd} USD`;
 }
 
+/* Tope de avisos internos: una ráfaga de reportes (o un script) no debe agotar el cupo diario del SMTP,
+   que también envía las entradas a los clientes. Pasado el tope, los avisos se cuentan y se resumen en el
+   primero de la ventana siguiente; los pagos siempre quedan en el panel. En memoria del proceso. */
+const ALERT_WINDOW_MS = 60 * 60_000;
+const ALERTS_PER_WINDOW = 20;
+const alertBudget = ((globalThis as unknown as { __eoProofAlerts?: { windowStart: number; sent: number; skipped: number } })
+  .__eoProofAlerts ??= { windowStart: 0, sent: 0, skipped: 0 });
+
 /** Aviso interno: llegó un pago para revisar. */
 export async function sendProofAlert(o: Order): Promise<void> {
   const to = process.env.ADMIN_NOTIFY_EMAIL || CONTACT.email;
   if (!to) return;
+
+  const now = Date.now();
+  if (now - alertBudget.windowStart >= ALERT_WINDOW_MS) {
+    alertBudget.windowStart = now;
+    alertBudget.sent = 0;
+  }
+  if (alertBudget.sent >= ALERTS_PER_WINDOW) {
+    alertBudget.skipped += 1;
+    return;
+  }
+  alertBudget.sent += 1;
+  const skipped = alertBudget.skipped;
+  alertBudget.skipped = 0;
+  const lastInWindow = alertBudget.sent === ALERTS_PER_WINDOW;
+
   await sendMail({
     to,
     subject: `Pago por revisar · ${o.code} · ${o.customerName}`,
     html: shell(
       "Pago por revisar",
-      `<p style="margin:0 0 8px;font-size:15px"><strong>${esc(o.customerName)}</strong> reportó un pago.</p>
+      `${
+        skipped
+          ? `<p style="margin:0 0 14px;font-size:14px;background:#F2EADF;padding:10px 12px;border-radius:6px">Además, llegaron <strong>${skipped}</strong> ${skipped === 1 ? "pago" : "pagos"} sin aviso individual. Revíselos en el panel.</p>`
+          : ""
+      }${
+        lastInWindow
+          ? `<p style="margin:0 0 14px;font-size:14px;background:#F9DEDC;color:#8C1D18;padding:10px 12px;border-radius:6px">Llegaron muchos reportes seguidos: se pausan los avisos por correo durante una hora. Los pagos siguen apareciendo en el panel.</p>`
+          : ""
+      }<p style="margin:0 0 8px;font-size:15px"><strong>${esc(o.customerName)}</strong> reportó un pago.</p>
 <p style="margin:0;font-size:14px;color:#4A3A36">${paymentSummary(o)}</p>
 ${o.paymentNote ? `<p style="margin:8px 0 0;font-size:14px;color:#4A3A36">Nota del cliente: ${esc(o.paymentNote)}</p>` : ""}
 ${o.couponCode ? `<p style="margin:8px 0 0;font-size:14px;color:#4A3A36">Cupón: <strong>${esc(o.couponCode)}</strong></p>` : ""}

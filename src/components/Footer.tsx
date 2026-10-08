@@ -42,7 +42,8 @@ export function Footer({ currentLang }: FooterProps) {
       <AvilaRidge fill="var(--wine-deep)" stroke="var(--wine-deep)" showValley={false} className="h-16 sm:h-24 -mb-px" />
 
       <div className="bg-primary">
-        <div className="max-w-[1320px] mx-auto px-5 sm:px-8 lg:px-12 pt-10 sm:pt-14 pb-24 sm:pb-10">
+        {/* pb-24 deja libre la franja inferior que ocupa el botón flotante de WhatsApp (WhatsAppConcierge). */}
+        <div className="max-w-[1320px] mx-auto px-5 sm:px-8 lg:px-12 pt-10 sm:pt-14 pb-24">
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-12 gap-12 lg:gap-8">
             {/* Marca */}
             <div className="sm:col-span-2 lg:col-span-4 space-y-6">
@@ -61,7 +62,7 @@ export function Footer({ currentLang }: FooterProps) {
                   <Link
                     key={l.href}
                     href={l.href}
-                    className="inline-flex items-center min-h-[40px] text-[14px] text-paper/80 hover:text-sun transition-colors"
+                    className="inline-flex items-center min-h-11 text-[14px] text-paper/80 hover:text-sun transition-colors"
                   >
                     {l.label}
                   </Link>
@@ -118,7 +119,7 @@ export function Footer({ currentLang }: FooterProps) {
             </div>
           </div>
 
-          <div className="mt-14 pt-6 border-t border-paper/15 flex flex-col sm:flex-row gap-3 sm:items-center justify-between text-[12px] text-paper/50">
+          <div className="mt-14 pt-6 border-t border-paper/15 flex flex-col sm:flex-row gap-3 sm:items-center justify-between text-[12px] text-paper/70">
             <p>{t.footer.copyright(new Date().getFullYear())}</p>
             <nav className="flex flex-wrap gap-x-5" aria-label={t.footer.legal}>
               <Link href="/privacidad" className="inline-flex items-center min-h-[44px] hover:text-paper transition-colors">

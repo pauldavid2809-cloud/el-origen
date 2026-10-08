@@ -25,7 +25,8 @@ export interface PaymentConfig {
   /** PENDIENTE CLIENTE: titular de las cuentas (y si se muestra en la página). */
   holderName?: string;
   binance: { enabled: boolean; payId?: string; email?: string; holder?: string };
-  efectivo: { enabled: boolean; instructions: string };
+  /** `instructionsEn`: versión en inglés opcional (si falta, la página traduce solo el texto por defecto). */
+  efectivo: { enabled: boolean; instructions: string; instructionsEn?: string };
 }
 
 const SETTING_KEY = "payment_config";
@@ -112,6 +113,7 @@ export function normalizePaymentConfig(input: unknown): PaymentConfig {
     efectivo: {
       enabled: e.enabled !== false,
       instructions: str(e.instructions, 300) || DEFAULT_PAYMENT_CONFIG.efectivo.instructions,
+      instructionsEn: optional(e.instructionsEn, 300),
     },
   };
 }

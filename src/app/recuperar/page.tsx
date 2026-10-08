@@ -3,6 +3,7 @@
 import React, { useState } from "react";
 import Link from "next/link";
 import { useLang } from "@/lib/useLang";
+import { useDocumentTitle } from "@/lib/useDocumentTitle";
 import { whatsappLink } from "@/lib/contact";
 import {
   AuthHeading,
@@ -19,6 +20,7 @@ const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 
 export default function ForgotPasswordPage() {
   const [lang, setLang] = useLang();
+  useDocumentTitle(lang, { es: "Recuperar contraseña", en: "Reset your password" });
   const t = FORGOT_COPY[lang];
   const [email, setEmail] = useState("");
   const [error, setError] = useState("");

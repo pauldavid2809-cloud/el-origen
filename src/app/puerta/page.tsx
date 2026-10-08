@@ -5,6 +5,7 @@ import Link from "next/link";
 import { Logo } from "@/components/Brand";
 import { DoorScanner } from "@/components/QRScannerModal";
 import { useLang } from "@/lib/useLang";
+import { useDocumentTitle } from "@/lib/useDocumentTitle";
 import type { Language } from "@/lib/i18n";
 import { DOOR_COPY } from "./copy";
 
@@ -14,6 +15,7 @@ type AuthState = { status: "loading" } | { status: "login"; notice?: string } | 
 /* Puerta del evento: clave propia (sin acceso al resto del panel) y escáner a pantalla completa para tablet o teléfono. */
 export default function DoorPage() {
   const [lang, setLang] = useLang();
+  useDocumentTitle(lang, { es: "Puerta", en: "Door" });
   const t = DOOR_COPY[lang];
   const [auth, setAuth] = useState<AuthState>({ status: "loading" });
 

@@ -248,3 +248,110 @@ on conflict (id) do update
 insert into storage.buckets (id, name, public)
 values ('comprobantes', 'comprobantes', false)
 on conflict (id) do update set public = false;
+
+-- ------------------------------------------------------------------------------
+-- 9. CHECKOUT ATÓMICO: crea la orden solo si caben sus cupos y el cupón tiene usos.
+--    Lo llama src/lib/orders.ts → createOrderChecked(). Bloquea la cata (y el cupón)
+--    durante la transacción, así dos compras simultáneas no venden los mismos cupos.
+--    Reglas de retención (iguales a holdsSpots() en orders.ts):
+--      aprobada; en revisión (efectivo sin comprobante: solo p_cash_hold_hours desde el reporte);
+--      pendiente de pago creada hace menos de p_hold_minutes.
+-- ------------------------------------------------------------------------------
+create or replace function public.order_holds_spot(
+    p_status text,
+    p_created_at timestamptz,
+    p_payment_method text,
+    p_proof_submitted_at timestamptz,
+    p_hold_minutes integer,
+    p_cash_hold_hours integer
+) returns boolean
+language sql
+stable
+as $$
+    select case
+        when p_status = 'approved' then true
+        when p_status = 'in_review' then
+            p_payment_method is distinct from 'efectivo'
+            or coalesce(p_proof_submitted_at >= now() - make_interval(hours => p_cash_hold_hours), false)
+        when p_status = 'pending_payment' then p_created_at >= now() - make_interval(mins => p_hold_minutes)
+        else false
+    end;
+$$;
+
+create or replace function public.create_order_checked(
+    p_order jsonb,
+    p_total_spots integer,
+    p_max_uses integer default null,
+    p_hold_minutes integer default 60,
+    p_cash_hold_hours integer default 24
+) returns public.orders
+language plpgsql
+set search_path = public
+as $$
+declare
+    v_tasting text := p_order ->> 'tasting_id';
+    v_spots integer := (p_order ->> 'spots_count')::integer;
+    v_coupon text := upper(nullif(p_order ->> 'coupon_code', ''));
+    v_held integer;
+    v_uses integer;
+    v_cols text;
+    v_row public.orders;
+begin
+    if v_tasting is null or v_spots is null or v_spots < 1 then
+        raise exception 'EO_INVALID_ORDER';
+    end if;
+
+    -- Un bloqueo por cata y otro por cupón, liberados al terminar la transacción.
+    perform pg_advisory_xact_lock(hashtext('eo:tasting:' || v_tasting));
+    if v_coupon is not null and p_max_uses is not null then
+        perform pg_advisory_xact_lock(hashtext('eo:coupon:' || v_coupon));
+    end if;
+
+    select coalesce(sum(o.spots_count), 0) into v_held
+      from public.orders o
+     where o.tasting_id = v_tasting
+       and public.order_holds_spot(o.status, o.created_at, o.payment_method, o.proof_submitted_at, p_hold_minutes, p_cash_hold_hours);
+
+    if v_held + v_spots > p_total_spots then
+        raise exception 'EO_SOLD_OUT' using detail = greatest(0, p_total_spots - v_held)::text;
+    end if;
+
+    if v_coupon is not null and p_max_uses is not null then
+        select count(*) into v_uses
+          from public.orders o
+         where upper(o.coupon_code) = v_coupon
+           and public.order_holds_spot(o.status, o.created_at, o.payment_method, o.proof_submitted_at, p_hold_minutes, p_cash_hold_hours);
+        if v_uses >= p_max_uses then
+            raise exception 'EO_COUPON_EXHAUSTED';
+        end if;
+    end if;
+
+    -- Solo las columnas enviadas: las demás (created_at, updated_at…) toman su valor por defecto.
+    select string_agg(quote_ident(k), ', ') into v_cols from jsonb_object_keys(p_order) as k;
+    execute format(
+        'insert into public.orders (%1$s) select %1$s from jsonb_populate_record(null::public.orders, $1) returning *',
+        v_cols
+    ) using p_order into v_row;
+    return v_row;
+end;
+$$;
+
+-- Solo el servidor (service role) puede llamarlas.
+revoke all on function public.order_holds_spot(text, timestamptz, text, timestamptz, integer, integer) from public, anon, authenticated;
+revoke all on function public.create_order_checked(jsonb, integer, integer, integer, integer) from public, anon, authenticated;
+grant execute on function public.order_holds_spot(text, timestamptz, text, timestamptz, integer, integer) to service_role;
+grant execute on function public.create_order_checked(jsonb, integer, integer, integer, integer) to service_role;
+
+-- ------------------------------------------------------------------------------
+-- 10. TABLAS DEL ESQUEMA ANTERIOR (supabase/schema.sql, obsoleto)
+--     Si alguna vez se ejecutó, sus tablas quedaron sin RLS y legibles/escribibles con la
+--     clave pública (anon) vía PostgREST. Se activa RLS sin políticas: solo el servidor accede.
+-- ------------------------------------------------------------------------------
+alter table if exists public.tastings enable row level security;
+alter table if exists public.add_ons enable row level security;
+alter table if exists public.coupons enable row level security;
+alter table if exists public.reservations enable row level security;
+alter table if exists public.tasting_sensory_notes enable row level security;
+alter table if exists public.private_event_inquiries enable row level security;
+alter table if exists public.event_memory_photos enable row level security;
+alter table if exists public.notification_logs enable row level security;

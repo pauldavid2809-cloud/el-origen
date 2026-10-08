@@ -1,5 +1,5 @@
 import "server-only";
-import { getAdminClient, holdExpired, listCouponOrders } from "./orders";
+import { getAdminClient, holdsSpots, listCouponOrders } from "./orders";
 import { getMemberByEmail } from "./members";
 
 /* ─────────────────────────────────────────────────────────────
@@ -169,11 +169,14 @@ export async function deleteCoupon(code: string): Promise<boolean> {
   return Boolean(data && data.length);
 }
 
-/** Usos que cuentan para el límite: órdenes no anuladas ni rechazadas, ni apartados vencidos. */
+/**
+ * Usos que cuentan para el límite: órdenes no anuladas ni rechazadas, ni apartados vencidos.
+ * Es una comprobación previa (para avisar pronto): el límite se aplica de forma atómica al crear
+ * la orden con `createOrderChecked(input, totalSpots, coupon.maxUses)`.
+ */
 async function countActiveUses(code: string): Promise<number> {
   const now = Date.now();
-  const rows = await listCouponOrders(code);
-  return rows.filter((r) => r.status !== "rejected" && r.status !== "cancelled" && !holdExpired(r, now)).length;
+  return (await listCouponOrders(code)).filter((r) => holdsSpots(r, now)).length;
 }
 
 /**

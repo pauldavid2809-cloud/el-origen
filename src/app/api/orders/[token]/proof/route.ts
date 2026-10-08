@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { clientIp, hit, isLimited, tooManyAttempts, type RateLimit } from "@/lib/rateLimit";
 import { tastingWithAvailability } from "@/lib/availability";
 import { sendProofAlert } from "@/lib/notify";
 import {
@@ -7,7 +8,7 @@ import {
   PAYMENT_METHODS,
   referenceInUse,
   toPublicOrder,
-  updateOrder,
+  transitionOrder,
   uploadProof,
   type Order,
   type PaymentMethod,
@@ -26,10 +27,32 @@ const TYPES: Record<string, string> = {
   "application/pdf": "pdf",
 };
 const MAX_BYTES = 8 * 1024 * 1024;
+/** Margen para los demás campos y los separadores del multipart. */
+const MAX_BODY_BYTES = MAX_BYTES + 256 * 1024;
 const NOTE_MAX = 500;
+/** Reportes de pago por IP (cada uno avisa al admin por correo). */
+const REPORTS_PER_IP: RateLimit = { max: 10, windowMs: 15 * 60_000 };
+const DUPLICATE_REFERENCE = "Esa referencia ya fue reportada en otra reserva. Si es un error, escríbanos por WhatsApp.";
 
 const bad = (message: string, status = 400) => NextResponse.json({ success: false, message }, { status });
 const field = (form: FormData, key: string, max = 80) => String(form.get(key) ?? "").replace(/\s+/g, " ").trim().slice(0, max);
+
+/** HEIC y HEIF comparten contenedor (y marcas como "mif1"): se tratan como un mismo formato. */
+const family = (type: string) => (type === "image/heif" ? "image/heic" : type);
+
+/** Tipo real del comprobante según sus primeros bytes (no se confía en el tipo que declara el navegador). */
+function sniffProofType(data: Buffer): string | null {
+  if (data.length >= 3 && data[0] === 0xff && data[1] === 0xd8 && data[2] === 0xff) return "image/jpeg";
+  if (data.length >= 8 && data.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]))) return "image/png";
+  if (data.length >= 12 && data.toString("ascii", 0, 4) === "RIFF" && data.toString("ascii", 8, 12) === "WEBP") return "image/webp";
+  if (data.length >= 5 && data.toString("ascii", 0, 5) === "%PDF-") return "application/pdf";
+  if (data.length >= 12 && data.toString("ascii", 4, 8) === "ftyp") {
+    const brand = data.toString("ascii", 8, 12);
+    if (["heic", "heix", "heim", "heis", "hevc", "hevx", "hevm", "hevs"].includes(brand)) return "image/heic";
+    if (brand === "mif1" || brand === "msf1") return "image/heif";
+  }
+  return null;
+}
 
 /**
  * Monto escrito por el cliente: acepta "1.234,56", "1234,56", "1,234.56" o "25.5".
@@ -53,9 +76,16 @@ function parseAmount(raw: string): number {
  *  - pago_movil / transferencia: cuenta destino de la configuración, referencia, monto en Bs, datos del pagador y comprobante.
  *  - binance_usdt: referencia (Order ID / TxID), monto en USDT y comprobante.
  *  - efectivo: sin comprobante ni referencia (la entrega se coordina por WhatsApp); nota opcional.
+ *  - total $0 (cupón del 100 %): no hay nada que pagar; se pasa a revisión sin monto, referencia ni comprobante.
  * El monto se guarda en `paymentAmountBs`; su moneda depende del método (USDT en Binance).
  */
 export async function POST(request: Request, { params }: { params: { token: string } }) {
+  // Se rechaza antes de leer el cuerpo: formData() lo carga entero en memoria.
+  const length = Number(request.headers.get("content-length"));
+  if (Number.isFinite(length) && length > MAX_BODY_BYTES) return bad("El comprobante supera 8 MB.", 413);
+  const ipKey = `proof:ip:${clientIp(request)}`;
+  if (isLimited(ipKey, REPORTS_PER_IP)) return tooManyAttempts();
+
   try {
     const order = await getOrderByToken(params.token);
     if (!order) return bad("Orden no encontrada.", 404);
@@ -63,17 +93,19 @@ export async function POST(request: Request, { params }: { params: { token: stri
       return bad("Esta orden ya tiene un pago reportado.", 409);
     }
 
-    // Si el apartado venció (o el pago fue rechazado) los cupos se liberaron: se comprueba que sigan disponibles.
+    // Si el apartado venció (o el pago fue rechazado) los cupos se liberaron: se comprueba que sigan disponibles
+    // y que la venta siga abierta (el admin puede marcar la cata como agotada a mano).
     if (order.status === "rejected" || holdExpired(order)) {
       const tasting = await tastingWithAvailability(order.tastingId);
-      if (!tasting || tasting.availableSpots < order.spotsCount) {
+      if (!tasting || tasting.status === "sold_out" || tasting.availableSpots < order.spotsCount) {
         return bad("El tiempo de apartado venció y ya no quedan cupos suficientes en esta cata. Escríbanos por WhatsApp.", 409);
       }
     }
 
     const form = await request.formData();
+    const free = order.totalUsd <= 0;
     const method = String(form.get("paymentMethod") ?? "") as PaymentMethod;
-    if (!PAYMENT_METHODS.includes(method)) return bad("Seleccione la forma de pago.");
+    if (!free && !PAYMENT_METHODS.includes(method)) return bad("Seleccione la forma de pago.");
 
     const config = await getPaymentConfig();
     const note = field(form, "note", NOTE_MAX) || null;
@@ -83,8 +115,11 @@ export async function POST(request: Request, { params }: { params: { token: stri
     const amount = parseAmount(String(form.get("paymentAmount") ?? form.get("paymentAmountBs") ?? ""));
 
     let patch: Partial<Order>;
+    let reference: string | null = null;
 
-    if (method === "efectivo") {
+    if (free) {
+      patch = { paymentBank: null, paymentReference: null, paymentAmountBs: null, bcvRate: null, proofPath: null };
+    } else if (method === "efectivo") {
       if (!config.efectivo.enabled) return bad("El pago en efectivo no está disponible.");
       patch = {
         paymentBank: "efectivo",
@@ -95,7 +130,6 @@ export async function POST(request: Request, { params }: { params: { token: stri
       };
     } else {
       let destination: string;
-      let reference: string;
 
       if (method === "binance_usdt") {
         if (!config.binance.enabled) return bad("El pago por Binance no está disponible.");
@@ -115,16 +149,19 @@ export async function POST(request: Request, { params }: { params: { token: stri
 
       const file = form.get("file");
       if (!file || typeof file === "string") return bad("Adjunte la captura o PDF del comprobante.");
-      const ext = TYPES[file.type];
-      if (!ext) return bad("Formato no permitido: use JPG, PNG, WEBP, HEIC o PDF.");
       if (file.size > MAX_BYTES) return bad("El comprobante supera 8 MB.");
-      if (await referenceInUse(reference, order.id)) {
-        return bad("Esa referencia ya fue reportada en otra reserva. Si es un error, escríbanos por WhatsApp.", 409);
+      const data = Buffer.from(await file.arrayBuffer());
+      const actual = sniffProofType(data);
+      // Algunos navegadores no declaran el tipo de las fotos HEIC: basta con que el contenido sea válido.
+      const declared = file.type.toLowerCase().replace("image/jpg", "image/jpeg");
+      if (!actual || (declared && declared !== "application/octet-stream" && family(declared) !== family(actual))) {
+        return bad("Formato no permitido: use JPG, PNG, WEBP, HEIC o PDF.");
       }
+      if (await referenceInUse(reference, order.id)) return bad(DUPLICATE_REFERENCE, 409);
 
       const isBs = method !== "binance_usdt";
       const [proofPath, rate] = await Promise.all([
-        uploadProof(order.id, Buffer.from(await file.arrayBuffer()), file.type, ext),
+        uploadProof(order.id, data, actual, TYPES[actual]),
         isBs ? getBcvRate(order.rateCurrency ?? "USD") : null,
       ]);
       patch = {
@@ -136,22 +173,32 @@ export async function POST(request: Request, { params }: { params: { token: stri
       };
     }
 
-    const updated = await updateOrder(order.id, {
-      ...patch,
-      status: "in_review",
-      paymentMethod: method,
-      payerBank,
-      payerDocId,
-      payerPhone,
-      paymentNote: note,
-      proofSubmittedAt: new Date().toISOString(),
-      rejectionReason: null,
-    });
+    let updated: Order | null;
+    try {
+      // Solo si la orden sigue en el estado leído: un doble envío no reporta dos veces ni avisa dos veces.
+      updated = await transitionOrder(order.id, [order.status], {
+        ...patch,
+        status: "in_review",
+        paymentMethod: PAYMENT_METHODS.includes(method) ? method : null,
+        payerBank,
+        payerDocId,
+        payerPhone,
+        paymentNote: note,
+        proofSubmittedAt: new Date().toISOString(),
+        rejectionReason: null,
+      });
+    } catch (error) {
+      // El índice único de referencias puede saltar si otra orden reportó la misma referencia a la vez.
+      if (reference && (await referenceInUse(reference, order.id))) return bad(DUPLICATE_REFERENCE, 409);
+      throw error;
+    }
+    if (!updated) return bad("Esta orden ya tiene un pago reportado.", 409);
 
+    hit(ipKey, REPORTS_PER_IP);
     await sendProofAlert(updated);
     return NextResponse.json({ success: true, order: toPublicOrder(updated) });
   } catch (error) {
     console.error("[proof]", error);
-    return bad((error as Error).message || "Error al enviar el comprobante.", 500);
+    return bad("No se pudo enviar el reporte de pago. Intente de nuevo o escríbanos por WhatsApp.", 500);
   }
 }

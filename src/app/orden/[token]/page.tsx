@@ -5,10 +5,18 @@ import { useParams } from "next/navigation";
 import Link from "next/link";
 import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
-import { PaymentDetails, availableMethods, formatBs, formatUsd, type PaymentMethodId } from "@/components/PaymentDetails";
+import {
+  PaymentDetails,
+  availableMethods,
+  formatBs,
+  formatUsd,
+  hasBinanceDetails,
+  type PaymentMethodId,
+} from "@/components/PaymentDetails";
 import { PurchasePolicies } from "@/components/PurchasePolicies";
 import { TicketQR, type PublicTicket } from "@/components/TicketQR";
 import { CONTACT, whatsappLink } from "@/lib/contact";
+import { formatTastingDate } from "@/lib/dates";
 import { useLang } from "@/lib/useLang";
 import type { Language } from "@/lib/i18n";
 import type { PublicOrder } from "@/lib/orders";
@@ -22,7 +30,8 @@ interface RateInfo {
   amountBs: number;
 }
 
-type OrderWithTickets = PublicOrder & { tickets?: PublicTicket[] };
+/** `tastingDateIso`: fecha ISO de la cata para mostrarla en el idioma del visitante (`tastingDate` va en español). */
+type OrderWithTickets = PublicOrder & { tickets?: PublicTicket[]; tastingDateIso?: string | null };
 
 const STATUS_TONE: Record<PublicOrder["status"], string> = {
   pending_payment: "bg-tertiary-fixed text-on-tertiary-fixed-variant",
@@ -66,6 +75,11 @@ export default function OrderPage() {
   useEffect(() => {
     load();
   }, [load]);
+
+  // El título del layout queda en español para buscadores; la pestaña sigue el idioma elegido.
+  useEffect(() => {
+    document.title = `${t.docTitle} | El Origen Caracas`;
+  }, [t.docTitle]);
 
   // Mientras el pago está en revisión (o las entradas aún no aparecen), consultar periódicamente.
   const ticketsMissing = order?.status === "approved" && !order.tickets?.length;
@@ -164,10 +178,10 @@ function Panel({ children, className = "" }: { children: React.ReactNode; classN
 
 /* ─── Resumen ─── */
 
-function Summary({ order, lang }: { order: PublicOrder; lang: Language }) {
+function Summary({ order, lang }: { order: OrderWithTickets; lang: Language }) {
   const t = ORDER_COPY[lang];
   const rows: [string, string][] = [
-    [t.date, order.tastingDate],
+    [t.date, formatTastingDate(order.tastingDateIso, lang, order.tastingDate)],
     [t.time, order.tastingTime],
     [t.place, order.tastingLocation],
     [t.spots, t.persons(order.spotsCount)],
@@ -212,6 +226,23 @@ function Summary({ order, lang }: { order: PublicOrder; lang: Language }) {
 /* ─── Pago y reporte ─── */
 
 const usdtAmount = (usd: number) => (Number.isInteger(usd) ? String(usd) : usd.toFixed(2));
+
+const sameText = (a: string, b: string) => {
+  const norm = (v: string) => v.trim().replace(/[.\s]+$/, "").toLowerCase();
+  return norm(a) === norm(b);
+};
+
+/**
+ * Indicaciones de efectivo del admin. En inglés: la versión en inglés del admin si existe; si no, se traduce
+ * el texto por defecto (un texto personalizado sin versión en inglés se muestra tal cual).
+ */
+function cashInstructions(efectivo: PaymentConfig["efectivo"], lang: Language): string {
+  if (lang === "en") {
+    if (efectivo.instructionsEn?.trim()) return efectivo.instructionsEn;
+    if (sameText(efectivo.instructions, ORDER_COPY.es.cashInstructionsDefault)) return ORDER_COPY.en.cashInstructionsDefault;
+  }
+  return efectivo.instructions;
+}
 
 function PayAndReport({
   order,
@@ -258,24 +289,29 @@ function PayAndReport({
 
   const expired = holdExpiresAt ? new Date(holdExpiresAt).getTime() < Date.now() : false;
   const totalLabel = formatUsd(order.totalUsd);
+  // Cupón del 100 %: no hay método, monto ni comprobante (el servidor acepta el reporte sin campos).
+  const free = order.totalUsd <= 0;
 
   const submit = async (e?: React.FormEvent) => {
     e?.preventDefault();
-    if (!active) return;
+    if (!active && !free) return;
     setError("");
-    if (active !== "efectivo" && !file) {
+    if (!free && active !== "efectivo" && !file) {
       setError(t.proofMissing);
       return;
     }
     setSending(true);
     try {
       const fd = new FormData();
-      fd.set("paymentMethod", active);
-      if (active === "efectivo") {
+      if (free) {
+        // Sin campos de pago.
+      } else if (active === "efectivo") {
+        fd.set("paymentMethod", active);
         fd.set("paymentBank", "efectivo");
         fd.set("payerDocId", order.customerDocId);
         fd.set("payerPhone", order.customerPhone);
-      } else {
+      } else if (active) {
+        fd.set("paymentMethod", active);
         fd.set("paymentBank", active === "binance_usdt" ? "binance" : selectedAccount?.id ?? "");
         fd.set("paymentReference", reference);
         fd.set("paymentAmount", amount);
@@ -329,7 +365,31 @@ function PayAndReport({
         </div>
       )}
 
-      {!payment || !active ? (
+      {free ? (
+        <Panel>
+          <div className="flex items-start gap-4">
+            <span className="w-12 h-12 flex-shrink-0 rounded-full bg-secondary-container flex items-center justify-center" aria-hidden="true">
+              <span className="material-symbols-outlined text-[26px] text-primary-container">redeem</span>
+            </span>
+            <div className="min-w-0">
+              <h2 className="font-serif text-2xl">{t.freeTitle}</h2>
+              <p className="text-on-surface-variant mt-2 leading-relaxed">{t.freeText}</p>
+            </div>
+          </div>
+          <div className="mt-6 space-y-3">
+            {errorBox}
+            <button
+              type="button"
+              onClick={() => submit()}
+              disabled={sending}
+              className="w-full sm:w-auto inline-flex items-center justify-center gap-2 h-12 px-6 rounded bg-primary-container hover:bg-primary text-white font-semibold disabled:opacity-60"
+            >
+              {sending && <span className="material-symbols-outlined animate-spin text-[18px]" aria-hidden="true">progress_activity</span>}
+              {t.freeSubmit}
+            </button>
+          </div>
+        </Panel>
+      ) : !payment || !active ? (
         <Panel>
           <p className="text-on-surface-variant">{t.noMethods}</p>
           <a
@@ -384,7 +444,9 @@ function PayAndReport({
                 {active === "binance_usdt" ? (
                   <>
                     <p className="font-serif text-4xl text-on-surface mt-1">{usdtAmount(order.totalUsd)} USDT</p>
-                    <p className="text-[13px] text-on-surface-variant mt-1">{t.usdtLine}</p>
+                    <p className="text-[13px] text-on-surface-variant mt-1">
+                      {hasBinanceDetails(payment) ? t.usdtLine : t.usdtLineNoDetails}
+                    </p>
                   </>
                 ) : active === "efectivo" ? (
                   <>
@@ -421,7 +483,9 @@ function PayAndReport({
             </div>
 
             {active === "efectivo" ? (
-              <p className="mt-5 text-[14px] text-on-surface-variant leading-relaxed">{payment.efectivo.instructions}</p>
+              <p className="mt-5 text-[14px] text-on-surface-variant leading-relaxed">
+                {cashInstructions(payment.efectivo, lang)}
+              </p>
             ) : (
               <PaymentDetails
                 className="mt-5"
@@ -619,6 +683,7 @@ function InReview({ order, lang }: { order: PublicOrder; lang: Language }) {
   const t = ORDER_COPY[lang];
   const method = order.paymentMethod as PaymentMethodId | null;
   const isCash = method === "efectivo";
+  const free = order.totalUsd <= 0;
   const amount =
     order.paymentAmountBs == null
       ? null
@@ -634,12 +699,18 @@ function InReview({ order, lang }: { order: PublicOrder; lang: Language }) {
     <Panel>
       <div className="flex items-start gap-4">
         <span className="w-12 h-12 flex-shrink-0 rounded-full bg-secondary-container flex items-center justify-center" aria-hidden="true">
-          <span className="material-symbols-outlined text-[26px] text-primary-container">{isCash ? "handshake" : "hourglass_top"}</span>
+          <span className="material-symbols-outlined text-[26px] text-primary-container">
+            {free ? "redeem" : isCash ? "handshake" : "hourglass_top"}
+          </span>
         </span>
         <div className="min-w-0">
-          <h2 className="font-serif text-2xl">{t.reviewTitle}</h2>
+          <h2 className="font-serif text-2xl">{free ? t.freeReviewTitle : t.reviewTitle}</h2>
           <p className="text-on-surface-variant mt-2 leading-relaxed break-words">
-            {isCash ? t.reviewCashText(order.customerEmail) : t.reviewText(order.customerEmail)}
+            {free
+              ? t.freeReviewText(order.customerEmail)
+              : isCash
+                ? t.reviewCashText(order.customerEmail)
+                : t.reviewText(order.customerEmail)}
           </p>
         </div>
       </div>
@@ -683,7 +754,7 @@ function ApprovedTickets({
 }) {
   const t = ORDER_COPY[lang];
   const tickets = order.tickets ?? [];
-  const when = [order.tastingDate, order.tastingTime].filter(Boolean).join(" · ");
+  const when = [formatTastingDate(order.tastingDateIso, lang, order.tastingDate), order.tastingTime].filter(Boolean).join(" · ");
 
   return (
     <div className="space-y-4">
@@ -725,11 +796,11 @@ function ApprovedTickets({
       <div className="flex flex-col sm:flex-row sm:items-center gap-3 pt-2">
         <Link
           href="/catas"
-          className="inline-flex items-center justify-center gap-2 h-12 px-6 rounded border border-outline-variant hover:border-primary-container text-[14px] font-semibold"
+          className="shrink-0 whitespace-nowrap inline-flex items-center justify-center gap-2 h-12 px-6 rounded border border-outline-variant hover:border-primary-container text-[14px] font-semibold"
         >
           {t.otherTastings}
         </Link>
-        <p className="text-[13px] text-on-surface-variant break-words">{t.keepLink(order.customerEmail)}</p>
+        <p className="min-w-0 text-[13px] text-on-surface-variant break-words">{t.keepLink(order.customerEmail)}</p>
       </div>
     </div>
   );

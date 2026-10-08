@@ -4,6 +4,7 @@ import React, { Suspense, useEffect, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useLang } from "@/lib/useLang";
+import { useDocumentTitle } from "@/lib/useDocumentTitle";
 import {
   AuthHeading,
   AuthShell,
@@ -29,6 +30,7 @@ export default function ResetPasswordPage() {
 
 function ResetPassword() {
   const [lang, setLang] = useLang();
+  useDocumentTitle(lang, { es: "Nueva contraseña", en: "New password" });
   const t = RESET_COPY[lang];
   const tokenParam = useSearchParams().get("token") ?? "";
   const [token] = useState(tokenParam);

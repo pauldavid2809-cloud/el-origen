@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { clearMemberSession, currentMember, currentMemberId } from "@/lib/members";
+import { getCata } from "@/lib/catas";
 import { holdExpired, listOrdersByMember } from "@/lib/orders";
 import { activeWelcomeCoupon } from "../shared";
 
@@ -36,6 +37,11 @@ export async function GET(request: Request) {
   }
 
   const [orders, welcomeCoupon] = await Promise.all([listOrdersByMember(member.id), activeWelcomeCoupon()]);
+  // Fecha ISO de cada cata para mostrarla en el idioma del visitante (`tastingDate` se guarda en español).
+  const tastingIds = Array.from(new Set(orders.map((o) => o.tastingId)));
+  const isoDates = new Map(
+    await Promise.all(tastingIds.map(async (id) => [id, (await getCata(id).catch(() => null))?.date ?? null] as const))
+  );
   return NextResponse.json(
     {
       success: true,
@@ -46,6 +52,7 @@ export async function GET(request: Request) {
         status: o.status,
         tastingTitle: o.tastingTitle,
         tastingDate: o.tastingDate,
+        tastingDateIso: isoDates.get(o.tastingId) ?? null,
         tastingTime: o.tastingTime,
         spotsCount: o.spotsCount,
         totalUsd: o.totalUsd,

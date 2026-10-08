@@ -6,6 +6,7 @@ import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
 import { PageHeader } from "@/components/Brand";
 import { useLang } from "@/lib/useLang";
+import { useDocumentTitle } from "@/lib/useDocumentTitle";
 import type { Language } from "@/lib/i18n";
 import { CONTACT, whatsappLink } from "@/lib/contact";
 import { RichText } from "../../privadas/_components/RichText";
@@ -49,6 +50,7 @@ const CONTACT_COPY = {
 
 export function LegalPage({ documents }: { documents: Record<Language, LegalDocument> }) {
   const [lang, setLang] = useLang();
+  useDocumentTitle(lang, { es: documents.es.title, en: documents.en.title });
   const doc = documents[lang];
   const c = CONTACT_COPY[lang];
 

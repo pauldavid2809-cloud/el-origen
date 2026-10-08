@@ -123,7 +123,7 @@ export default function HomePage() {
             <dl className="max-w-[1320px] mx-auto px-5 sm:px-8 lg:px-12 pb-12 sm:pb-16 pt-4 grid grid-cols-1 sm:grid-cols-3 gap-8 sm:gap-6">
               {t.hero.stats.map((s, i) => (
                 <div key={s.label} className={`sm:px-6 ${i > 0 ? "sm:border-l border-paper/20" : ""}`}>
-                  <dt className="text-[12px] font-semibold uppercase tracking-[0.2em] text-sun">{s.label}</dt>
+                  <dt className="text-[12px] font-semibold uppercase tracking-[0.2em] text-tertiary-fixed-dim">{s.label}</dt>
                   <dd className="font-serif text-3xl sm:text-4xl mt-2">{s.value}</dd>
                 </div>
               ))}

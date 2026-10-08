@@ -6,6 +6,7 @@ import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
 import { PageHeader, SectionHeading } from "@/components/Brand";
 import { useLang } from "@/lib/useLang";
+import { useDocumentTitle } from "@/lib/useDocumentTitle";
 import type { SommelierSpecialty } from "@/lib/leads";
 import {
   EMAIL_RE,
@@ -57,6 +58,7 @@ function validYears(v: string): boolean {
 
 export default function SommeliersPage() {
   const [lang, setLang] = useLang();
+  useDocumentTitle(lang, { es: "Únete a nuestra red de sommeliers & directores de cata", en: "Join our network of sommeliers & tasting directors" });
   const t = SOMMELIERS_COPY[lang];
   const common = FORM_COPY[lang];
 

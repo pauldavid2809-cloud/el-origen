@@ -47,7 +47,7 @@ const COPY = {
     shareImage: "Compartir imagen",
     downloadImage: "Descargar imagen",
     working: "Preparando…",
-    imageError: "No se pudo crear la imagen. Intente de nuevo.",
+    imageError: "No se pudo crear la imagen. Inténtalo de nuevo.",
     shareText: (title: string) => `Viví la cata «${title}» en El Origen.`,
     previewLabel: "Vista previa del certificado",
     fileName: "Certificado-El-Origen",

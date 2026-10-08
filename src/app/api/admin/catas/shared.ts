@@ -1,5 +1,5 @@
 import "server-only";
-import { getAdminClient, holdExpired, listOrders, type OrderStatus } from "@/lib/orders";
+import { fetchAllRows, getAdminClient, holdExpired, listOrders, type OrderStatus } from "@/lib/orders";
 
 /** Resumen de las órdenes de una cata para el panel. */
 export interface TastingOrderStats {
@@ -23,19 +23,29 @@ interface OrderLite {
   spotsCount: number;
   totalUsd: number;
   createdAt: string;
+  paymentMethod: string | null;
+  proofSubmittedAt: string | null;
 }
 
 async function listOrderLites(): Promise<OrderLite[]> {
   const sb = getAdminClient();
   if (!sb) return listOrders();
-  const { data, error } = await sb.from("orders").select("tasting_id, status, spots_count, total_usd, created_at").limit(20000);
-  if (error) throw new Error(error.message);
-  return (data ?? []).map((r) => ({
+  const rows = await fetchAllRows<Record<string, unknown>>((from, to) =>
+    sb
+      .from("orders")
+      .select("id, tasting_id, status, spots_count, total_usd, created_at, payment_method, proof_submitted_at")
+      .order("created_at", { ascending: true })
+      .order("id", { ascending: true })
+      .range(from, to)
+  );
+  return rows.map((r) => ({
     tastingId: String(r.tasting_id),
     status: r.status as OrderStatus,
     spotsCount: Number(r.spots_count),
     totalUsd: Number(r.total_usd),
     createdAt: String(r.created_at),
+    paymentMethod: (r.payment_method as string | null) ?? null,
+    proofSubmittedAt: (r.proof_submitted_at as string | null) ?? null,
   }));
 }
 
@@ -49,7 +59,7 @@ export async function orderStatsByTasting(): Promise<Record<string, TastingOrder
     if (o.status === "approved") {
       s.approvedSpots += o.spotsCount;
       s.approvedUsd = Math.round((s.approvedUsd + o.totalUsd) * 100) / 100;
-    } else if (o.status === "in_review") {
+    } else if (o.status === "in_review" && !holdExpired(o, now)) {
       s.inReviewSpots += o.spotsCount;
     } else if (o.status === "pending_payment" && !holdExpired(o, now)) {
       s.pendingSpots += o.spotsCount;

@@ -25,7 +25,7 @@ export async function POST(request: Request) {
       acceptTerms: accepted,
       marketingOptIn: body.marketingOptIn === true,
     });
-    setMemberSession(member.id);
+    await setMemberSession(member.id);
     await touchLogin(member.id);
     return NextResponse.json({
       success: true,

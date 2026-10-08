@@ -29,10 +29,29 @@ export function availableMethods(cfg: PaymentConfig): PaymentMethodId[] {
   return methods;
 }
 
+/** Si la configuración trae datos de Binance para mostrar (Pay ID o correo). */
+export function hasBinanceDetails(cfg: PaymentConfig): boolean {
+  return Boolean(cfg.binance.payId || cfg.binance.email);
+}
+
+/** Tipos de cuenta habituales (los escribe el admin en español) con su traducción al inglés. */
+const ACCOUNT_TYPES_EN: Record<string, string> = {
+  "cuenta corriente": "Checking account",
+  "cuenta de ahorro": "Savings account",
+  "cuenta de ahorros": "Savings account",
+  corriente: "Checking account",
+  ahorro: "Savings account",
+  ahorros: "Savings account",
+};
+
+function accountTypeLabel(type: string, lang: Language): string {
+  return lang === "en" ? ACCOUNT_TYPES_EN[type.trim().toLowerCase()] ?? type : type;
+}
+
 const COPY = {
   es: {
     heading: "Datos para el pago",
-    choose: "Seleccione la cuenta a la que pagará:",
+    choose: "Selecciona la cuenta a la que pagarás:",
     bank: "Banco",
     phone: "Teléfono",
     docId: "Cédula",
@@ -43,7 +62,7 @@ const COPY = {
     copy: "Copiar",
     copied: "Copiado",
     copyAria: (field: string) => `Copiar ${field.toLowerCase()}`,
-    binanceMissing: "Solicite los datos de Binance por WhatsApp antes de pagar.",
+    binanceMissing: "Pídenos los datos de Binance por WhatsApp antes de pagar.",
     binanceAsk: "Solicitar datos de Binance",
     binanceMessage: "Hola, quiero pagar mi reserva de El Origen con Binance USDT. ¿Me envían los datos?",
   },
@@ -121,7 +140,7 @@ export function PaymentDetails({ config, method, lang, selectedId, onSelect, cla
   } else if (method === "transferencia") {
     destinations = config.transfers.map((a) => ({
       id: a.id,
-      title: `${a.bank}${a.accountType ? ` · ${a.accountType}` : ""}`,
+      title: `${a.bank}${a.accountType ? ` · ${accountTypeLabel(a.accountType, lang)}` : ""}`,
       fields: [
         { name: t.account, value: a.number, copy: digits(a.number) },
         { name: t.docId, value: a.docId, copy: digits(a.docId) },

@@ -79,6 +79,11 @@ export default function VerifyTicketPage() {
     [token]
   );
 
+  // El título del layout queda en español para buscadores; la pestaña sigue el idioma elegido.
+  useEffect(() => {
+    document.title = `${t.docTitle} | El Origen Caracas`;
+  }, [t.docTitle]);
+
   // Solo el personal (sesión de admin o de puerta) valida contra /api/verify; el público ve su entrada.
   useEffect(() => {
     let alive = true;

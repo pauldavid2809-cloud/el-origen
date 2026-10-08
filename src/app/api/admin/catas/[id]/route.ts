@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/auth";
 import { CataInputError, deleteCata, getCata, updateCata, type CataInput } from "@/lib/catas";
-import { heldSpotsByTasting } from "@/lib/orders";
+import { heldSpotsByTasting, syncOrdersWithTasting, tastingSnapshot } from "@/lib/orders";
 import { countTastingOrders } from "../shared";
 
 export const dynamic = "force-dynamic";
@@ -39,7 +39,7 @@ export async function PATCH(request: Request, { params }: Params) {
     // No se pueden dejar menos cupos que los ya ocupados (aprobados, en revisión o apartados).
     if (patch.totalSpots !== undefined) {
       const total = Number(patch.totalSpots);
-      const held = (await heldSpotsByTasting())[current.id] ?? 0;
+      const held = (await heldSpotsByTasting([current.id]))[current.id] ?? 0;
       if (Number.isFinite(total) && total < held) {
         return NextResponse.json(
           { success: false, message: `Esta cata ya tiene ${held} cupos ocupados: los cupos totales no pueden ser menos.` },
@@ -49,7 +49,11 @@ export async function PATCH(request: Request, { params }: Params) {
     }
 
     const tasting = await updateCata(current.id, patch);
-    return tasting ? NextResponse.json({ success: true, tasting }) : notFound();
+    if (!tasting) return notFound();
+    // Las órdenes guardan una copia de nombre, fecha, hora y lugar: si cambiaron, se actualizan para que
+    // la entrada, el reenvío, la puerta y el export no muestren datos viejos.
+    const ordersUpdated = await syncOrdersWithTasting(tasting.id, tastingSnapshot(tasting));
+    return NextResponse.json({ success: true, tasting, ordersUpdated });
   } catch (error) {
     if (error instanceof CataInputError) {
       return NextResponse.json({ success: false, message: error.message }, { status: 400 });

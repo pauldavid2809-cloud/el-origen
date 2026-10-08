@@ -5,7 +5,9 @@ import Link from "next/link";
 import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
 import { PageHeader } from "@/components/Brand";
+import { formatTastingDate } from "@/lib/dates";
 import { useLang } from "@/lib/useLang";
+import { useDocumentTitle } from "@/lib/useDocumentTitle";
 import { MEMORIES_COPY } from "./copy";
 
 export interface GalleryPhoto {
@@ -16,13 +18,18 @@ export interface GalleryPhoto {
 }
 
 interface MemoriesGalleryProps {
-  tasting: { title: string; date: string; location: string } | null;
+  /** `date`: fecha en español; `dateIso`: "YYYY-MM-DD" para mostrarla en inglés. */
+  tasting: { title: string; date: string; dateIso: string; location: string } | null;
   photos: GalleryPhoto[];
 }
 
 /* Las fotos vienen de Supabase Storage (o data URL en pruebas locales): se usan <img> nativas con carga diferida. */
 export function MemoriesGallery({ tasting, photos }: MemoriesGalleryProps) {
   const [lang, setLang] = useLang();
+  useDocumentTitle(
+    lang,
+    tasting ? { es: `Recuerdos · ${tasting.title}`, en: `Memories · ${tasting.title}` } : { es: "Recuerdos", en: "Memories" }
+  );
   const t = MEMORIES_COPY[lang];
   const [open, setOpen] = useState<number | null>(null);
   const closeRef = useRef<HTMLButtonElement>(null);
@@ -54,7 +61,9 @@ export function MemoriesGallery({ tasting, photos }: MemoriesGalleryProps) {
     };
   }, [open, close, step]);
 
-  const subtitle = tasting ? [tasting.date, tasting.location].filter(Boolean).join(" · ") : t.subtitle;
+  const subtitle = tasting
+    ? [formatTastingDate(tasting.dateIso, lang, tasting.date), tasting.location].filter(Boolean).join(" · ")
+    : t.subtitle;
   const current = open === null ? null : photos[open];
 
   return (

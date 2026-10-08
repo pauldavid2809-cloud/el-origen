@@ -218,7 +218,7 @@ export default function AdminReservationsPage() {
           ))}
         </div>
         <div className="flex flex-col sm:flex-row gap-2">
-          <select value={tasting} onChange={(e) => setTasting(e.target.value)} className="h-11 rounded border border-outline-variant bg-surface-container-lowest px-3 text-[14px] sm:w-80">
+          <select value={tasting} onChange={(e) => setTasting(e.target.value)} aria-label="Filtrar por cata" className="h-11 rounded border border-outline-variant bg-surface-container-lowest px-3 text-[14px] sm:w-80">
             <option value="">Todas las catas</option>
             {tastings.map(([id, label]) => (
               <option key={id} value={id}>{label}</option>
@@ -226,6 +226,7 @@ export default function AdminReservationsPage() {
           </select>
           <input
             type="search"
+            aria-label="Buscar reservas"
             value={q}
             onChange={(e) => setQ(e.target.value)}
             placeholder="Nombre, código, cédula, referencia o cupón"

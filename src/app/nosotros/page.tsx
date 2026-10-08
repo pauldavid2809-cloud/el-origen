@@ -7,12 +7,14 @@ import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
 import { AvilaRidge, Logo, PageHeader, SectionHeading, SunBurst } from "@/components/Brand";
 import { useLang } from "@/lib/useLang";
+import { useDocumentTitle } from "@/lib/useDocumentTitle";
 import type { Language } from "@/lib/i18n";
 import { TEAM, instagramUrl, teamInitials, type TeamMember } from "@/lib/team";
 import { NOSOTROS_COPY } from "./copy";
 
 export default function NosotrosPage() {
   const [lang, setLang] = useLang();
+  useDocumentTitle(lang, { es: "Nosotros: nuestra historia y sommeliers", en: "About us: our story and sommeliers" });
   const t = NOSOTROS_COPY[lang];
 
   return (

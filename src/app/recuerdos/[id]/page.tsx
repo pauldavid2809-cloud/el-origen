@@ -35,7 +35,7 @@ export default async function MemoriesPage({ params }: { params: { id: string } 
   const { cata, photos } = data;
   return (
     <MemoriesGallery
-      tasting={cata ? { title: cata.title, date: cata.dateFull, location: cata.location } : null}
+      tasting={cata ? { title: cata.title, date: cata.dateFull, dateIso: cata.date, location: cata.location } : null}
       photos={photos}
     />
   );

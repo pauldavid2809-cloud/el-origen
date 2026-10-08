@@ -321,7 +321,12 @@ export function CataForm({ source, mode, heldSpots = 0, rates, onClose, onSaved 
       const data = await res.json();
       if (!data.success) throw new Error(data.message);
       setDirty(false);
-      onSaved(data.tasting, editing ? "Cata actualizada." : mode === "duplicate" ? "Copia creada como borrador." : "Cata creada.");
+      const synced = Number(data.ordersUpdated) || 0;
+      const updatedMessage =
+        synced > 0
+          ? `Cata actualizada. Se actualizaron los datos de ${synced} ${synced === 1 ? "orden" : "órdenes"}: use "Reenviar" en Reservas para avisar a los compradores.`
+          : "Cata actualizada.";
+      onSaved(data.tasting, editing ? updatedMessage : mode === "duplicate" ? "Copia creada como borrador." : "Cata creada.");
     } catch (err) {
       setError((err as Error).message || "No se pudo guardar la cata.");
       requestAnimationFrame(() => errorRef.current?.scrollIntoView({ behavior: "smooth", block: "center" }));

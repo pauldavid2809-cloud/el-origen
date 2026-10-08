@@ -213,12 +213,3 @@ const en: TastingCopy = {
 };
 
 export const TASTING_COPY: Record<Language, TastingCopy> = { es, en };
-
-/** "2026-10-24" → "Saturday, October 24, 2026" (en); en español se usa `dateFull` del servidor. */
-export function formatTastingDate(date: string, lang: Language, fallback: string): string {
-  if (lang === "es" || !/^\d{4}-\d{2}-\d{2}$/.test(date)) return fallback;
-  const d = new Date(`${date}T12:00:00Z`);
-  return Number.isNaN(d.getTime())
-    ? fallback
-    : d.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", year: "numeric", timeZone: "UTC" });
-}

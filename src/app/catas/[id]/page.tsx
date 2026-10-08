@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { Navbar } from "@/components/Navbar";
@@ -14,7 +14,8 @@ import { getTeamMember, instagramUrl, teamInitials, type TeamMember } from "@/li
 import { useLang } from "@/lib/useLang";
 import type { Language } from "@/lib/i18n";
 import type { Tasting } from "@/types";
-import { TASTING_COPY, formatTastingDate } from "./copy";
+import { formatTastingDate } from "@/lib/dates";
+import { TASTING_COPY } from "./copy";
 
 /** Máximo de cupos por reserva (el servidor aplica el mismo límite). */
 const MAX_SPOTS = 10;
@@ -75,6 +76,11 @@ export default function TastingDetailPage() {
     };
   }, [tastingId]);
 
+  // El título de la cata llega del layout; solo el de "no disponible" depende del idioma.
+  useEffect(() => {
+    if (notFound) document.title = `${t.notFoundTitle} | El Origen Caracas`;
+  }, [notFound, t.notFoundTitle]);
+
   if (notFound) {
     return (
       <Shell lang={lang} setLang={setLang}>
@@ -117,7 +123,12 @@ export default function TastingDetailPage() {
           <Facts tasting={tasting} lang={lang} />
         </div>
 
-        <aside id="reservar" className="lg:col-span-5 lg:col-start-8 lg:row-start-1 lg:row-span-2 lg:sticky lg:top-28 min-w-0 scroll-mt-24">
+        {/* Fija en escritorio, pero nunca más alta que la pantalla: deja libre la franja del botón flotante de WhatsApp
+            y, si no cabe, se desplaza por dentro para que el total y "Continuar" sigan a la vista. */}
+        <aside
+          id="reservar"
+          className="lg:col-span-5 lg:col-start-8 lg:row-start-1 lg:row-span-2 lg:sticky lg:top-28 lg:max-h-[calc(100dvh-12rem)] lg:overflow-y-auto lg:overscroll-contain min-w-0 scroll-mt-24"
+        >
           <Checkout tasting={tasting} rate={rate} lang={lang} />
         </aside>
 
@@ -343,32 +354,36 @@ function SommelierCard({ person, lang }: { person: SommelierView; lang: Language
         </div>
       </div>
       {person.bio && (
-        <>
-          <p id={bioId} className={`mt-3 text-[13.5px] text-on-surface-variant leading-relaxed ${open ? "" : "line-clamp-3"}`}>
-            {person.bio}
-          </p>
-          <button
-            type="button"
-            onClick={() => setOpen((v) => !v)}
-            aria-expanded={open}
-            aria-controls={bioId}
-            className="mt-1 min-h-11 text-[13px] font-semibold text-primary-container underline-offset-4 hover:underline"
-          >
-            {open ? t.readLess : t.readMore}
-          </button>
-        </>
+        <p id={bioId} className={`mt-3 text-[13.5px] text-on-surface-variant leading-relaxed ${open ? "" : "line-clamp-3"}`}>
+          {person.bio}
+        </p>
       )}
-      {person.instagram && (
-        <a
-          href={instagramUrl(person.instagram)}
-          target="_blank"
-          rel="noopener noreferrer"
-          aria-label={t.instagramAria(person.instagram)}
-          className="mt-1 inline-flex items-center gap-1.5 min-h-11 text-[13px] font-semibold text-on-surface hover:text-primary-container"
-        >
-          <span className="material-symbols-outlined text-[18px]" aria-hidden="true">photo_camera</span>
-          {person.instagram}
-        </a>
+      {(person.bio || person.instagram) && (
+        <div className="mt-1 flex flex-wrap items-center gap-x-5">
+          {person.bio && (
+            <button
+              type="button"
+              onClick={() => setOpen((v) => !v)}
+              aria-expanded={open}
+              aria-controls={bioId}
+              className="min-h-11 text-[13px] font-semibold text-primary-container underline-offset-4 hover:underline"
+            >
+              {open ? t.readLess : t.readMore}
+            </button>
+          )}
+          {person.instagram && (
+            <a
+              href={instagramUrl(person.instagram)}
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label={t.instagramAria(person.instagram)}
+              className="inline-flex items-center gap-1.5 min-h-11 text-[13px] font-semibold text-on-surface hover:text-primary-container"
+            >
+              <span className="material-symbols-outlined text-[18px]" aria-hidden="true">photo_camera</span>
+              {person.instagram}
+            </a>
+          )}
+        </div>
       )}
     </li>
   );
@@ -474,14 +489,45 @@ function Checkout({ tasting, rate, lang }: { tasting: Tasting; rate: number | nu
     }
   };
 
+  const formRef = useRef<HTMLFormElement>(null);
+  const revealOnStep = useRef(false);
+  const [errorFocus, setErrorFocus] = useState(0);
+
+  const changeStep = (next: Step) => {
+    revealOnStep.current = true;
+    setStep(next);
+  };
+
   const goTo = (next: Step) => {
     if (next === 3 && !dataValid) {
       setShowErrors(true);
       setStep(2);
+      setErrorFocus((n) => n + 1);
       return;
     }
-    setStep(next);
+    changeStep(next);
   };
+
+  // Al cambiar de paso, el inicio del formulario vuelve a la vista: en móvil el paso nuevo puede ser más corto
+  // y quedar por encima de la pantalla; en escritorio la tarjeta fija se desplaza por dentro.
+  useEffect(() => {
+    if (!revealOnStep.current) return;
+    revealOnStep.current = false;
+    const form = formRef.current;
+    if (!form) return;
+    const box = form.closest("aside");
+    if (box && box.scrollHeight > box.clientHeight + 1) {
+      if (box.scrollTop > 0) box.scrollTo({ top: 0, behavior: "smooth" });
+    } else if (form.getBoundingClientRect().top < 0) {
+      form.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+  }, [step]);
+
+  // Con datos inválidos, el foco va al primer campo marcado (el navegador lo trae a la vista).
+  useEffect(() => {
+    if (!errorFocus) return;
+    formRef.current?.querySelector<HTMLElement>('[aria-invalid="true"]')?.focus();
+  }, [errorFocus]);
 
   const setAddOn = (id: string, qty: number) =>
     setAddOnQty((prev) => ({ ...prev, [id]: Math.max(0, Math.min(MAX_ADDON_QTY, qty)) }));
@@ -601,7 +647,7 @@ function Checkout({ tasting, rate, lang }: { tasting: Tasting; rate: number | nu
           </a>
         </div>
       ) : (
-        <form onSubmit={submit} noValidate className="p-5 sm:p-7">
+        <form ref={formRef} onSubmit={submit} noValidate className="p-5 sm:p-7 scroll-mt-24">
           {/* Pasos */}
           <ol className="grid grid-cols-3 gap-1 mb-6 rounded-full bg-surface-container p-1 text-[13px] font-semibold">
             {t.steps.map((label, i) => {
@@ -663,13 +709,18 @@ function Checkout({ tasting, rate, lang }: { tasting: Tasting; rate: number | nu
                             qty > 0 ? "border-primary-container" : "border-outline-variant"
                           }`}
                         >
-                          <div className="flex items-start justify-between gap-3">
+                          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                             <div className="min-w-0">
                               <p id={labelId} className="text-[14px] font-semibold text-on-surface">{a.title}</p>
                               {a.description && <p className="mt-0.5 text-[12.5px] text-on-surface-variant">{a.description}</p>}
                               <p className="mt-1 text-[13px] font-semibold text-primary-container">
                                 {formatUsd(a.priceUsd)}
-                                {rate && <span className="ml-1.5 font-normal text-on-surface-variant">{bs(a.priceUsd)}</span>}
+                                {rate && (
+                                  <>
+                                    {" "}
+                                    <span className="font-normal text-on-surface-variant whitespace-nowrap">{bs(a.priceUsd)}</span>
+                                  </>
+                                )}
                               </p>
                             </div>
                             <Stepper
@@ -680,6 +731,7 @@ function Checkout({ tasting, rate, lang }: { tasting: Tasting; rate: number | nu
                               lessLabel={t.addOnLess(a.title)}
                               moreLabel={t.addOnMore(a.title)}
                               labelledBy={labelId}
+                              className="self-end sm:self-auto"
                             />
                           </div>
                         </li>
@@ -755,7 +807,7 @@ function Checkout({ tasting, rate, lang }: { tasting: Tasting; rate: number | nu
                 <p role="alert" className="text-[13px] text-error">{t.errFix}</p>
               )}
               <div className="flex gap-3 pt-2">
-                <SecondaryButton onClick={() => setStep(1)}>{t.back}</SecondaryButton>
+                <SecondaryButton onClick={() => changeStep(1)}>{t.back}</SecondaryButton>
                 <PrimaryButton onClick={() => goTo(3)}>{t.review}</PrimaryButton>
               </div>
             </div>
@@ -871,7 +923,7 @@ function Checkout({ tasting, rate, lang }: { tasting: Tasting; rate: number | nu
               )}
 
               <div className="flex gap-3">
-                <SecondaryButton onClick={() => setStep(2)}>{t.back}</SecondaryButton>
+                <SecondaryButton onClick={() => changeStep(2)}>{t.back}</SecondaryButton>
                 <button
                   type="submit"
                   disabled={submitting}
@@ -933,6 +985,7 @@ function Stepper({
   lessLabel,
   moreLabel,
   labelledBy,
+  className = "",
 }: {
   value: number;
   min: number;
@@ -941,11 +994,12 @@ function Stepper({
   lessLabel: string;
   moreLabel: string;
   labelledBy: string;
+  className?: string;
 }) {
   const btn =
     "w-11 h-11 rounded-full border border-outline-variant bg-surface-container-lowest text-primary-container flex items-center justify-center hover:border-primary-container disabled:opacity-35 disabled:hover:border-outline-variant transition-colors";
   return (
-    <div className="flex items-center gap-2 flex-shrink-0" role="group" aria-labelledby={labelledBy}>
+    <div className={`flex items-center gap-2 flex-shrink-0 ${className}`} role="group" aria-labelledby={labelledBy}>
       <button type="button" className={btn} onClick={() => onChange(value - 1)} disabled={value <= min} aria-label={lessLabel}>
         <span className="material-symbols-outlined text-[20px]" aria-hidden="true">remove</span>
       </button>

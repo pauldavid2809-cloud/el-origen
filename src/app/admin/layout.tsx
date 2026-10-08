@@ -137,7 +137,8 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             className="absolute inset-0 pointer-events-none opacity-[0.02]"
             style={{ backgroundImage: "radial-gradient(#7D2A46 1px, transparent 1px)", backgroundSize: "20px 20px" }}
           />
-          <div className="relative z-10 flex-1">{children}</div>
+          {/* Sin z-index: no debe crear un contexto de apilamiento, para que los modales (z-50) queden sobre la barra móvil (z-30). */}
+          <div className="relative flex-1">{children}</div>
         </main>
       </div>
     </AdminAuthGuard>

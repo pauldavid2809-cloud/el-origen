@@ -11,7 +11,8 @@ export async function GET() {
   try {
     return NextResponse.json({ success: true, config: await getPaymentConfig(), defaults: DEFAULT_PAYMENT_CONFIG });
   } catch (error) {
-    return NextResponse.json({ success: false, message: (error as Error).message }, { status: 500 });
+    console.error("[admin/settings] No se pudo leer la configuración de pagos:", error);
+    return NextResponse.json({ success: false, message: "No se pudo cargar la configuración de pagos." }, { status: 500 });
   }
 }
 
@@ -32,6 +33,6 @@ export async function PUT(request: Request) {
       return NextResponse.json({ success: false, message: error.message }, { status: 400 });
     }
     console.error("[admin/settings] No se pudo guardar la configuración de pagos:", error);
-    return NextResponse.json({ success: false, message: (error as Error).message }, { status: 500 });
+    return NextResponse.json({ success: false, message: "No se pudo guardar la configuración de pagos. Intente de nuevo." }, { status: 500 });
   }
 }

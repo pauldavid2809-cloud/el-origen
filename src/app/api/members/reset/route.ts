@@ -36,7 +36,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ success: false, message: "No pudimos cambiar la contraseña. Inténtalo de nuevo." }, { status: 500 });
   }
 
-  setMemberSession(member.id);
+  await setMemberSession(member.id);
   await touchLogin(member.id);
   return NextResponse.json({ success: true });
 }

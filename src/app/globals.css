@@ -99,6 +99,17 @@ h1, h2, h3, h4, .font-serif {
   font-variation-settings: 'FILL' 1, 'wght' 300, 'GRAD' 0, 'opsz' 24;
 }
 
+/* La hoja de la fuente fija display:inline-block en los iconos y puede ganarle a `hidden` de Tailwind. */
+.material-symbols-outlined.hidden {
+  display: none;
+}
+
+@media (min-width: 640px) {
+  .material-symbols-outlined.sm\:inline {
+    display: inline;
+  }
+}
+
 /* ─── Button Press Recipe (Physical Feedback) ─── */
 
 button, a.button, .press-feedback {

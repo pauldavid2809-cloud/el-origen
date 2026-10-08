@@ -4,6 +4,7 @@ import React, { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useLang } from "@/lib/useLang";
+import { useDocumentTitle } from "@/lib/useDocumentTitle";
 import {
   AuthHeading,
   AuthShell,
@@ -21,6 +22,7 @@ import { LOGIN_COPY } from "./copy";
 
 export default function LoginPage() {
   const [lang, setLang] = useLang();
+  useDocumentTitle(lang, { es: "Ingresar", en: "Sign in" });
   const t = LOGIN_COPY[lang];
   const router = useRouter();
   const nextParam = useQueryParam("next");

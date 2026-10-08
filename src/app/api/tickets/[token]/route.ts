@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { getCata } from "@/lib/catas";
 import { findTicket, getOrderById } from "@/lib/orders";
 
 export const dynamic = "force-dynamic";
@@ -25,6 +26,8 @@ export async function GET(_request: Request, { params }: { params: { token: stri
     if (!ticket || ticket.token !== token) return notFound();
     const order = await getOrderById(ticket.orderId);
     if (!order || order.status !== "approved") return notFound();
+    // Fecha ISO de la cata para mostrarla en el idioma del visitante (`tastingDate` se guarda en español).
+    const tasting = await getCata(order.tastingId).catch(() => null);
 
     return NextResponse.json(
       {
@@ -36,6 +39,7 @@ export async function GET(_request: Request, { params }: { params: { token: stri
           tastingId: order.tastingId,
           tastingTitle: order.tastingTitle,
           tastingDate: order.tastingDate,
+          tastingDateIso: tasting?.date ?? null,
           customerName: order.customerName,
         },
       },

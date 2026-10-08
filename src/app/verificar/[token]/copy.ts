@@ -3,10 +3,13 @@ import type { Language } from "@/lib/i18n";
 /* Textos de /verificar/[token] (ES/EN). Los mensajes de validación los redacta el servidor. */
 
 const es = {
+  /** Título de la pestaña del navegador (el layout trae el de ES para buscadores). */
+  docTitle: "Verificar entrada",
+
   // Visitante (sin sesión de puerta ni de admin)
   guestTitle: "Entrada de El Origen",
-  guestPresent: "Presente este código en la puerta",
-  guestText: "El personal de El Origen lo escaneará al llegar. Cada código es válido para una persona.",
+  guestPresent: "Presenta este código en la puerta",
+  guestText: "El personal de El Origen lo escaneará cuando llegues. Cada código es válido para una persona.",
   ticketOf: (n: number) => `Entrada ${n}`,
   qrAlt: (code: string) => `Código QR de la entrada ${code}`,
   live: "Ficha de cata en vivo",
@@ -35,6 +38,8 @@ const es = {
 type VerifyCopy = typeof es;
 
 const en: VerifyCopy = {
+  docTitle: "Verify ticket",
+
   guestTitle: "El Origen ticket",
   guestPresent: "Show this code at the door",
   guestText: "El Origen staff will scan it when you arrive. Each code admits one person.",

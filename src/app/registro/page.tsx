@@ -3,6 +3,7 @@
 import React, { useState } from "react";
 import Link from "next/link";
 import { useLang } from "@/lib/useLang";
+import { useDocumentTitle } from "@/lib/useDocumentTitle";
 import type { Language } from "@/lib/i18n";
 import { REGISTER_TERMS_CHECKBOX } from "@/lib/policies";
 import {
@@ -33,6 +34,7 @@ interface WelcomeCoupon {
 
 export default function RegisterPage() {
   const [lang, setLang] = useLang();
+  useDocumentTitle(lang, { es: "Crea tu Cuenta Origen", en: "Create your Origen Account" });
   const t = REGISTER_COPY[lang];
   const nextParam = useQueryParam("next");
   const next = nextParam ? safeNext(nextParam) : null;

@@ -38,7 +38,7 @@ export const TEAM: TeamMember[] = [
     role: { es: "Formador en whisky · Brand Ambassador", en: "Whisky educator · Brand ambassador" },
     bio: {
       es: "Fundador y director dedicado a la creación y dictado de cursos presenciales y online en Venezuela y Latinoamérica sobre el mundo y la cultura del whisky. Brand Ambassador de Buchanan's y embajador de marcas.",
-      en: "Founder and director devoted to creating and teaching in-person and online courses across Venezuela and Latin America on the world and culture of whisky. Buchanan's Brand Ambassador and brand ambassador.",
+      en: "Founder and director devoted to creating and teaching in-person and online courses across Venezuela and Latin America on the world and culture of whisky. Brand Ambassador for Buchanan's and ambassador for other brands.",
     },
   },
   {

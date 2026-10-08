@@ -3,7 +3,9 @@
 import React, { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { formatTastingDate } from "@/lib/dates";
 import { useLang } from "@/lib/useLang";
+import { useDocumentTitle } from "@/lib/useDocumentTitle";
 import type { Language } from "@/lib/i18n";
 import type { OrderStatus } from "@/lib/orders";
 import { whatsappLink } from "@/lib/contact";
@@ -24,6 +26,8 @@ interface AccountOrder {
   status: OrderStatus;
   tastingTitle: string;
   tastingDate: string;
+  /** Fecha ISO de la cata (para mostrarla en inglés); `tastingDate` va en español. */
+  tastingDateIso: string | null;
   tastingTime: string;
   spotsCount: number;
   totalUsd: number;
@@ -60,6 +64,7 @@ function formatDate(iso: string, lang: Language): string {
 
 export default function MyAccountPage() {
   const [lang, setLang] = useLang();
+  useDocumentTitle(lang, { es: "Mi cuenta", en: "My account" });
   const t = ACCOUNT_COPY[lang];
   const router = useRouter();
   const [data, setData] = useState<AccountData | null>(null);
@@ -213,7 +218,7 @@ function OrderCard({ lang, order: o }: { lang: Language; order: AccountOrder }) 
       </div>
       <h3 className="font-serif text-xl leading-snug mt-3 break-words">{o.tastingTitle}</h3>
       <p className="text-[14px] text-on-surface-variant mt-1">
-        {[o.tastingDate, o.tastingTime].filter(Boolean).join(" · ")}
+        {[formatTastingDate(o.tastingDateIso, lang, o.tastingDate), o.tastingTime].filter(Boolean).join(" · ")}
       </p>
       <dl className="mt-3 flex flex-wrap gap-x-5 gap-y-1 text-[13px]">
         <div className="flex gap-1.5">
@@ -271,7 +276,7 @@ function Profile({ lang, member }: { lang: Language; member: AccountMember }) {
       </dl>
       <div className="mt-5 pt-5 border-t border-outline-variant space-y-3">
         <p className="text-[13px] text-on-surface-variant">{t.changeData}</p>
-        <div className="flex flex-col sm:flex-row lg:flex-col xl:flex-row gap-2">
+        <div className="flex flex-col sm:flex-row lg:flex-col gap-2">
           <a
             href={whatsappLink(t.changeDataMessage(member.email))}
             target="_blank"

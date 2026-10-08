@@ -5,6 +5,7 @@ import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
 import { PageHeader, SectionHeading, SunBurst } from "@/components/Brand";
 import { useLang } from "@/lib/useLang";
+import { useDocumentTitle } from "@/lib/useDocumentTitle";
 import { whatsappLink } from "@/lib/contact";
 import type { BrandObjective } from "@/lib/leads";
 import {
@@ -31,6 +32,7 @@ type Field = "company" | "brand" | "contactName" | "phone" | "email" | "objectiv
 
 export default function AlianzasPage() {
   const [lang, setLang] = useLang();
+  useDocumentTitle(lang, { es: "Alianzas Comerciales & Marcas Aliadas", en: "Business Partnerships & Partner Brands" });
   const t = ALIANZAS_COPY[lang];
   const common = FORM_COPY[lang];
 

@@ -5,7 +5,8 @@ import type { Tasting } from "@/types";
 
 /** Catas con los cupos disponibles reales: total de la cata menos lo retenido por órdenes. */
 export async function tastingsWithAvailability(options: ListCatasOptions = {}): Promise<Tasting[]> {
-  const [tastings, held] = await Promise.all([listCatas(options), heldSpotsByTasting()]);
+  const tastings = await listCatas(options);
+  const held = await heldSpotsByTasting(tastings.map((t) => t.id));
   return tastings.map((t) => applyHeld(t, held[t.id] ?? 0));
 }
 
@@ -13,7 +14,7 @@ export async function tastingsWithAvailability(options: ListCatasOptions = {}): 
 export async function tastingWithAvailability(idOrSlug: string): Promise<Tasting | null> {
   const t = await getCata(idOrSlug);
   if (!t) return null;
-  const held = await heldSpotsByTasting();
+  const held = await heldSpotsByTasting([t.id]);
   return applyHeld(t, held[t.id] ?? 0);
 }
 

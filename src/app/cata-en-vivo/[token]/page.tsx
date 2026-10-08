@@ -8,7 +8,9 @@ import { Footer } from "@/components/Footer";
 import { SensoryWheel, aromaLabel, type LiveTastingNote, type SensoryData } from "@/components/SensoryWheel";
 import { AudioGuidePlayer } from "@/components/AudioGuidePlayer";
 import { CertificateGenerator, type CertificateSigner } from "@/components/CertificateGenerator";
+import { formatTastingDate } from "@/lib/dates";
 import { useLang } from "@/lib/useLang";
+import { useDocumentTitle } from "@/lib/useDocumentTitle";
 import { getTeamMember } from "@/lib/team";
 import type { Tasting, TastingProduct } from "@/types";
 import { LIVE_COPY } from "./copy";
@@ -21,6 +23,8 @@ interface TicketInfo {
   tastingId: string;
   tastingTitle: string;
   tastingDate: string;
+  /** Fecha ISO de la cata (para mostrarla en inglés); `tastingDate` va en español. */
+  tastingDateIso?: string | null;
   customerName: string;
 }
 
@@ -32,6 +36,7 @@ const isDemoToken = (token: string) => token.startsWith("tok-demo");
 export default function LiveTastingPage() {
   const { token } = useParams<{ token: string }>();
   const [lang, setLang] = useLang();
+  useDocumentTitle(lang, { es: "Ficha de cata en vivo", en: "Live tasting sheet" });
   const t = LIVE_COPY[lang];
   const demo = isDemoToken(token);
 
@@ -209,6 +214,7 @@ export default function LiveTastingPage() {
   const guide = guides[0];
   const story = product?.audioStory || product?.description || "";
   const title = demo ? t.demoTitle : ticket.tastingTitle;
+  const dateLabel = demo ? "" : formatTastingDate(ticket.tastingDateIso ?? tasting?.date, lang, ticket.tastingDate);
   const taster = demo ? t.demoGuest : ticket.attendeeName || (ticket.number === 1 ? ticket.customerName : "");
 
   return shell(
@@ -224,7 +230,7 @@ export default function LiveTastingPage() {
           )}
           {t.ticket} <span className="font-mono">{ticket.code}</span>
         </p>
-        {!demo && ticket.tastingDate && <p className="text-[13px] text-on-surface-variant">{ticket.tastingDate}</p>}
+        {dateLabel && <p className="text-[13px] text-on-surface-variant">{dateLabel}</p>}
       </header>
 
       {demo && (
@@ -362,7 +368,7 @@ export default function LiveTastingPage() {
             lang={lang}
             attendeeName={certName.trim() || t.certificateNamePlaceholder}
             tastingTitle={title}
-            tastingDate={demo ? "" : ticket.tastingDate}
+            tastingDate={dateLabel}
             averageScore={summary.average}
             glassesRated={ratedCount}
             featuredAromas={summary.aromas}

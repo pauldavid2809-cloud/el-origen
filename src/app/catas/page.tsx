@@ -9,6 +9,7 @@ import { TastingCard, TastingsEmptyState, TastingsLoadError, useBcvRates } from 
 import type { Tasting, TastingCategory } from "@/types";
 import { translations } from "@/lib/i18n";
 import { useLang } from "@/lib/useLang";
+import { useDocumentTitle } from "@/lib/useDocumentTitle";
 
 type LoadState = "loading" | "ready" | "error";
 
@@ -21,6 +22,7 @@ const normalize = (s: string) =>
 
 export default function CatasCatalogPage() {
   const [lang, setLang] = useLang();
+  useDocumentTitle(lang, { es: "Próximas catas guiadas", en: "Upcoming guided tastings" });
   const t = translations[lang];
 
   const [tastings, setTastings] = useState<Tasting[]>([]);
@@ -173,7 +175,7 @@ export default function CatasCatalogPage() {
           {/* Experiencias privadas */}
           <div className="mt-24 rounded-2xl bg-primary-container text-paper p-8 sm:p-12 flex flex-col md:flex-row md:items-center justify-between gap-8">
             <div className="max-w-2xl">
-              <p className="eyebrow !text-sun mb-4">{t.catalog.privateBadge}</p>
+              <p className="eyebrow !text-tertiary-fixed-dim mb-4">{t.catalog.privateBadge}</p>
               <h2 className="font-serif text-3xl sm:text-4xl leading-tight text-balance">{t.catalog.privateTitle}</h2>
               <p className="mt-4 text-[15px] text-paper/80 leading-relaxed">{t.catalog.privateSubtitle}</p>
             </div>

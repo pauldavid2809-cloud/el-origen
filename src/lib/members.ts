@@ -3,7 +3,7 @@ import crypto from "crypto";
 import { promisify } from "util";
 import { cookies } from "next/headers";
 import { safeEqual, sessionCookieOptions, signValue, verifySignedValue } from "./auth";
-import { getAdminClient } from "./orders";
+import { fetchAllRows, getAdminClient } from "./orders";
 
 /* ─────────────────────────────────────────────────────────────
    Miembros registrados ("Cuenta Origen", tabla public.members).
@@ -216,16 +216,18 @@ export async function getMemberByEmail(email: string): Promise<Member | null> {
 export async function listMembers(): Promise<Member[]> {
   const sb = getAdminClient();
   if (!sb) return Array.from(memMembers.values()).map(toPublic).sort((a, b) => b.createdAt.localeCompare(a.createdAt));
-  const { data, error } = await sb
-    .from("members")
-    .select("id, full_name, email, phone, is_adult, accepted_terms_at, marketing_opt_in, created_at, last_login_at")
-    .order("created_at", { ascending: false })
-    .limit(10000);
-  if (error) throw new Error(error.message);
-  return (data ?? []).map((row) => toPublic(fromRow(row)));
+  const rows = await fetchAllRows<Row>((from, to) =>
+    sb
+      .from("members")
+      .select("id, full_name, email, phone, is_adult, accepted_terms_at, marketing_opt_in, created_at, last_login_at")
+      .order("created_at", { ascending: false })
+      .order("id", { ascending: true })
+      .range(from, to)
+  );
+  return rows.map((row) => toPublic(fromRow(row)));
 }
 
-/** Cambia la contraseña (los enlaces de recuperación emitidos antes dejan de servir). */
+/** Cambia la contraseña: los enlaces de recuperación y las sesiones abiertas antes dejan de servir. */
 export async function updatePassword(id: string, password: string): Promise<void> {
   checkPasswordStrength(password);
   const passwordHash = await hashPassword(password);
@@ -252,11 +254,25 @@ export async function touchLogin(id: string): Promise<void> {
   await sb.from("members").update({ last_login_at: now }).eq("id", id);
 }
 
-/* ─── Sesión (cookie eo_member_session = "<id>.<exp>.<firma>") ─── */
+/* ─── Sesión (cookie eo_member_session = "<id>.<exp>.<huella>.<firma>") ───
+   La huella del hash de la contraseña va firmada: al cambiar o restablecer la contraseña,
+   todas las sesiones abiertas antes dejan de valer (currentMember la compara con la cuenta). */
 
-export function setMemberSession(id: string): void {
+/* Huella del hash actual (también invalida los enlaces de recuperación al cambiar la contraseña). */
+const hashFingerprint = (passwordHash: string) =>
+  crypto.createHash("sha256").update(passwordHash).digest("base64url").slice(0, 16);
+
+interface SessionClaims {
+  id: string;
+  fingerprint: string;
+}
+
+/** Abre la sesión del miembro (cookie firmada, 30 días). */
+export async function setMemberSession(id: string): Promise<void> {
+  const record = await recordById(id);
+  if (!record) throw new Error("Miembro no encontrado");
   const exp = Math.floor(Date.now() / 1000) + SESSION_MAX_AGE_SECONDS;
-  const payload = `${id}.${exp}`;
+  const payload = `${record.id}.${exp}.${hashFingerprint(record.passwordHash)}`;
   cookies().set({
     name: SESSION_COOKIE,
     value: `${payload}.${signValue("member", payload)}`,
@@ -268,26 +284,34 @@ export function clearMemberSession(): void {
   cookies().delete(SESSION_COOKIE);
 }
 
-/** Id del miembro con sesión válida (sin consultar la base de datos). */
-export function currentMemberId(): string | null {
+/** Datos firmados de la cookie si la firma es válida y no venció (sin consultar la base de datos). */
+function sessionClaims(): SessionClaims | null {
   const token = cookies().get(SESSION_COOKIE)?.value;
   if (!token) return null;
-  const [id, exp, sig] = token.split(".");
-  if (!id || !exp || !sig) return null;
+  const [id, exp, fingerprint, sig] = token.split(".");
+  if (!id || !exp || !fingerprint || !sig) return null;
   if (!(Number(exp) >= Math.floor(Date.now() / 1000))) return null;
-  return verifySignedValue("member", `${id}.${exp}`, sig) ? id : null;
+  return verifySignedValue("member", `${id}.${exp}.${fingerprint}`, sig) ? { id, fingerprint } : null;
 }
 
+/**
+ * Id de la cookie de sesión si su firma es válida, sin consultar la base de datos.
+ * No detecta sesiones revocadas por un cambio de contraseña: para leer datos use `currentMember()`.
+ */
+export function currentMemberId(): string | null {
+  return sessionClaims()?.id ?? null;
+}
+
+/** Miembro con sesión válida; null si no hay sesión o si la contraseña cambió después de abrirla. */
 export async function currentMember(): Promise<Member | null> {
-  const id = currentMemberId();
-  return id ? getMemberById(id) : null;
+  const claims = sessionClaims();
+  if (!claims) return null;
+  const record = await recordById(claims.id);
+  if (!record || !safeEqual(claims.fingerprint, hashFingerprint(record.passwordHash))) return null;
+  return toPublic(record);
 }
 
 /* ─── Recuperación de contraseña ─── */
-
-/* Huella del hash actual: el enlace deja de servir en cuanto la contraseña cambia. */
-const hashFingerprint = (passwordHash: string) =>
-  crypto.createHash("sha256").update(passwordHash).digest("base64url").slice(0, 16);
 
 /** Token firmado de un solo propósito, válido 1 hora: "<id>.<exp>.<huella>.<firma>". */
 export async function createResetToken(member: Pick<Member, "id">): Promise<string> {

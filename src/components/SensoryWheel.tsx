@@ -163,15 +163,15 @@ const COPY = {
     steps: ["Vista", "Nariz", "Boca", "Puntaje"],
     stepsLabel: "Fases de la cata",
     visualTitle: "Vista: color y brillo",
-    visualText: "Incline la copa sobre un fondo blanco y observe el color, la limpidez y las lágrimas.",
+    visualText: "Inclina la copa sobre un fondo blanco y observa el color, la limpidez y las lágrimas.",
     colorLabel: "Tono predominante",
     clarityLabel: "Limpidez",
     densityLabel: "Lágrimas",
     noseTitle: "Nariz: aromas",
-    noseText: "Gire suavemente la copa y marque todos los aromas que reconozca.",
+    noseText: "Gira suavemente la copa y marca todos los aromas que reconozcas.",
     selected: (n: number) => `${n} marcados`,
     palateTitle: "Boca: sensaciones",
-    palateText: "Tome un sorbo, manténgalo unos segundos y evalúe cada sensación.",
+    palateText: "Toma un sorbo, mantenlo unos segundos y evalúa cada sensación.",
     gustative: {
       acidity: { label: "Acidez / frescura", ends: ["Baja", "Media", "Vibrante"] },
       tannins: { label: "Taninos / astringencia", ends: ["Sedosos", "Redondos", "Firmes"] },
@@ -179,12 +179,12 @@ const COPY = {
       persistence: { label: "Persistencia", ends: ["Corta", "Media", "Larga"] },
     } satisfies Record<GustativeKey, { label: string; ends: string[] }>,
     scoreTitle: "Puntaje y notas",
-    scoreText: "Califique la copa de 70 a 100 puntos y anote sus impresiones.",
+    scoreText: "Califica la copa de 70 a 100 puntos y anota tus impresiones.",
     scoreLabel: "Puntaje",
     points: "pts",
     badges: ["Bueno", "Muy bueno", "Excelente", "Excepcional"],
     notesLabel: "Mis notas",
-    notesPlaceholder: "Lo que más le llamó la atención de esta copa…",
+    notesPlaceholder: "Lo que más te llamó la atención de esta copa…",
     pairingLabel: "Maridaje que imagino",
     pairingPlaceholder: "Ej.: quesos curados, chocolate oscuro…",
     previous: "Anterior",
@@ -339,8 +339,9 @@ export function SensoryWheel({
               step === i ? "bg-primary-container text-white shadow-sm" : "text-on-surface-variant hover:text-on-surface"
             }`}
           >
-            <span className="material-symbols-outlined text-[16px] hidden sm:inline" aria-hidden="true">
-              {STEP_ICONS[i]}
+            {/* La visibilidad va en el contenedor: la hoja de Material Symbols fija display:inline-block en el icono y anula `hidden`. */}
+            <span className="hidden sm:inline-flex" aria-hidden="true">
+              <span className="material-symbols-outlined text-[16px]">{STEP_ICONS[i]}</span>
             </span>
             {label}
           </button>

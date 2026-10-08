@@ -21,7 +21,7 @@ interface FormState {
   transfers: TrRow[];
   holderName: string;
   binance: { enabled: boolean; payId: string; email: string; holder: string };
-  efectivo: { enabled: boolean; instructions: string };
+  efectivo: { enabled: boolean; instructions: string; instructionsEn: string };
 }
 
 function toForm(c: PaymentConfig): FormState {
@@ -30,7 +30,7 @@ function toForm(c: PaymentConfig): FormState {
     transfers: c.transfers.map((a) => keyed({ ...a })),
     holderName: c.holderName ?? "",
     binance: { enabled: c.binance.enabled, payId: c.binance.payId ?? "", email: c.binance.email ?? "", holder: c.binance.holder ?? "" },
-    efectivo: { enabled: c.efectivo.enabled, instructions: c.efectivo.instructions },
+    efectivo: { enabled: c.efectivo.enabled, instructions: c.efectivo.instructions, instructionsEn: c.efectivo.instructionsEn ?? "" },
   };
 }
 
@@ -341,6 +341,20 @@ export default function AdminPaymentSettingsPage() {
                   onChange={(e) => update((f) => ({ ...f, efectivo: { ...f.efectivo, instructions: e.target.value } }))}
                   className="w-full rounded border border-outline-variant bg-surface-container-lowest px-3 py-2.5 text-[14px] focus:border-primary-container focus:outline-none"
                 />
+                <label htmlFor={id("cash-en")} className={`${labelCls} mt-4`}>Instrucciones en inglés (opcional)</label>
+                <textarea
+                  id={id("cash-en")}
+                  rows={2}
+                  maxLength={300}
+                  value={form.efectivo.instructionsEn}
+                  onChange={(e) => update((f) => ({ ...f, efectivo: { ...f.efectivo, instructionsEn: e.target.value } }))}
+                  placeholder="Ej.: Cash delivery arranged in advance via WhatsApp"
+                  aria-describedby={id("cash-en-hint")}
+                  className="w-full rounded border border-outline-variant bg-surface-container-lowest px-3 py-2.5 text-[14px] focus:border-primary-container focus:outline-none"
+                />
+                <p id={id("cash-en-hint")} className="mt-1.5 text-[12px] text-on-surface-variant">
+                  Se muestra a quien ve el sitio en inglés. Si lo deja vacío, se muestra el texto en español.
+                </p>
               </div>
             )}
           </Card>

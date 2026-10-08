@@ -1,4 +1,13 @@
 -- ==============================================================================
+-- ⚠ OBSOLETO — NO EJECUTAR EN INSTALACIONES NUEVAS.
+-- Esquema original (v1) que ya no usa el sitio. El esquema vigente es:
+--   1) supabase/orders.sql   2) supabase/v2.sql
+-- Se conserva solo como referencia histórica. Sus tablas no activan RLS y siembra cupones
+-- de ejemplo activos; si ya se ejecutó en un proyecto, v2.sql activa RLS en esas tablas
+-- (revise y desactive en el panel los cupones ORIGEN10, SOMMELIER20 y VIP2024 si existen).
+-- ==============================================================================
+
+-- ==============================================================================
 -- EL ORIGEN — BOUTIQUE WINE TASTINGS
 -- Supabase / PostgreSQL Database Schema
 -- ==============================================================================
