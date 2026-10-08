@@ -1,208 +1,407 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
-import { TerroirDivider } from "@/components/TerroirDivider";
-import { SensoryWheel, SensoryData } from "@/components/SensoryWheel";
+import { SensoryWheel, aromaLabel, type LiveTastingNote, type SensoryData } from "@/components/SensoryWheel";
 import { AudioGuidePlayer } from "@/components/AudioGuidePlayer";
-import { CertificateGenerator } from "@/components/CertificateGenerator";
-import { Reservation, Tasting } from "@/types";
+import { CertificateGenerator, type CertificateSigner } from "@/components/CertificateGenerator";
+import { formatTastingDate } from "@/lib/dates";
+import { useLang } from "@/lib/useLang";
+import { useDocumentTitle } from "@/lib/useDocumentTitle";
+import { getTeamMember } from "@/lib/team";
+import type { Tasting, TastingProduct } from "@/types";
+import { LIVE_COPY } from "./copy";
 
-export default function LiveTastingExperiencePage() {
-  const params = useParams();
-  const token = params?.token as string;
+/** `GET /api/tickets/[token]`. */
+interface TicketInfo {
+  code: string;
+  number: number;
+  attendeeName: string | null;
+  tastingId: string;
+  tastingTitle: string;
+  tastingDate: string;
+  /** Fecha ISO de la cata (para mostrarla en inglés); `tastingDate` va en español. */
+  tastingDateIso?: string | null;
+  customerName: string;
+}
 
-  const [reservation, setReservation] = useState<Reservation | null>(null);
+type LoadState = "loading" | "ready" | "not_found" | "error";
+
+/** Enlace de demostración de la portada: la ficha funciona pero no guarda nada. */
+const isDemoToken = (token: string) => token.startsWith("tok-demo");
+
+export default function LiveTastingPage() {
+  const { token } = useParams<{ token: string }>();
+  const [lang, setLang] = useLang();
+  useDocumentTitle(lang, { es: "Ficha de cata en vivo", en: "Live tasting sheet" });
+  const t = LIVE_COPY[lang];
+  const demo = isDemoToken(token);
+
+  const [state, setState] = useState<LoadState>("loading");
+  const [ticket, setTicket] = useState<TicketInfo | null>(null);
   const [tasting, setTasting] = useState<Tasting | null>(null);
-  const [currentWineIndex, setCurrentWineIndex] = useState(0);
-  const [savedNotes, setSavedNotes] = useState<{ [wineIdx: number]: SensoryData }>({});
-  const [showCertificate, setShowCertificate] = useState(false);
-  const [loading, setLoading] = useState(true);
+  const [notes, setNotes] = useState<Record<number, LiveTastingNote>>({});
+  const [current, setCurrent] = useState(0);
+  const [view, setView] = useState<"sheet" | "certificate">("sheet");
+  const [saving, setSaving] = useState(false);
+  const [notice, setNotice] = useState<{ tone: "ok" | "error"; text: string } | null>(null);
+  const [certName, setCertName] = useState("");
+  const [attempt, setAttempt] = useState(0);
 
   useEffect(() => {
-    async function loadData() {
-      try {
-        const res = await fetch("/api/verify", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ token, action: "verify" }),
-        });
-        const data = await res.json();
-        if (data.reservation) {
-          setReservation(data.reservation);
-        }
-
-        // Fetch tastings
-        const tRes = await fetch("/api/tastings");
-        const tData = await tRes.json();
-        if (tData.success && tData.tastings.length > 0) {
-          setTasting(tData.tastings[0]);
-        }
-      } catch {
-        // fallback
-      } finally {
-        setLoading(false);
-      }
-    }
-    loadData();
-  }, [token]);
-
-  const handleSaveNote = async (data: SensoryData) => {
-    setSavedNotes((prev) => ({
-      ...prev,
-      [currentWineIndex]: data,
-    }));
-
-    try {
-      await fetch("/api/tasting-notes", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          reservationToken: token,
-          tastingId: tasting?.id || "tasting-1",
-          attendeeName: reservation?.customerName || "Catador de Bodega",
-          wineIndex: currentWineIndex,
-          wineName: tasting?.wines[currentWineIndex]?.name || "Vino de Altura",
-          visual: data.visual,
-          aromas: data.aromas,
-          gustative: data.gustative,
-          score: data.score,
-          notes: data.notes,
-          pairingIdea: data.pairingIdea,
-        }),
+    if (demo) {
+      setTicket({
+        code: "EO-DEMO-1",
+        number: 1,
+        attendeeName: null,
+        tastingId: "",
+        tastingTitle: "",
+        tastingDate: "",
+        customerName: "",
       });
-    } catch {
-      // ignore
+      setState("ready");
+      return;
     }
 
-    if (tasting && currentWineIndex < tasting.wines.length - 1) {
-      setCurrentWineIndex(currentWineIndex + 1);
-    } else {
-      setShowCertificate(true);
-    }
-  };
+    let cancelled = false;
+    setState("loading");
+    (async () => {
+      try {
+        const res = await fetch(`/api/tickets/${encodeURIComponent(token)}`, { cache: "no-store" });
+        if (res.status === 404) {
+          if (!cancelled) setState("not_found");
+          return;
+        }
+        const data = await res.json();
+        if (!res.ok || !data.success) throw new Error(data.message);
+        const info: TicketInfo = data.ticket;
 
-  if (loading) {
-    return (
-      <div className="bg-background min-h-screen flex items-center justify-center p-4 text-secondary">
-        <span className="material-symbols-outlined animate-spin text-2xl mr-2">progress_activity</span>
-        Iniciando experiencia sensorial en vivo...
+        const [tastingRes, notesRes] = await Promise.all([
+          fetch(`/api/tastings/${encodeURIComponent(info.tastingId)}?ticket=${encodeURIComponent(token)}`).then((r) => (r.ok ? r.json() : null)).catch(() => null),
+          fetch(`/api/tasting-notes?token=${encodeURIComponent(token)}`, { cache: "no-store" })
+            .then((r) => (r.ok ? r.json() : null))
+            .catch(() => null),
+        ]);
+        if (cancelled) return;
+
+        const latest: Record<number, LiveTastingNote> = {};
+        for (const note of (notesRes?.notes ?? []) as LiveTastingNote[]) latest[note.productIndex] = note;
+
+        setTicket(info);
+        setTasting(tastingRes?.success ? tastingRes.tasting : null);
+        setNotes(latest);
+        setCertName(info.attendeeName || (info.number === 1 ? info.customerName : ""));
+        setState("ready");
+      } catch {
+        if (!cancelled) setState("error");
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [token, demo, attempt]);
+
+  const products: TastingProduct[] = useMemo(() => {
+    if (demo) return t.demoProducts.map((p) => ({ ...p, vintage: "", aromaProfile: [] }));
+    if (tasting?.wines.length) return tasting.wines;
+    return ticket ? [{ name: ticket.tastingTitle, vintage: "", type: "", description: "", aromaProfile: [] }] : [];
+  }, [demo, t.demoProducts, tasting, ticket]);
+
+  const guides: CertificateSigner[] = useMemo(
+    () =>
+      (tasting?.sommelierIds ?? [])
+        .map((id) => getTeamMember(id))
+        .filter((m): m is NonNullable<typeof m> => Boolean(m))
+        .map((m) => ({ name: m.name, role: m.role[lang] })),
+    [tasting, lang]
+  );
+
+  const ratedCount = Object.keys(notes).length;
+  const summary = useMemo(() => {
+    const list = Object.values(notes);
+    if (!list.length) return { average: null, aromas: [] as string[] };
+    const average = Math.round(list.reduce((sum, n) => sum + n.score, 0) / list.length);
+    const counts = new Map<string, number>();
+    list.forEach((n) => n.aromas.forEach((a) => counts.set(a, (counts.get(a) ?? 0) + 1)));
+    const aromas = Array.from(counts.entries())
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 3)
+      .map(([id]) => aromaLabel(id, lang));
+    return { average, aromas };
+  }, [notes, lang]);
+
+  const saveNote = useCallback(
+    async (data: SensoryData) => {
+      const product = products[current];
+      if (!product || !ticket) return;
+      const note: LiveTastingNote = { ...data, tastingId: ticket.tastingId, productIndex: current, productName: product.name };
+      setSaving(true);
+      setNotice(null);
+      try {
+        if (!demo) {
+          const res = await fetch("/api/tasting-notes", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ token, note }),
+          });
+          const body = await res.json().catch(() => ({}));
+          if (!res.ok || !body.success) throw new Error(body.message);
+        }
+        const next = { ...notes, [current]: note };
+        setNotes(next);
+        setNotice({ tone: "ok", text: t.saved });
+        const pending = products.findIndex((_, i) => !next[i]);
+        if (pending === -1) setView("certificate");
+        else setCurrent(pending);
+        window.scrollTo({ top: 0, behavior: "smooth" });
+      } catch {
+        setNotice({ tone: "error", text: t.saveError });
+      } finally {
+        setSaving(false);
+      }
+    },
+    [current, demo, notes, products, t.saveError, t.saved, ticket, token]
+  );
+
+  const shell = (children: React.ReactNode) => (
+    <div className="bg-background text-on-background min-h-screen flex flex-col">
+      <Navbar currentLang={lang} onLanguageChange={setLang} />
+      <main className="flex-grow w-full max-w-3xl mx-auto px-5 sm:px-8 pt-8 sm:pt-12 pb-16">{children}</main>
+      <Footer currentLang={lang} />
+    </div>
+  );
+
+  if (state === "loading") {
+    return shell(
+      <p className="flex items-center justify-center gap-2 py-24 text-on-surface-variant" role="status">
+        <span className="material-symbols-outlined animate-spin" aria-hidden="true">progress_activity</span>
+        {t.loading}
+      </p>
+    );
+  }
+
+  if (state !== "ready" || !ticket) {
+    const notFound = state === "not_found";
+    return shell(
+      <div className="py-16 text-center max-w-md mx-auto">
+        <span className="material-symbols-outlined text-5xl text-primary-container" aria-hidden="true">
+          {notFound ? "confirmation_number" : "wifi_off"}
+        </span>
+        <h1 className="font-serif text-3xl mt-4">{notFound ? t.notFoundTitle : t.errorTitle}</h1>
+        <p className="mt-3 text-on-surface-variant leading-relaxed">{notFound ? t.notFoundText : t.errorText}</p>
+        <div className="mt-8 flex flex-col sm:flex-row gap-3 justify-center">
+          {!notFound && (
+            <button
+              type="button"
+              onClick={() => setAttempt((n) => n + 1)}
+              className="h-12 px-6 rounded bg-primary-container hover:bg-primary text-white text-[14px] font-semibold"
+            >
+              {t.retry}
+            </button>
+          )}
+          <Link href="/" className="h-12 px-6 rounded border border-outline-variant inline-flex items-center justify-center text-[14px] font-semibold">
+            {t.home}
+          </Link>
+        </div>
       </div>
     );
   }
 
-  const currentWine = tasting?.wines[currentWineIndex] || {
-    name: "El Origen Malbec Gran Reserva",
-    vintage: "2021",
-    type: "Tinto de Altura • Crianza 18 meses",
-    description: "Intenso color violeta profundo. Notas de ciruela madura, violetas y un fondo mineral de piedra caliza.",
-    aromaProfile: ["Ciruela", "Violetas", "Grafito", "Pimienta negra"],
-    audioStory: "Nuestras vides de Malbec reciben el agua pura de deshielo andino. En esta copa experimentamos la máxima expresión del terroir.",
-  };
+  const product = products[current];
+  const guide = guides[0];
+  const story = product?.audioStory || product?.description || "";
+  const title = demo ? t.demoTitle : ticket.tastingTitle;
+  const dateLabel = demo ? "" : formatTastingDate(ticket.tastingDateIso ?? tasting?.date, lang, ticket.tastingDate);
+  const taster = demo ? t.demoGuest : ticket.attendeeName || (ticket.number === 1 ? ticket.customerName : "");
 
-  return (
-    <div className="bg-background text-on-background min-h-screen flex flex-col">
-      <Navbar />
+  return shell(
+    <>
+      <header className="text-center">
+        <p className="eyebrow">{t.badge}</p>
+        <h1 className="font-serif text-3xl sm:text-4xl mt-3 text-balance">{title}</h1>
+        <p className="mt-2 text-[14px] text-on-surface-variant">
+          {taster && (
+            <>
+              {t.taster}: <strong className="text-on-surface">{taster}</strong> ·{" "}
+            </>
+          )}
+          {t.ticket} <span className="font-mono">{ticket.code}</span>
+        </p>
+        {dateLabel && <p className="text-[13px] text-on-surface-variant">{dateLabel}</p>}
+      </header>
 
-      <main className="flex-grow py-10 sm:py-16 px-4 sm:px-8 lg:px-16 max-w-4xl mx-auto w-full">
-        {/* Top Header */}
-        <div className="text-center mb-8">
-          <span className="text-[11px] font-bold uppercase tracking-[0.2em] text-[#D4AF37] bg-[#5C0531] text-white px-3.5 py-1.5 rounded-full shadow-sm">
-            Ficha de Cata Sensorial Digital
-          </span>
-          <h1 className="font-serif text-3xl sm:text-4xl font-bold text-on-surface mt-3 mb-1">
-            {tasting?.title || "Cata de Vinos Premium & Terroir"}
-          </h1>
-          <p className="text-xs sm:text-sm text-secondary">
-            Catador: <strong className="text-primary">{reservation?.customerName || "Invitado Especial"}</strong> • Ticket {reservation?.code || "#EO-8492A"}
-          </p>
-        </div>
+      {demo && (
+        <p className="mt-6 rounded-xl border border-tertiary-container bg-tertiary-fixed/50 px-4 py-3 text-[14px] text-on-tertiary-fixed-variant">
+          {t.demoBanner}
+        </p>
+      )}
 
-        {/* Wine Selector Tabs */}
-        {tasting && tasting.wines.length > 1 && !showCertificate && (
-          <div className="flex flex-wrap gap-2 justify-center mb-8">
-            {tasting.wines.map((w, idx) => (
-              <button
-                key={idx}
-                onClick={() => setCurrentWineIndex(idx)}
-                className={`px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-wider transition-all ${
-                  currentWineIndex === idx
-                    ? "bg-primary-container text-white shadow-sm"
-                    : "bg-surface-container text-secondary hover:bg-surface-variant"
-                }`}
-              >
-                Copa #{idx + 1}: {w.name}
-              </button>
-            ))}
-          </div>
-        )}
+      {notice && (
+        <p
+          role={notice.tone === "error" ? "alert" : "status"}
+          className={`mt-6 rounded-xl px-4 py-3 text-[14px] ${
+            notice.tone === "ok" ? "bg-emerald-50 text-emerald-900 border border-emerald-200" : "bg-error-container text-on-error-container"
+          }`}
+        >
+          {notice.text}
+        </p>
+      )}
 
-        {!showCertificate ? (
-          <div className="space-y-8 animate-fade-in-up">
-            {/* Audio Guide Player */}
+      {view === "sheet" ? (
+        <div className="mt-8 space-y-6">
+          {products.length > 1 && (
+            <nav aria-label={t.glassesLabel} className="-mx-5 px-5 sm:mx-0 sm:px-0 overflow-x-auto">
+              <ol className="flex gap-2 w-max sm:w-auto sm:flex-wrap sm:justify-center">
+                {products.map((p, i) => (
+                  <li key={`${i}-${p.name}`}>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setCurrent(i);
+                        setNotice(null);
+                      }}
+                      aria-current={current === i ? "step" : undefined}
+                      className={`h-11 px-4 rounded-full border text-[13px] font-semibold inline-flex items-center gap-1.5 whitespace-nowrap ${
+                        current === i
+                          ? "bg-primary-container border-primary-container text-white"
+                          : "bg-surface-container-lowest border-outline-variant text-on-surface-variant hover:text-on-surface"
+                      }`}
+                    >
+                      {notes[i] && (
+                        <span className="material-symbols-outlined text-[16px]" aria-label={t.rated}>
+                          check_circle
+                        </span>
+                      )}
+                      {t.glass(i + 1)}
+                    </button>
+                  </li>
+                ))}
+              </ol>
+            </nav>
+          )}
+
+          {product && story && (
             <AudioGuidePlayer
-              title={`Guía de Cata: ${currentWine.name}`}
-              storyText={currentWine.audioStory || "Disfruta de este recorrido aromático guiado por la bodega."}
+              lang={lang}
+              title={product.name}
+              storyText={story}
+              guideName={guide?.name}
+              guideRole={guide?.role}
+              textLang={demo ? lang : "es"}
             />
+          )}
 
-            {/* Interactive Sensory Sheet & Aroma Wheel */}
+          {product && product.aromaProfile.length > 0 && (
+            <div className="rounded-2xl border border-outline-variant bg-surface-container-low p-5">
+              <p className="text-[13px] font-semibold">{t.sommelierNotes}</p>
+              <ul className="mt-3 flex flex-wrap gap-2">
+                {product.aromaProfile.map((a) => (
+                  <li key={a} className="rounded-full bg-surface-container-lowest border border-outline-variant px-3 py-1 text-[13px]">
+                    {a}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          {product && (
             <SensoryWheel
-              key={currentWineIndex}
-              wineName={currentWine.name}
-              wineVintage={currentWine.vintage}
-              wineType={currentWine.type}
-              onSave={handleSaveNote}
+              key={`${current}-${notes[current] ? "saved" : "new"}`}
+              lang={lang}
+              productName={product.name}
+              productVintage={product.vintage}
+              productType={product.type}
+              glassNumber={current + 1}
+              initialData={notes[current]}
+              saving={saving}
+              onSave={saveNote}
             />
-          </div>
-        ) : (
-          <div className="space-y-8 animate-fade-in-up">
-            <div className="text-center mb-4">
-              <span className="text-xs uppercase font-bold tracking-widest text-emerald-700 bg-emerald-50 px-3 py-1 rounded-full">
-                ✓ Experiencia Completada
-              </span>
-              <h2 className="font-serif text-2xl sm:text-3xl font-bold text-on-surface mt-2">
-                Tu Certificado de Degustador
-              </h2>
-              <p className="text-xs text-on-surface-variant max-w-md mx-auto mt-1">
-                Has calificado con éxito todos los vinos de la experiencia. Guarda tu pasaporte oficial o compártelo en tus historias.
-              </p>
-            </div>
+          )}
 
-            <CertificateGenerator
-              attendeeName={reservation?.customerName || "Catador Distinguido"}
-              tastingTitle={tasting?.title || "Cata de Vinos Premium"}
-              tastingDate={reservation?.tastingDate || "24 de Octubre de 2026"}
-              averageScore={94}
-              certificateCode={reservation?.code || "#EO-8492A"}
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-3 rounded-2xl border border-outline-variant bg-surface-container-lowest p-4">
+            <p className="text-[14px] text-on-surface-variant">{t.progress(ratedCount, products.length)}</p>
+            <button
+              type="button"
+              disabled={ratedCount === 0}
+              onClick={() => {
+                setView("certificate");
+                setNotice(null);
+                window.scrollTo({ top: 0, behavior: "smooth" });
+              }}
+              className="w-full sm:w-auto h-12 px-5 rounded bg-primary-container hover:bg-primary text-white text-[14px] font-semibold inline-flex items-center justify-center gap-2 disabled:opacity-50"
+            >
+              <span className="material-symbols-outlined text-[20px]" aria-hidden="true">workspace_premium</span>
+              {t.seeCertificate}
+            </button>
+          </div>
+        </div>
+      ) : (
+        <div className="mt-8 space-y-6">
+          <div className="text-center">
+            <h2 className="font-serif text-2xl sm:text-3xl">{t.certificateTitle}</h2>
+            <p className="mt-2 text-[14px] text-on-surface-variant max-w-md mx-auto">{t.certificateText}</p>
+          </div>
+
+          <div className="max-w-md mx-auto">
+            <label htmlFor="cert-name" className="block text-[13px] font-semibold mb-1.5">
+              {t.certificateName}
+            </label>
+            <input
+              id="cert-name"
+              type="text"
+              value={certName}
+              maxLength={80}
+              onChange={(e) => setCertName(e.target.value)}
+              placeholder={t.certificateNamePlaceholder}
+              aria-describedby="cert-name-hint"
+              className="w-full h-12 rounded border border-outline-variant bg-surface-container-lowest px-3.5 text-[16px] focus:border-primary-container focus:outline-none"
             />
-
-            <div className="text-center pt-4">
-              <button
-                onClick={() => setShowCertificate(false)}
-                className="text-xs font-bold uppercase tracking-wider text-secondary hover:text-primary underline"
-              >
-                ← Volver a editar notas de cata
-              </button>
-            </div>
+            <p id="cert-name-hint" className="mt-1 text-[12px] text-on-surface-variant">
+              {t.certificateNameHint}
+            </p>
           </div>
-        )}
 
-        <TerroirDivider className="my-14" />
+          <CertificateGenerator
+            lang={lang}
+            attendeeName={certName.trim() || t.certificateNamePlaceholder}
+            tastingTitle={title}
+            tastingDate={dateLabel}
+            averageScore={summary.average}
+            glassesRated={ratedCount}
+            featuredAromas={summary.aromas}
+            certificateCode={ticket.code}
+            signers={guides}
+            demo={demo}
+          />
 
-        <div className="flex justify-between items-center text-xs text-secondary">
-          <Link href={`/confirmacion/${reservation?.id || "res-1"}?token=${token}`} className="hover:text-primary underline">
-            ← Volver a mi Ticket QR
+          <div className="text-center">
+            <button
+              type="button"
+              onClick={() => setView("sheet")}
+              className="inline-flex items-center gap-1 min-h-11 text-[14px] font-semibold text-on-surface-variant hover:text-primary-container"
+            >
+              <span className="material-symbols-outlined text-[18px]" aria-hidden="true">arrow_back</span>
+              {t.backToSheet}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {!demo && (
+        <div className="mt-12 pt-6 border-t border-outline-variant flex flex-col sm:flex-row justify-between gap-2 text-[14px] font-semibold">
+          <Link href={`/verificar/${token}`} className="inline-flex items-center gap-1.5 min-h-11 hover:text-primary-container">
+            <span className="material-symbols-outlined text-[18px]" aria-hidden="true">qr_code_2</span>
+            {t.myTicket}
           </Link>
-          <Link href={`/recuerdos/${tasting?.id || "tasting-1"}`} className="hover:text-primary underline">
-            Ver fotos del evento →
+          <Link href={`/recuerdos/${encodeURIComponent(ticket.tastingId)}`} className="inline-flex items-center gap-1.5 min-h-11 hover:text-primary-container">
+            <span className="material-symbols-outlined text-[18px]" aria-hidden="true">photo_library</span>
+            {t.photos}
           </Link>
         </div>
-      </main>
-
-      <Footer />
-    </div>
+      )}
+    </>
   );
 }

@@ -1,182 +1,191 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
-import { TerroirDivider } from "@/components/TerroirDivider";
-import { TastingCard } from "@/components/TastingCard";
-import { Tasting } from "@/types";
-import { translations, Language } from "@/lib/i18n";
+import { PageHeader } from "@/components/Brand";
+import { TastingCard, TastingsEmptyState, TastingsLoadError, useBcvRates } from "@/components/TastingCard";
+import type { Tasting, TastingCategory } from "@/types";
+import { translations } from "@/lib/i18n";
+import { useLang } from "@/lib/useLang";
+import { useDocumentTitle } from "@/lib/useDocumentTitle";
+
+type LoadState = "loading" | "ready" | "error";
+
+/** Minúsculas y sin acentos, para que "degustacion" encuentre "Degustación". */
+const normalize = (s: string) =>
+  s
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "");
 
 export default function CatasCatalogPage() {
-  const [lang, setLang] = useState<Language>("es");
-  const [tastings, setTastings] = useState<Tasting[]>([]);
-  const [filteredTastings, setFilteredTastings] = useState<Tasting[]>([]);
-  const [categoryFilter, setCategoryFilter] = useState<string>("all");
-  const [searchQuery, setSearchQuery] = useState<string>("");
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    const saved = localStorage.getItem("el_origen_lang") as Language | null;
-    if (saved === "en" || saved === "es") {
-      setLang(saved);
-    }
-  }, []);
-
-  const handleLanguageChange = (newLang: Language) => {
-    setLang(newLang);
-    localStorage.setItem("el_origen_lang", newLang);
-  };
-
+  const [lang, setLang] = useLang();
+  useDocumentTitle(lang, { es: "Próximas catas guiadas", en: "Upcoming guided tastings" });
   const t = translations[lang];
 
-  useEffect(() => {
-    async function loadTastings() {
-      try {
-        const res = await fetch("/api/tastings");
-        const data = await res.json();
-        if (data.success) {
-          setTastings(data.tastings);
-          setFilteredTastings(data.tastings);
-        }
-      } catch {
-        // fallback
-      } finally {
-        setLoading(false);
-      }
+  const [tastings, setTastings] = useState<Tasting[]>([]);
+  const [status, setStatus] = useState<LoadState>("loading");
+  const [categoryFilter, setCategoryFilter] = useState<TastingCategory | "all">("all");
+  const [searchQuery, setSearchQuery] = useState("");
+  const rates = useBcvRates();
+
+  const loadTastings = useCallback(async () => {
+    setStatus("loading");
+    try {
+      const res = await fetch("/api/tastings");
+      const data = await res.json();
+      if (!res.ok || !data.success) throw new Error(data.message);
+      setTastings(Array.isArray(data.tastings) ? data.tastings : []);
+      setStatus("ready");
+    } catch {
+      setStatus("error");
     }
-    loadTastings();
   }, []);
 
   useEffect(() => {
-    let result = tastings;
-    if (categoryFilter !== "all") {
-      result = result.filter((t) => t.category === categoryFilter);
-    }
-    if (searchQuery.trim()) {
-      const q = searchQuery.toLowerCase();
-      result = result.filter(
-        (t) =>
-          t.title.toLowerCase().includes(q) ||
-          t.description.toLowerCase().includes(q) ||
-          t.dateDisplay.toLowerCase().includes(q)
-      );
-    }
-    setFilteredTastings(result);
-  }, [categoryFilter, searchQuery, tastings]);
+    loadTastings();
+  }, [loadTastings]);
 
-  const categories = [
-    { id: "all", label: t.catalog.filterAll },
-    { id: "reserva", label: t.catalog.filterReserva },
-    { id: "atardecer", label: t.catalog.filterSunset },
-    { id: "blancos", label: t.catalog.filterWhites },
-  ];
+  // Solo se ofrecen como filtro las categorías que tienen catas publicadas.
+  const categories = useMemo(() => {
+    const present = Array.from(new Set(tastings.map((x) => x.category)));
+    return present.length > 1 ? present : [];
+  }, [tastings]);
+
+  const filteredTastings = useMemo(() => {
+    const q = normalize(searchQuery.trim());
+    return tastings.filter((x) => {
+      if (categoryFilter !== "all" && x.category !== categoryFilter) return false;
+      if (!q) return true;
+      const haystack = [
+        x.title,
+        x.subtitle ?? "",
+        x.description,
+        x.dateDisplay,
+        x.dateFull,
+        x.location,
+        x.sommelier?.name ?? "",
+        ...(x.wines ?? []).map((w) => `${w.name} ${w.type}`),
+      ].join(" ");
+      return normalize(haystack).includes(q);
+    });
+  }, [tastings, categoryFilter, searchQuery]);
+
+  const resetFilters = () => {
+    setCategoryFilter("all");
+    setSearchQuery("");
+  };
+
+  const hasTastings = status === "ready" && tastings.length > 0;
 
   return (
-    <div className="bg-background text-on-background min-h-screen flex flex-col selection:bg-primary/10 selection:text-primary">
-      <Navbar currentLang={lang} onLanguageChange={handleLanguageChange} />
+    <div className="bg-background text-on-background min-h-screen flex flex-col">
+      <Navbar currentLang={lang} onLanguageChange={setLang} />
 
-      <main className="flex-grow py-16 sm:py-24 px-5 sm:px-8 lg:px-12 max-w-[1320px] mx-auto w-full">
-        {/* Header */}
-        <div className="text-center max-w-3xl mx-auto mb-16">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-black/[0.03] border border-black/[0.06] mb-4">
-            <span className="text-[10px] font-semibold uppercase tracking-[0.2em] text-primary">
-              {t.catalog.badge}
-            </span>
-          </div>
-          <h1 className="font-serif text-4xl sm:text-5xl md:text-6xl font-semibold text-on-surface tracking-tight mb-5">
-            {t.catalog.title}
-          </h1>
-          <p className="text-[14px] sm:text-base text-on-surface-variant/80 max-w-xl mx-auto leading-relaxed">
-            {t.catalog.subtitle}
-          </p>
-        </div>
+      <main className="flex-grow">
+        <PageHeader eyebrow={t.catalog.badge} title={t.catalog.title} subtitle={t.catalog.subtitle} />
 
-        {/* Filter Bar (Floating Island Pill design) */}
-        <div className="flex flex-col md:flex-row gap-4 items-center justify-between mb-12 p-2 rounded-2xl sm:rounded-full bg-black/[0.02] border border-black/[0.05]">
-          {/* Category Pills */}
-          <div className="flex flex-wrap gap-1.5 w-full md:w-auto">
-            {categories.map((cat) => (
-              <button
-                key={cat.id}
-                onClick={() => setCategoryFilter(cat.id)}
-                className={`px-4 py-2 rounded-full text-[12px] font-medium transition-all duration-300 ${
-                  categoryFilter === cat.id
-                    ? "bg-primary-container text-white shadow-sm"
-                    : "text-on-surface-variant hover:text-primary hover:bg-black/[0.04]"
-                }`}
-              >
-                {cat.label}
-              </button>
-            ))}
-          </div>
+        <div className="px-5 sm:px-8 lg:px-12 max-w-[1320px] mx-auto w-full pt-10 sm:pt-14 pb-24">
+          {/* Filtros (solo cuando hay catas que filtrar) */}
+          {hasTastings && (
+            <div className="flex flex-col md:flex-row gap-5 md:items-center justify-between mb-10 pb-6 border-b border-outline-variant">
+              {categories.length > 0 ? (
+                <div
+                  className="flex gap-2 overflow-x-auto -mx-5 px-5 md:mx-0 md:px-0 md:flex-wrap"
+                  role="group"
+                  aria-label={t.catalog.filterLabel}
+                >
+                  {(["all", ...categories] as const).map((id) => {
+                    const active = categoryFilter === id;
+                    return (
+                      <button
+                        key={id}
+                        type="button"
+                        aria-pressed={active}
+                        onClick={() => setCategoryFilter(id)}
+                        className={`h-11 px-4 whitespace-nowrap rounded-full border text-[13px] font-medium transition-colors ${
+                          active
+                            ? "bg-primary-container border-primary-container text-white"
+                            : "border-outline-variant text-on-surface-variant hover:border-primary-container hover:text-primary-container"
+                        }`}
+                      >
+                        {id === "all" ? t.catalog.filterAll : t.categories[id] ?? id}
+                      </button>
+                    );
+                  })}
+                </div>
+              ) : (
+                <p className="text-[14px] text-on-surface-variant" aria-live="polite">
+                  {t.catalog.count(filteredTastings.length)}
+                </p>
+              )}
 
-          {/* Search input */}
-          <div className="relative w-full md:w-72">
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder={t.catalog.searchPlaceholder}
-              className="w-full bg-white border border-black/[0.06] rounded-full pl-9 pr-4 py-2 text-[12px] text-on-surface focus:border-primary focus:outline-none transition-colors"
-            />
-            <span className="material-symbols-outlined absolute left-3 top-2.5 text-on-surface-variant/50 text-[16px]">
-              search
-            </span>
-          </div>
-        </div>
-
-        {/* Tastings Grid */}
-        {loading ? (
-          <div className="flex items-center justify-center py-24 text-on-surface-variant/60 text-xs">
-            <span className="material-symbols-outlined animate-spin text-xl mr-2">progress_activity</span>
-            {t.catalog.loading}
-          </div>
-        ) : filteredTastings.length === 0 ? (
-          <div className="text-center py-20 bg-white rounded-3xl border border-black/[0.05] p-8">
-            <span className="material-symbols-outlined text-4xl text-primary/40 mb-3">wine_bar</span>
-            <h3 className="font-serif text-xl font-semibold text-on-surface mb-1">{t.catalog.noResultsTitle}</h3>
-            <p className="text-[13px] text-on-surface-variant/70 mb-4">{t.catalog.noResultsSubtitle}</p>
-            <button
-              onClick={() => {
-                setCategoryFilter("all");
-                setSearchQuery("");
-              }}
-              className="text-[12px] font-semibold text-primary underline"
-            >
-              {t.catalog.resetFilters}
-            </button>
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8">
-            {filteredTastings.map((tasting) => (
-              <TastingCard key={tasting.id} tasting={tasting} currentLang={lang} />
-            ))}
-          </div>
-        )}
-
-        <TerroirDivider className="my-20" />
-
-        {/* Private Inquiries Banner in Double-Bezel */}
-        <div className="p-2 sm:p-2.5 rounded-[2.5rem] bg-black/[0.02] border border-black/[0.05]">
-          <div className="bg-white rounded-[calc(2.5rem-0.625rem)] p-8 sm:p-12 flex flex-col md:flex-row items-center justify-between gap-8">
-            <div className="space-y-2 text-center md:text-left">
-              <h3 className="font-serif text-2xl sm:text-3xl font-semibold text-on-surface tracking-tight">
-                {t.catalog.privateTitle}
-              </h3>
-              <p className="text-[13px] sm:text-sm text-on-surface-variant/80 max-w-xl">
-                {t.catalog.privateSubtitle}
-              </p>
+              <label className="relative w-full md:w-80">
+                <span className="sr-only">{t.catalog.searchPlaceholder}</span>
+                <span
+                  className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant text-[18px]"
+                  aria-hidden="true"
+                >
+                  search
+                </span>
+                <input
+                  type="search"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder={t.catalog.searchPlaceholder}
+                  className="w-full h-11 bg-surface-container-lowest border border-outline-variant rounded pl-10 pr-4 text-[14px] text-on-surface placeholder:text-on-surface-variant/70 focus:border-primary-container focus:outline-none transition-colors"
+                />
+              </label>
             </div>
-            <a
+          )}
+
+          {status === "loading" ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6" aria-busy="true" aria-label={t.catalog.loading}>
+              {[0, 1, 2].map((i) => (
+                <div key={i} className="h-[520px] rounded-xl border border-outline-variant bg-surface-container-low animate-pulse" />
+              ))}
+            </div>
+          ) : status === "error" ? (
+            <TastingsLoadError lang={lang} onRetry={loadTastings} headingLevel="h2" />
+          ) : tastings.length === 0 ? (
+            <TastingsEmptyState lang={lang} headingLevel="h2" />
+          ) : filteredTastings.length === 0 ? (
+            <div className="text-center py-20 px-6 border border-dashed border-outline-variant rounded-xl">
+              <span className="material-symbols-outlined text-4xl text-primary-container/50" aria-hidden="true">wine_bar</span>
+              <h2 className="font-serif text-2xl text-on-surface mt-3">{t.catalog.noResultsTitle}</h2>
+              <p className="text-[14px] text-on-surface-variant mt-1 mb-5">{t.catalog.noResultsSubtitle}</p>
+              <button
+                type="button"
+                onClick={resetFilters}
+                className="min-h-[44px] px-2 text-[14px] font-semibold text-primary-container underline underline-offset-4"
+              >
+                {t.catalog.resetFilters}
+              </button>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8">
+              {filteredTastings.map((tasting) => (
+                <TastingCard key={tasting.id} tasting={tasting} currentLang={lang} rates={rates} />
+              ))}
+            </div>
+          )}
+
+          {/* Experiencias privadas */}
+          <div className="mt-24 rounded-2xl bg-primary-container text-paper p-8 sm:p-12 flex flex-col md:flex-row md:items-center justify-between gap-8">
+            <div className="max-w-2xl">
+              <p className="eyebrow !text-tertiary-fixed-dim mb-4">{t.catalog.privateBadge}</p>
+              <h2 className="font-serif text-3xl sm:text-4xl leading-tight text-balance">{t.catalog.privateTitle}</h2>
+              <p className="mt-4 text-[15px] text-paper/80 leading-relaxed">{t.catalog.privateSubtitle}</p>
+            </div>
+            <Link
               href="/privadas"
-              className="group inline-flex items-center gap-3 bg-primary-container hover:bg-primary text-white text-[12px] font-semibold pl-5 pr-2 py-2 rounded-full transition-all duration-300 shadow-sm flex-shrink-0"
+              className="inline-flex items-center justify-center gap-2 h-[52px] px-7 bg-paper text-primary hover:bg-white text-[14px] font-semibold rounded transition-colors flex-shrink-0"
             >
-              <span>{t.catalog.privateCta}</span>
-              <span className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center transition-transform group-hover:translate-x-0.5">
-                <span className="material-symbols-outlined text-[16px]">arrow_forward</span>
-              </span>
-            </a>
+              {t.catalog.privateCta}
+              <span className="material-symbols-outlined text-[18px]" aria-hidden="true">arrow_forward</span>
+            </Link>
           </div>
         </div>
       </main>

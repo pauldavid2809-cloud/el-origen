@@ -1,27 +1,20 @@
 import { NextResponse } from "next/server";
-import { db } from "@/lib/db";
+import { tastingsWithAvailability } from "@/lib/availability";
 
-export async function GET() {
+export const dynamic = "force-dynamic";
+
+/**
+ * Catas publicadas (activas y agotadas) con su disponibilidad real, próximas primero.
+ * Por defecto solo de hoy en adelante; `?past=1` incluye también las ya realizadas.
+ * (Las catas se crean y editan desde el panel: `/api/admin/catas`.)
+ */
+export async function GET(request: Request) {
+  const includePast = new URL(request.url).searchParams.get("past") === "1";
   try {
-    const tastings = await db.getTastings();
+    const tastings = await tastingsWithAvailability({ upcomingOnly: !includePast });
     return NextResponse.json({ success: true, tastings });
   } catch (error) {
-    return NextResponse.json(
-      { success: false, error: (error as Error).message },
-      { status: 500 }
-    );
-  }
-}
-
-export async function POST(request: Request) {
-  try {
-    const body = await request.json();
-    const newTasting = await db.createTasting(body);
-    return NextResponse.json({ success: true, tasting: newTasting });
-  } catch (error) {
-    return NextResponse.json(
-      { success: false, error: (error as Error).message },
-      { status: 400 }
-    );
+    console.error("[tastings] No se pudieron leer las catas:", error);
+    return NextResponse.json({ success: false, message: "No se pudieron cargar las catas." }, { status: 500 });
   }
 }

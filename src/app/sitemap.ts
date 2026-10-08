@@ -1,84 +1,44 @@
 import { MetadataRoute } from "next";
-import { db } from "@/lib/db";
+import { listCatas } from "@/lib/catas";
+
+export const dynamic = "force-dynamic";
+
+const SITE_URL = (process.env.NEXT_PUBLIC_APP_URL || "https://el-origen-two.vercel.app").replace(/\/+$/, "");
+
+type ChangeFrequency = NonNullable<MetadataRoute.Sitemap[number]["changeFrequency"]>;
+
+/* El idioma se elige en el navegador (misma URL para ES y EN). */
+const entry = (path: string, changeFrequency: ChangeFrequency, priority: number, lastModified = new Date()) => {
+  const url = `${SITE_URL}${path}`;
+  return { url, lastModified, changeFrequency, priority, alternates: { languages: { es: url, en: url } } };
+};
+
+/** Páginas públicas indexables (sin cuentas, órdenes, entradas, puerta ni panel). */
+const STATIC_PAGES: [path: string, changeFrequency: ChangeFrequency, priority: number][] = [
+  ["", "daily", 1],
+  ["/catas", "daily", 0.95],
+  ["/privadas", "monthly", 0.85],
+  ["/alianzas", "monthly", 0.8],
+  ["/nosotros", "monthly", 0.8],
+  ["/sommeliers", "monthly", 0.7],
+  ["/registro", "yearly", 0.5],
+  ["/privacidad", "yearly", 0.3],
+  ["/terminos", "yearly", 0.3],
+];
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  const baseUrl = "https://el-origen-two.vercel.app";
+  const pages = STATIC_PAGES.map(([path, freq, priority]) => entry(path, freq, priority));
 
-  let tastingUrls: MetadataRoute.Sitemap = [];
+  let catas: MetadataRoute.Sitemap = [];
   try {
-    const tastings = await db.getTastings();
-    tastingUrls = tastings.map((t) => ({
-      url: `${baseUrl}/catas/${t.slug || t.id}`,
-      lastModified: new Date(),
-      changeFrequency: "weekly" as const,
-      priority: 0.9,
-      alternates: {
-        languages: {
-          es: `${baseUrl}/catas/${t.slug || t.id}`,
-          en: `${baseUrl}/catas/${t.slug || t.id}`,
-        },
-      },
-    }));
-  } catch {
-    // fallback if db error
+    // Solo catas publicadas (activas o agotadas) de hoy en adelante.
+    const tastings = await listCatas({ upcomingOnly: true });
+    catas = tastings.map((t) =>
+      entry(`/catas/${t.slug || t.id}`, "weekly", 0.9, new Date(t.updatedAt || t.createdAt || Date.now()))
+    );
+  } catch (error) {
+    console.error("[sitemap] No se pudieron leer las catas:", error);
   }
 
-  const staticUrls: MetadataRoute.Sitemap = [
-    {
-      url: baseUrl,
-      lastModified: new Date(),
-      changeFrequency: "daily" as const,
-      priority: 1.0,
-      alternates: {
-        languages: {
-          es: baseUrl,
-          en: baseUrl,
-        },
-      },
-    },
-    {
-      url: `${baseUrl}/catas`,
-      lastModified: new Date(),
-      changeFrequency: "daily" as const,
-      priority: 0.95,
-      alternates: {
-        languages: {
-          es: `${baseUrl}/catas`,
-          en: `${baseUrl}/catas`,
-        },
-      },
-    },
-    {
-      url: `${baseUrl}/nosotros`,
-      lastModified: new Date(),
-      changeFrequency: "monthly" as const,
-      priority: 0.8,
-      alternates: {
-        languages: {
-          es: `${baseUrl}/nosotros`,
-          en: `${baseUrl}/nosotros`,
-        },
-      },
-    },
-    {
-      url: `${baseUrl}/privadas`,
-      lastModified: new Date(),
-      changeFrequency: "monthly" as const,
-      priority: 0.85,
-      alternates: {
-        languages: {
-          es: `${baseUrl}/privadas`,
-          en: `${baseUrl}/privadas`,
-        },
-      },
-    },
-    {
-      url: `${baseUrl}/cata-en-vivo/tok-demo-1234`,
-      lastModified: new Date(),
-      changeFrequency: "monthly" as const,
-      priority: 0.7,
-    },
-  ];
-
-  return [...staticUrls, ...tastingUrls];
+  return [...pages, ...catas];
 }

@@ -1,3 +1,32 @@
+export type TastingCategory = "degustacion" | "reserva" | "atardecer" | "blancos" | "privada" | "icono";
+export type TastingStatus = "active" | "sold_out" | "draft" | "archived";
+/** Tasa BCV con la que se calcula el monto en bolívares de una cata. */
+export type RateCurrency = "USD" | "EUR";
+
+/** Producto a degustar (vino, destilado, cocuy…). */
+export interface TastingProduct {
+  name: string;
+  vintage: string;
+  type: string;
+  description: string;
+  aromaProfile: string[];
+  audioStory?: string;
+}
+
+/** Adicional que el admin define para una cata concreta (botella, producto…). */
+export interface TastingAddOn {
+  id: string;
+  title: string;
+  description?: string;
+  priceUsd: number;
+}
+
+/** Usuario de Instagram que se muestra en la cata (sommelier, aliado…). */
+export interface TastingInstagram {
+  handle: string; // "@usuario"
+  label?: string;
+}
+
 export interface Tasting {
   id: string;
   slug: string;
@@ -6,36 +35,43 @@ export interface Tasting {
   description: string;
   date: string; // YYYY-MM-DD
   dateDisplay: string; // e.g. "24 OCT"
-  dateFull: string; // e.g. "Sábado, 24 de Octubre de 2024"
+  dateFull: string; // e.g. "Sábado, 24 de octubre de 2026"
   timeStart: string; // e.g. "18:00"
   timeEnd: string; // e.g. "20:30"
   location: string;
-  price: number; // in CLP / ARS / USD representation, e.g., 45000
-  priceFormatted: string; // e.g. "$45.000"
+  locationAddress?: string;
+  /** Enlace de Google Maps (GPS del sitio). */
+  mapsUrl?: string;
+  /** Precio por cupo en divisa. Igual a `priceUsd` (se conserva por compatibilidad). */
+  price: number;
+  priceUsd: number;
+  priceFormatted: string; // e.g. "$55 USD"
+  rateCurrency: RateCurrency;
   totalSpots: number;
   availableSpots: number;
   imageUrl: string;
   imageAlt: string;
-  category: "reserva" | "atardecer" | "blancos" | "privada" | "icono";
-  wines: {
-    name: string;
-    vintage: string;
-    type: string;
-    description: string;
-    aromaProfile: string[];
-    audioStory?: string;
-  }[];
+  category: TastingCategory;
+  /** Productos a degustar. */
+  wines: TastingProduct[];
+  /** Armonías / menú. */
   pairings: string[];
+  sommelierIds: string[];
+  /** Primer sommelier seleccionado (compatibilidad). Campos vacíos si la cata no tiene sommelier. */
   sommelier: {
     name: string;
     role: string;
     bio: string;
     avatarUrl: string;
   };
-  status: "active" | "sold_out" | "draft" | "archived";
+  instagram: TastingInstagram[];
+  addOns: TastingAddOn[];
+  status: TastingStatus;
   createdAt: string;
+  updatedAt?: string;
 }
 
+/** @deprecated Los adicionales ahora son por cata: use `TastingAddOn`. */
 export interface AddOn {
   id: string;
   title: string;
@@ -46,45 +82,13 @@ export interface AddOn {
   category: "bottle" | "transport" | "pairing" | "experience";
 }
 
+/** @deprecated Use `Coupon` de `@/lib/coupons`. */
 export interface Coupon {
   code: string;
   discountPercent?: number;
   discountAmount?: number;
   description: string;
   active: boolean;
-}
-
-export interface Reservation {
-  id: string;
-  token: string;
-  code: string; // e.g. "#EO-8492A"
-  tastingId: string;
-  tastingTitle: string;
-  tastingDate: string;
-  tastingTime: string;
-  customerName: string;
-  customerEmail: string;
-  customerPhone: string;
-  spotsCount: number;
-  dietaryRestrictions?: string;
-  selectedAddOns: {
-    id: string;
-    title: string;
-    price: number;
-    quantity: number;
-  }[];
-  subtotal: number;
-  discountAmount: number;
-  couponCode?: string;
-  totalAmount: number;
-  paymentMethod: "stripe" | "bank_transfer" | "test";
-  paymentStatus: "paid" | "pending_transfer" | "cancelled";
-  transferReceiptUrl?: string;
-  checkinStatus: "pending" | "checked_in";
-  checkedInAt?: string;
-  checkedInBy?: string;
-  createdAt: string;
-  notes?: string;
 }
 
 export interface TastingSensoryNote {

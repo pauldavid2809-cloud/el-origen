@@ -1,331 +1,324 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { TerroirDivider } from "@/components/TerroirDivider";
-import { QRScannerModal } from "@/components/QRScannerModal";
-import { Tasting, Reservation } from "@/types";
+
+interface Stats {
+  persistent: boolean;
+  orders: { inReview: number; pendingPayment: number };
+  sales: { approvedOrders: number; approvedSpots: number; approvedUsd: number; last30DaysUsd: number; last30DaysSpots: number };
+  tickets: { issued: number; checkedIn: number };
+  upcoming: {
+    id: string;
+    slug: string;
+    title: string;
+    dateDisplay: string;
+    timeStart: string;
+    status: "active" | "sold_out" | "draft" | "archived";
+    totalSpots: number;
+    heldSpots: number;
+    approvedSpots: number;
+    availableSpots: number;
+    approvedUsd: number;
+  }[];
+  members: { total: number; last7Days: number };
+  leads: { private: number; brand: number; sommelier: number };
+  recentOrders: {
+    code: string;
+    customerName: string;
+    tastingTitle: string;
+    tastingDate: string;
+    spotsCount: number;
+    totalUsd: number;
+    status: string;
+    createdAt: string;
+  }[];
+}
+
+const ORDER_STATUS: Record<string, { label: string; cls: string }> = {
+  pending_payment: { label: "Sin pago", cls: "bg-surface-container-high text-on-surface-variant" },
+  in_review: { label: "Por revisar", cls: "bg-tertiary-fixed text-on-tertiary-fixed-variant" },
+  approved: { label: "Aprobada", cls: "bg-emerald-100 text-emerald-900" },
+  rejected: { label: "Rechazada", cls: "bg-error-container text-on-error-container" },
+  cancelled: { label: "Anulada", cls: "bg-surface-container-high text-on-surface-variant" },
+};
+
+const usd = (n: number) => `$${n.toLocaleString("en-US", { minimumFractionDigits: Number.isInteger(n) ? 0 : 2, maximumFractionDigits: 2 })}`;
+const when = (iso: string) =>
+  new Date(iso).toLocaleString("es-VE", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" });
 
 export default function AdminDashboardPage() {
-  const [tastings, setTastings] = useState<Tasting[]>([]);
-  const [reservations, setReservations] = useState<Reservation[]>([]);
-  const [isScannerOpen, setIsScannerOpen] = useState(false);
+  const [stats, setStats] = useState<Stats | null>(null);
+  const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    async function loadData() {
-      try {
-        const [tRes, rRes] = await Promise.all([
-          fetch("/api/tastings"),
-          fetch("/api/verify?all=true").catch(() => null),
-        ]);
-        const tData = await tRes.json();
-        if (tData.success) {
-          setTastings(tData.tastings);
-        }
-
-        // Mock reservations if api not returning all
-        setReservations([
-          {
-            id: "res-1",
-            token: "tok-carlos-mendoza-8492",
-            code: "#EO-8492A",
-            tastingId: "tasting-malbec-reserva",
-            tastingTitle: "Cata Malbec Reserva",
-            tastingDate: "24 OCT",
-            tastingTime: "18:00",
-            customerName: "Carlos Mendoza",
-            customerEmail: "carlos@ejemplo.com",
-            customerPhone: "+54 9 261 455-8822",
-            spotsCount: 2,
-            selectedAddOns: [],
-            subtotal: 90000,
-            discountAmount: 0,
-            totalAmount: 90000,
-            paymentMethod: "stripe",
-            paymentStatus: "paid",
-            checkinStatus: "checked_in",
-            createdAt: "Hace 2 horas",
-          },
-          {
-            id: "res-2",
-            token: "tok-lucia-ferreyra-7193",
-            code: "#EO-7193B",
-            tastingId: "tasting-atardecer-vinedo",
-            tastingTitle: "Atardecer en el Viñedo",
-            tastingDate: "28 OCT",
-            tastingTime: "17:30",
-            customerName: "Lucía Ferreyra",
-            customerEmail: "lucia@ejemplo.com",
-            customerPhone: "+54 9 11 3499-1122",
-            spotsCount: 2,
-            selectedAddOns: [],
-            subtotal: 70000,
-            discountAmount: 0,
-            totalAmount: 70000,
-            paymentMethod: "stripe",
-            paymentStatus: "paid",
-            checkinStatus: "checked_in",
-            createdAt: "Hoy, 10:30",
-          },
-          {
-            id: "res-3",
-            token: "tok-martin-rossi-6204",
-            code: "#EO-6204C",
-            tastingId: "tasting-blancos-altura",
-            tastingTitle: "Blancos de Altura",
-            tastingDate: "02 NOV",
-            tastingTime: "11:00",
-            customerName: "Martín Rossi",
-            customerEmail: "martin@ejemplo.com",
-            customerPhone: "+54 9 261 887-1234",
-            spotsCount: 1,
-            selectedAddOns: [],
-            subtotal: 40000,
-            discountAmount: 0,
-            totalAmount: 40000,
-            paymentMethod: "bank_transfer",
-            paymentStatus: "pending_transfer",
-            checkinStatus: "pending",
-            createdAt: "Ayer",
-          },
-          {
-            id: "res-4",
-            token: "tok-ana-gimenez-5109",
-            code: "#EO-5109D",
-            tastingId: "tasting-malbec-reserva",
-            tastingTitle: "Cata Malbec Reserva",
-            tastingDate: "24 OCT",
-            tastingTime: "18:00",
-            customerName: "Ana P. Giménez",
-            customerEmail: "ana.g@ejemplo.com",
-            customerPhone: "+54 9 261 990-4411",
-            spotsCount: 2,
-            selectedAddOns: [],
-            subtotal: 90000,
-            discountAmount: 0,
-            totalAmount: 90000,
-            paymentMethod: "stripe",
-            paymentStatus: "paid",
-            checkinStatus: "pending",
-            createdAt: "Ayer",
-          },
-        ]);
-      } catch {
-        // ignore
-      } finally {
-        setLoading(false);
-      }
+  const load = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/admin/stats", { cache: "no-store" });
+      const data = await res.json();
+      if (!data.success) throw new Error(data.message);
+      setStats(data);
+    } catch (err) {
+      setError((err as Error).message || "No se pudo cargar el resumen.");
+    } finally {
+      setLoading(false);
     }
-    loadData();
   }, []);
 
-  const totalSpotsSold = 124;
-  const totalRevenue = "$4.500.000";
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  const newLeads = stats ? stats.leads.private + stats.leads.brand + stats.leads.sommelier : 0;
 
   return (
-    <div className="p-6 sm:p-10 max-w-7xl mx-auto space-y-8">
-      {/* Header */}
-      <header className="flex flex-col sm:flex-row justify-between items-start sm:items-end gap-4 border-b border-surface-variant pb-6">
+    <div className="p-5 sm:p-8 lg:p-10 max-w-6xl mx-auto space-y-8">
+      <header className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
         <div>
-          <p className="text-xs uppercase font-bold tracking-[0.2em] text-secondary mb-1">
-            Resumen Mensual
-          </p>
-          <h2 className="font-serif text-2xl sm:text-3xl font-bold text-on-surface">
-            Panorama General
-          </h2>
+          <p className="eyebrow mb-2">Panel</p>
+          <h1 className="font-serif text-3xl sm:text-4xl">Resumen</h1>
         </div>
-        <div className="flex flex-wrap gap-3">
+        <div className="flex flex-wrap gap-2">
           <button
-            onClick={() => setIsScannerOpen(true)}
-            className="flex items-center gap-2 px-4 py-2.5 bg-primary-container text-white rounded-xl text-xs font-bold uppercase tracking-wider hover:bg-primary transition-all shadow-sm"
+            type="button"
+            onClick={load}
+            className="h-11 px-4 rounded border border-outline-variant text-[14px] font-semibold inline-flex items-center gap-2 hover:border-primary-container"
           >
-            <span className="material-symbols-outlined text-[16px]">qr_code_scanner</span>
-            Escanear QR Puerta
+            <span className="material-symbols-outlined text-[18px]" aria-hidden="true">refresh</span>
+            Actualizar
           </button>
           <Link
-            href="/admin/catas"
-            className="flex items-center gap-2 px-4 py-2.5 bg-surface text-primary border border-outline-variant rounded-xl text-xs font-bold uppercase tracking-wider hover:bg-surface-variant transition-colors shadow-sm"
+            href="/admin/scanner"
+            className="h-11 px-4 rounded border border-outline-variant text-[14px] font-semibold inline-flex items-center gap-2 hover:border-primary-container"
           >
-            <span className="material-symbols-outlined text-[16px]">add</span>
-            Nueva Cata
+            <span className="material-symbols-outlined text-[18px]" aria-hidden="true">qr_code_scanner</span>
+            Escáner
+          </Link>
+          <Link
+            href="/admin/catas?nueva=1"
+            className="h-11 px-4 rounded bg-primary-container hover:bg-primary text-white text-[14px] font-semibold inline-flex items-center gap-2"
+          >
+            <span className="material-symbols-outlined text-[18px]" aria-hidden="true">add</span>
+            Nueva cata
           </Link>
         </div>
       </header>
 
-      {/* 3 Metric Cards (Stitch panel_de_control_admin) */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-12 gap-6">
-        {/* Card 1: Total Spots Sold */}
-        <div className="lg:col-span-4 bg-surface rounded-2xl p-6 border border-surface-variant soft-shadow relative overflow-hidden group">
-          <div className="absolute top-0 right-0 w-32 h-32 bg-primary/5 rounded-bl-full -mr-8 -mt-8 transition-transform group-hover:scale-110" />
-          <div className="relative z-10">
-            <div className="flex items-center gap-2 mb-3 text-secondary text-xs font-bold uppercase tracking-wider">
-              <span className="material-symbols-outlined text-primary text-base">confirmation_number</span>
-              <h3>Total Cupos Vendidos</h3>
-            </div>
-            <div className="flex items-baseline gap-3">
-              <span className="font-serif text-4xl sm:text-5xl font-bold text-primary">
-                {totalSpotsSold}
-              </span>
-              <span className="text-xs font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full flex items-center gap-0.5">
-                <span className="material-symbols-outlined text-xs">trending_up</span> +12%
-              </span>
-            </div>
-            <p className="text-xs text-secondary mt-2">Mes actual (Noviembre 2026)</p>
-          </div>
+      {loading && !stats ? (
+        <div className="py-20 text-center text-on-surface-variant">
+          <span className="material-symbols-outlined animate-spin" aria-hidden="true">progress_activity</span>
+          <span className="sr-only">Cargando…</span>
         </div>
-
-        {/* Card 2: Total Revenue */}
-        <div className="lg:col-span-4 bg-surface rounded-2xl p-6 border border-surface-variant soft-shadow relative overflow-hidden group">
-          <div className="absolute top-0 right-0 w-32 h-32 bg-tertiary/5 rounded-bl-full -mr-8 -mt-8 transition-transform group-hover:scale-110" />
-          <div className="relative z-10">
-            <div className="flex items-center gap-2 mb-3 text-secondary text-xs font-bold uppercase tracking-wider">
-              <span className="material-symbols-outlined text-tertiary-container text-base">payments</span>
-              <h3>Ingresos del Mes</h3>
-            </div>
-            <div className="flex items-baseline gap-3">
-              <span className="font-serif text-4xl sm:text-5xl font-bold text-on-surface">
-                {totalRevenue}
-              </span>
-              <span className="text-xs font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full flex items-center gap-0.5">
-                <span className="material-symbols-outlined text-xs">trending_up</span> +8%
-              </span>
-            </div>
-            <p className="text-xs text-secondary mt-2">Ingresos netos estimados de catas</p>
-          </div>
+      ) : error && !stats ? (
+        <div role="alert" className="rounded-lg border border-error/40 bg-error-container/50 p-4 text-[14px] text-on-error-container">
+          {error}
         </div>
-
-        {/* Card 3: Harvest / Cellar Status Card */}
-        <div className="lg:col-span-4 rounded-2xl overflow-hidden relative soft-shadow min-h-[160px] flex flex-col justify-end p-6 text-white group">
-          <div
-            className="absolute inset-0 bg-cover bg-center transition-transform duration-700 group-hover:scale-105"
-            style={{
-              backgroundImage:
-                "url('https://images.unsplash.com/photo-1506377247377-2a5b3b417ebb?q=80&w=800&auto=format&fit=crop')",
-            }}
-          />
-          <div className="absolute inset-0 bg-gradient-to-t from-primary/95 via-primary/60 to-transparent" />
-          <div className="relative z-10">
-            <span className="text-[10px] font-bold uppercase tracking-widest text-[#D4AF37] block mb-0.5">
-              Estado de Bodega
-            </span>
-            <h3 className="font-serif text-xl font-bold">Cosecha & Cava 2026</h3>
-            <p className="text-xs opacity-90 mt-0.5">Cavas subterráneas al 85% de capacidad.</p>
-          </div>
-        </div>
-      </div>
-
-      <TerroirDivider />
-
-      {/* Next Row: Upcoming Tastings Progress & Recent Attendees Table */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
-        {/* Left: Próximas Catas & Occupancy Progress */}
-        <div className="lg:col-span-5 bg-surface rounded-2xl p-6 border border-surface-variant soft-shadow space-y-6">
-          <div className="flex justify-between items-center border-b border-surface-variant pb-3">
-            <h3 className="font-serif text-lg font-bold text-on-surface">Próximas Catas</h3>
-            <Link href="/admin/catas" className="text-xs font-bold uppercase text-primary hover:underline">
-              Ver todas
-            </Link>
-          </div>
-
-          <div className="space-y-5">
-            {tastings.slice(0, 3).map((t, idx) => {
-              const occupied = t.totalSpots - t.availableSpots;
-              const percent = Math.round((occupied / t.totalSpots) * 100);
-              const isFull = t.availableSpots <= 0;
-
-              return (
-                <div key={idx} className="space-y-1.5">
-                  <div className="flex justify-between text-xs font-semibold">
-                    <span className="text-on-surface truncate max-w-[200px]">{t.title}</span>
-                    <span className="text-secondary">{t.dateDisplay}, {t.timeStart} hs</span>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <div className="flex-1 h-2 bg-surface-variant rounded-full overflow-hidden">
-                      <div
-                        className={`h-full rounded-full transition-all duration-500 ${
-                          isFull ? "bg-primary" : percent > 70 ? "bg-primary" : "bg-primary/50"
-                        }`}
-                        style={{ width: `${percent}%` }}
-                      />
-                    </div>
-                    <span className="text-xs font-bold text-primary min-w-[45px] text-right">
-                      {isFull ? "Completo" : `${occupied}/${t.totalSpots}`}
-                    </span>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-
-        {/* Right: Recent Attendees Table */}
-        <div className="lg:col-span-7 bg-surface rounded-2xl border border-surface-variant soft-shadow overflow-hidden flex flex-col">
-          <div className="p-6 border-b border-surface-variant flex justify-between items-center bg-surface-container-lowest">
-            <div>
-              <h3 className="font-serif text-lg font-bold text-on-surface">
-                Lista de Asistentes Recientes
-              </h3>
-              <p className="text-xs text-secondary">Últimas reservas registradas</p>
+      ) : stats ? (
+        <>
+          {!stats.persistent && (
+            <div className="rounded-lg border border-tertiary/40 bg-tertiary-fixed/60 p-4 text-[14px] text-on-tertiary-fixed-variant">
+              <strong>Modo de prueba:</strong> Supabase no está configurado; los datos se guardan en memoria y se pierden al reiniciar.
             </div>
-            <Link
+          )}
+
+          {/* Pendientes de acción */}
+          {(stats.orders.inReview > 0 || newLeads > 0) && (
+            <div className="flex flex-col sm:flex-row gap-3">
+              {stats.orders.inReview > 0 && (
+                <Link
+                  href="/admin/reservas"
+                  className="flex-1 flex items-center gap-3 rounded-xl border border-tertiary/40 bg-tertiary-fixed/60 px-4 min-h-[56px] text-[14px] text-on-tertiary-fixed-variant hover:border-tertiary"
+                >
+                  <span className="material-symbols-outlined" aria-hidden="true">pending_actions</span>
+                  <span>
+                    <strong>{stats.orders.inReview}</strong> {stats.orders.inReview === 1 ? "pago por revisar" : "pagos por revisar"}
+                  </span>
+                  <span className="material-symbols-outlined ml-auto" aria-hidden="true">chevron_right</span>
+                </Link>
+              )}
+              {newLeads > 0 && (
+                <Link
+                  href="/admin/solicitudes"
+                  className="flex-1 flex items-center gap-3 rounded-xl border border-outline-variant bg-surface-container-lowest px-4 min-h-[56px] text-[14px] hover:border-primary-container"
+                >
+                  <span className="material-symbols-outlined text-primary-container" aria-hidden="true">inbox</span>
+                  <span>
+                    <strong>{newLeads}</strong> {newLeads === 1 ? "solicitud nueva" : "solicitudes nuevas"}
+                  </span>
+                  <span className="material-symbols-outlined ml-auto text-on-surface-variant" aria-hidden="true">chevron_right</span>
+                </Link>
+              )}
+            </div>
+          )}
+
+          {/* Cifras */}
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+            <Metric
+              icon="payments"
+              label="Ventas aprobadas"
+              value={usd(stats.sales.approvedUsd)}
+              hint={`${usd(stats.sales.last30DaysUsd)} en los últimos 30 días`}
+            />
+            <Metric
+              icon="confirmation_number"
+              label="Cupos vendidos"
+              value={String(stats.sales.approvedSpots)}
+              hint={`${stats.sales.approvedOrders} ${stats.sales.approvedOrders === 1 ? "orden aprobada" : "órdenes aprobadas"}`}
+            />
+            <Metric
+              icon="qr_code_2"
+              label="Entradas escaneadas"
+              value={`${stats.tickets.checkedIn} / ${stats.tickets.issued}`}
+              hint="ingresaron / emitidas"
+            />
+            <Metric
+              icon="group"
+              label="Miembros"
+              value={String(stats.members.total)}
+              hint={`${stats.members.last7Days} nuevos en 7 días`}
+              href="/admin/miembros"
+            />
+            <Metric
+              icon="pending_actions"
+              label="Pagos por revisar"
+              value={String(stats.orders.inReview)}
               href="/admin/reservas"
-              className="text-xs font-bold uppercase text-primary hover:underline"
-            >
-              Ver todas las reservas
-            </Link>
+            />
+            <Metric
+              icon="hourglass_top"
+              label="Apartados sin pago"
+              value={String(stats.orders.pendingPayment)}
+              hint="cupos retenidos 60 min"
+            />
+            <Metric
+              icon="inbox"
+              label="Solicitudes nuevas"
+              value={String(newLeads)}
+              hint={`${stats.leads.private} privadas · ${stats.leads.brand} marcas · ${stats.leads.sommelier} sommeliers`}
+              href="/admin/solicitudes"
+            />
+            <Metric
+              icon="calendar_month"
+              label="Próximas catas"
+              value={String(stats.upcoming.filter((t) => t.status !== "draft").length)}
+              hint={`${stats.upcoming.filter((t) => t.status === "draft").length} en borrador`}
+              href="/admin/catas"
+            />
           </div>
 
-          <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse text-xs">
-              <thead>
-                <tr className="bg-surface-container-low border-b border-surface-variant">
-                  <th className="px-5 py-3 font-bold uppercase tracking-wider text-secondary">Nombre</th>
-                  <th className="px-5 py-3 font-bold uppercase tracking-wider text-secondary">Evento</th>
-                  <th className="px-5 py-3 font-bold uppercase tracking-wider text-secondary">Fecha Compra</th>
-                  <th className="px-5 py-3 font-bold uppercase tracking-wider text-secondary">Estado</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-surface-variant">
-                {reservations.map((r) => (
-                  <tr key={r.id} className="hover:bg-surface-container-lowest transition-colors">
-                    <td className="px-5 py-3.5 font-bold text-on-surface">
-                      {r.customerName}
-                      <span className="block text-[10px] text-secondary font-normal">{r.spotsCount} personas ({r.code})</span>
-                    </td>
-                    <td className="px-5 py-3.5 text-secondary">{r.tastingTitle}</td>
-                    <td className="px-5 py-3.5 text-secondary">{r.createdAt}</td>
-                    <td className="px-5 py-3.5">
-                      {r.checkinStatus === "checked_in" ? (
-                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800">
-                          ✓ Check-in
-                        </span>
-                      ) : r.paymentStatus === "paid" ? (
-                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-blue-100 text-blue-800">
-                          Confirmado
-                        </span>
-                      ) : (
-                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800">
-                          Pendiente Transf.
-                        </span>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      </div>
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+            {/* Próximas catas */}
+            <section className="lg:col-span-5 rounded-xl border border-outline-variant bg-surface-container-lowest p-5 space-y-5">
+              <div className="flex items-center justify-between gap-3">
+                <h2 className="font-serif text-xl">Próximas catas</h2>
+                <Link href="/admin/catas" className="text-[13px] font-semibold text-primary-container hover:underline">
+                  Ver todas
+                </Link>
+              </div>
+              {stats.upcoming.length === 0 ? (
+                <p className="text-[14px] text-on-surface-variant">
+                  No hay catas próximas.{" "}
+                  <Link href="/admin/catas?nueva=1" className="font-semibold text-primary-container hover:underline">
+                    Crear una cata
+                  </Link>
+                </p>
+              ) : (
+                <ul className="space-y-5">
+                  {stats.upcoming.map((t) => {
+                    const others = Math.max(0, t.heldSpots - t.approvedSpots);
+                    const sold = t.totalSpots ? Math.min(100, (t.approvedSpots / t.totalSpots) * 100) : 0;
+                    const held = t.totalSpots ? Math.min(100 - sold, (others / t.totalSpots) * 100) : 0;
+                    return (
+                      <li key={t.id} className="space-y-1.5">
+                        <div className="flex items-baseline justify-between gap-3 text-[14px]">
+                          <span className="font-semibold truncate">
+                            {t.title}
+                            {t.status === "draft" && (
+                              <span className="ml-2 align-middle text-[10px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded bg-surface-container-high text-on-surface-variant">
+                                Borrador
+                              </span>
+                            )}
+                          </span>
+                          <span className="text-[12px] text-on-surface-variant whitespace-nowrap">
+                            {t.dateDisplay} · {t.timeStart}
+                          </span>
+                        </div>
+                        <div
+                          className="flex h-2 rounded-full bg-surface-variant overflow-hidden"
+                          role="img"
+                          aria-label={`${t.approvedSpots} vendidos y ${others} apartados o en revisión de ${t.totalSpots} cupos`}
+                        >
+                          <div className="h-full bg-primary-container" style={{ width: `${sold}%` }} />
+                          <div className="h-full bg-tertiary-container" style={{ width: `${Math.max(0, held)}%` }} />
+                        </div>
+                        <p className="text-[12px] text-on-surface-variant">
+                          {t.approvedSpots} vendidos · {others} apartados/en revisión · {t.availableSpots} libres de{" "}
+                          {t.totalSpots} · {usd(t.approvedUsd)}
+                        </p>
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
+            </section>
 
-      {/* QR Scanner Modal */}
-      <QRScannerModal
-        isOpen={isScannerOpen}
-        onClose={() => setIsScannerOpen(false)}
-        onCheckInSuccess={(res) => {
-          alert(`Check-in confirmado para ${res.customerName} (${res.tastingTitle})`);
-        }}
-      />
+            {/* Últimas reservas */}
+            <section className="lg:col-span-7 rounded-xl border border-outline-variant bg-surface-container-lowest overflow-hidden">
+              <div className="flex items-center justify-between gap-3 p-5 border-b border-outline-variant">
+                <h2 className="font-serif text-xl">Últimas reservas</h2>
+                <Link href="/admin/reservas" className="text-[13px] font-semibold text-primary-container hover:underline">
+                  Reservas y pagos
+                </Link>
+              </div>
+              {stats.recentOrders.length === 0 ? (
+                <p className="p-5 text-[14px] text-on-surface-variant">Todavía no hay reservas.</p>
+              ) : (
+                <ul className="divide-y divide-outline-variant">
+                  {stats.recentOrders.map((o) => {
+                    const st = ORDER_STATUS[o.status] ?? ORDER_STATUS.pending_payment;
+                    return (
+                      <li key={o.code} className="flex flex-wrap items-center gap-x-4 gap-y-1 px-5 py-3.5 text-[14px]">
+                        <span className="min-w-0 flex-1">
+                          <span className="font-semibold">{o.customerName}</span>
+                          <span className="block text-[12px] text-on-surface-variant truncate">
+                            {o.code} · {o.spotsCount} {o.spotsCount === 1 ? "cupo" : "cupos"} · {o.tastingTitle}
+                          </span>
+                        </span>
+                        <span className="text-[13px] tabular-nums">{usd(o.totalUsd)}</span>
+                        <span className={`text-[11px] font-semibold px-2.5 py-1 rounded-full ${st.cls}`}>{st.label}</span>
+                        <span className="w-full sm:w-auto text-[12px] text-on-surface-variant">{when(o.createdAt)}</span>
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
+            </section>
+          </div>
+        </>
+      ) : null}
     </div>
+  );
+}
+
+function Metric({ icon, label, value, hint, href }: { icon: string; label: string; value: string; hint?: string; href?: string }) {
+  const body = (
+    <>
+      <p className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wider text-on-surface-variant">
+        <span className="material-symbols-outlined text-[18px] text-primary-container" aria-hidden="true">{icon}</span>
+        {label}
+      </p>
+      <p className="font-serif text-2xl sm:text-3xl mt-2 tabular-nums break-words">{value}</p>
+      {hint && <p className="text-[12px] text-on-surface-variant mt-1">{hint}</p>}
+    </>
+  );
+  const cls = "block rounded-xl border border-outline-variant bg-surface-container-lowest p-4 sm:p-5";
+  return href ? (
+    <Link href={href} className={`${cls} hover:border-primary-container transition-colors`}>
+      {body}
+    </Link>
+  ) : (
+    <div className={cls}>{body}</div>
   );
 }

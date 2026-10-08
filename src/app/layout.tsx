@@ -4,38 +4,45 @@ import { WhatsAppConcierge } from "@/components/WhatsAppConcierge";
 import { JsonLd } from "@/components/JsonLd";
 
 export const viewport: Viewport = {
-  themeColor: "#5C0531",
+  themeColor: "#5A1C31",
   width: "device-width",
   initialScale: 1,
   maximumScale: 5,
 };
 
+const SITE_URL = (process.env.NEXT_PUBLIC_APP_URL || "https://el-origen-two.vercel.app").replace(/\/+$/, "");
+
+const TITLE = "El Origen | Catas guiadas y experiencias en Caracas, Venezuela";
+const DESCRIPTION =
+  "El Origen, allí el inicio de todo. Catas guiadas de vinos, destilados y licores de alta gama con sommeliers y maridaje de autor en Caracas. Reserva tu cupo en línea, con una entrada QR por persona.";
+const OG_IMAGE = "https://images.unsplash.com/photo-1510812431401-41d2bd2722f3?q=80&w=1200&auto=format&fit=crop";
+
 export const metadata: Metadata = {
-  metadataBase: new URL("https://el-origen-two.vercel.app"),
+  metadataBase: new URL(SITE_URL),
   title: {
-    default: "El Origen | Experiencias de Cata de Vinos en Caracas, Venezuela",
+    default: TITLE,
     template: "%s | El Origen Caracas",
   },
-  description:
-    "Experiencias exclusivas de cata de vinos de colección y maridaje de autor en Caracas, Venezuela. Reserva de cupos online, sommelier certificado y eventos privados.",
+  description: DESCRIPTION,
   keywords: [
     "catas de vino caracas",
-    "degustacion de vinos venezuela",
-    "eventos privados caracas",
+    "catas guiadas caracas",
+    "degustación de vinos venezuela",
+    "cata de whisky caracas",
+    "cata de cocuy",
     "maridaje de autor caracas",
-    "wine tasting caracas",
-    "catas privadas caracas",
-    "el origen wine experience",
     "sommelier caracas",
-    "reserva de catas online caracas",
-    "experiencias gastronomicas caracas",
+    "catas privadas caracas",
+    "eventos corporativos caracas",
+    "wine tasting caracas",
+    "el origen caracas",
   ],
-  authors: [{ name: "El Origen Caracas", url: "https://el-origen-two.vercel.app" }],
-  creator: "El Origen Caracas",
-  publisher: "El Origen Caracas",
+  authors: [{ name: "El Origen", url: SITE_URL }],
+  creator: "El Origen",
+  publisher: "El Origen",
   formatDetection: {
     email: true,
-    address: true,
+    address: false,
     telephone: true,
   },
   alternates: {
@@ -46,28 +53,31 @@ export const metadata: Metadata = {
     },
   },
   openGraph: {
-    title: "El Origen | Experiencias de Cata de Vinos en Caracas, Venezuela",
-    description:
-      "Una experiencia de cata única en Caracas. Reserve su cupo online para degustaciones de colección guiadas por sommeliers y maridaje de autor.",
-    url: "https://el-origen-two.vercel.app",
+    title: TITLE,
+    description: DESCRIPTION,
+    url: SITE_URL,
     siteName: "El Origen",
     images: [
       {
-        url: "https://images.unsplash.com/photo-1510812431401-41d2bd2722f3?q=80&w=1200&auto=format&fit=crop",
+        url: OG_IMAGE,
         width: 1200,
         height: 630,
-        alt: "Experiencias de cata y maridaje de vinos en Caracas - El Origen",
+        alt: "Copa de vino tinto — El Origen, catas guiadas en Caracas",
       },
     ],
     locale: "es_VE",
+    alternateLocale: ["en_US"],
     type: "website",
   },
   twitter: {
     card: "summary_large_image",
-    title: "El Origen | Experiencias de Cata de Vinos en Caracas",
-    description:
-      "Catas guiadas de colección, copas de cristal y maridajes de autor en Caracas, Venezuela.",
-    images: ["https://images.unsplash.com/photo-1510812431401-41d2bd2722f3?q=80&w=1200&auto=format&fit=crop"],
+    title: TITLE,
+    description: DESCRIPTION,
+    images: [OG_IMAGE],
+  },
+  icons: {
+    icon: "/images/icon-192.png",
+    apple: "/images/icon-192.png",
   },
   robots: {
     index: true,
@@ -80,11 +90,10 @@ export const metadata: Metadata = {
       "max-snippet": -1,
     },
   },
+  // Sin coordenadas: El Origen no tiene oficina; cada cata indica su propio lugar.
   other: {
     "geo.region": "VE-A",
     "geo.placename": "Caracas, Venezuela",
-    "geo.position": "10.4806;-66.9036",
-    "ICBM": "10.4806, -66.9036",
   },
 };
 
@@ -99,7 +108,7 @@ export default function RootLayout({
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="" />
         <link
-          href="https://fonts.googleapis.com/css2?family=Manrope:wght@300;400;500;600;700;800&family=Playfair+Display:ital,wght@0,400;0,600;0,700;0,800;1,400;1,600&display=swap"
+          href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700&family=Gelasio:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500&display=swap"
           rel="stylesheet"
         />
         <link
@@ -107,7 +116,7 @@ export default function RootLayout({
           rel="stylesheet"
         />
       </head>
-      <body className="bg-background text-on-background antialiased min-h-screen flex flex-col selection:bg-primary-fixed selection:text-primary">
+      <body className="bg-background text-on-background antialiased min-h-screen flex flex-col">
         <JsonLd />
         {children}
         <WhatsAppConcierge />

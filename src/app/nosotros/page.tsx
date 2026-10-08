@@ -1,142 +1,113 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
-import { TerroirDivider } from "@/components/TerroirDivider";
-import { translations, Language } from "@/lib/i18n";
+import { AvilaRidge, Logo, PageHeader, SectionHeading, SunBurst } from "@/components/Brand";
+import { useLang } from "@/lib/useLang";
+import { useDocumentTitle } from "@/lib/useDocumentTitle";
+import type { Language } from "@/lib/i18n";
+import { TEAM, instagramUrl, teamInitials, type TeamMember } from "@/lib/team";
+import { NOSOTROS_COPY } from "./copy";
 
 export default function NosotrosPage() {
-  const [lang, setLang] = useState<Language>("es");
-
-  useEffect(() => {
-    const saved = localStorage.getItem("el_origen_lang") as Language | null;
-    if (saved === "en" || saved === "es") {
-      setLang(saved);
-    }
-  }, []);
-
-  const handleLanguageChange = (newLang: Language) => {
-    setLang(newLang);
-    localStorage.setItem("el_origen_lang", newLang);
-  };
-
-  const t = translations[lang];
+  const [lang, setLang] = useLang();
+  useDocumentTitle(lang, { es: "Nosotros: nuestra historia y sommeliers", en: "About us: our story and sommeliers" });
+  const t = NOSOTROS_COPY[lang];
 
   return (
-    <div className="bg-background text-on-background min-h-screen flex flex-col selection:bg-primary/10 selection:text-primary">
-      <Navbar currentLang={lang} onLanguageChange={handleLanguageChange} />
+    <div className="bg-background text-on-background min-h-screen flex flex-col">
+      <Navbar currentLang={lang} onLanguageChange={setLang} />
 
       <main className="flex-grow">
-        {/* Header Hero */}
-        <section className="pt-20 sm:pt-28 pb-20 sm:pb-28 px-5 sm:px-8 lg:px-12 text-center max-w-4xl mx-auto">
-          <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-black/[0.03] border border-black/[0.06] mb-6">
-            <span className="text-[10px] font-semibold uppercase tracking-[0.2em] text-primary">
-              {t.winery.badge}
-            </span>
+        <PageHeader
+          eyebrow={t.eyebrow}
+          title={
+            <>
+              {t.titleMain} <em className="italic font-normal text-primary-container">{t.titleHighlight}</em>
+            </>
+          }
+          subtitle={t.subtitle}
+        />
+
+        {/* Historia */}
+        <section className="px-5 sm:px-8 lg:px-12 max-w-[1320px] mx-auto w-full pt-12 sm:pt-16 pb-20 sm:pb-28 grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-16">
+          <div className="lg:col-span-4">
+            <p className="eyebrow mb-4">{t.historyEyebrow}</p>
+            <h2 className="font-serif text-[2rem] sm:text-5xl leading-[1.1] text-on-surface">{t.historyTitle}</h2>
           </div>
-
-          <h1 className="font-serif text-4xl sm:text-6xl md:text-7xl font-semibold text-on-surface tracking-tight leading-[1.08] mb-6 text-balance">
-            {t.winery.titleMain} <span className="italic text-primary font-normal">{t.winery.titleHighlight}</span>
-          </h1>
-
-          <p className="text-[15px] sm:text-lg text-on-surface-variant/80 max-w-2xl mx-auto leading-relaxed text-balance">
-            {t.winery.subtitle}
-          </p>
-        </section>
-
-        {/* Gallery / Story Grid in Double-Bezel Frames */}
-        <section className="py-12 px-5 sm:px-8 lg:px-12 max-w-[1320px] mx-auto space-y-24">
-          {/* Row 1: The Mountain & Soil */}
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 lg:gap-16 items-center">
-            <div className="lg:col-span-6 p-2 rounded-[2.5rem] bg-black/[0.02] border border-black/[0.05]">
-              <div className="relative rounded-[calc(2.5rem-0.5rem)] overflow-hidden aspect-[4/3] w-full bg-surface-container">
-                <Image
-                  src="https://images.unsplash.com/photo-1506377247377-2a5b3b417ebb?q=80&w=1200&auto=format&fit=crop"
-                  alt="Curaduría de vinos El Origen Caracas"
-                  fill
-                  className="object-cover"
-                />
-              </div>
-            </div>
-
-            <div className="lg:col-span-6 space-y-5">
-              <span className="text-[10px] font-semibold uppercase tracking-[0.2em] text-primary block">
-                {t.winery.section1Badge}
-              </span>
-
-              <h2 className="font-serif text-3xl sm:text-4xl font-semibold text-on-surface tracking-tight leading-tight">
-                {t.winery.section1Title}
-              </h2>
-
-              <p className="text-[14px] sm:text-base text-on-surface-variant/80 leading-relaxed font-normal">
-                {t.winery.section1P1}
+          <div className="lg:col-span-8 space-y-6 max-w-3xl">
+            {t.history.map((p, i) => (
+              <p
+                key={i}
+                className={
+                  i === 0
+                    ? "font-serif text-[1.3rem] sm:text-[1.6rem] leading-snug text-on-surface text-pretty"
+                    : "text-[16px] sm:text-[18px] text-on-surface-variant leading-relaxed text-pretty"
+                }
+              >
+                {p}
               </p>
-
-              <p className="text-[14px] sm:text-base text-on-surface-variant/80 leading-relaxed font-normal">
-                {t.winery.section1P2}
-              </p>
-            </div>
-          </div>
-
-          <TerroirDivider />
-
-          {/* Row 2: The Cellar & Craft */}
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 lg:gap-16 items-center">
-            <div className="lg:col-span-6 lg:order-2 p-2 rounded-[2.5rem] bg-black/[0.02] border border-black/[0.05]">
-              <div className="relative rounded-[calc(2.5rem-0.5rem)] overflow-hidden aspect-[4/3] w-full bg-surface-container">
-                <Image
-                  src="https://images.unsplash.com/photo-1510812431401-41d2bd2722f3?q=80&w=1200&auto=format&fit=crop"
-                  alt="Degustación y maridaje de autor en Caracas"
-                  fill
-                  className="object-cover"
-                />
-              </div>
-            </div>
-
-            <div className="lg:col-span-6 lg:order-1 space-y-5">
-              <span className="text-[10px] font-semibold uppercase tracking-[0.2em] text-primary block">
-                {t.winery.section2Badge}
-              </span>
-
-              <h2 className="font-serif text-3xl sm:text-4xl font-semibold text-on-surface tracking-tight leading-tight">
-                {t.winery.section2Title}
-              </h2>
-
-              <p className="text-[14px] sm:text-base text-on-surface-variant/80 leading-relaxed font-normal">
-                {t.winery.section2P1}
-              </p>
-
-              <p className="text-[14px] sm:text-base text-on-surface-variant/80 leading-relaxed font-normal">
-                {t.winery.section2P2}
-              </p>
-            </div>
+            ))}
           </div>
         </section>
 
-        {/* CTA Banner */}
-        <section className="py-20 sm:py-28 px-5 sm:px-8 lg:px-12 max-w-[1320px] mx-auto w-full text-center">
-          <div className="p-2 sm:p-2.5 rounded-[2.5rem] bg-black/[0.02] border border-black/[0.05]">
-            <div className="bg-white rounded-[calc(2.5rem-0.625rem)] p-8 sm:p-14 max-w-3xl mx-auto space-y-5">
-              <h2 className="font-serif text-3xl sm:text-4xl font-semibold text-on-surface tracking-tight">
-                {t.winery.ctaTitle}
-              </h2>
-              <p className="text-[14px] sm:text-base text-on-surface-variant/80 max-w-xl mx-auto">
-                {t.winery.ctaSubtitle}
-              </p>
-              <div className="pt-3">
-                <Link
-                  href="/catas"
-                  className="group inline-flex items-center gap-3 bg-primary-container hover:bg-primary text-white text-[13px] font-semibold pl-6 pr-2 py-2 rounded-full transition-all duration-300 shadow-sm"
-                >
-                  <span>{t.winery.ctaButton}</span>
-                  <span className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center transition-transform group-hover:translate-x-0.5">
-                    <span className="material-symbols-outlined text-[16px]">arrow_forward</span>
-                  </span>
-                </Link>
-              </div>
+        {/* Lema */}
+        <section className="bg-primary-container text-paper relative overflow-hidden" aria-label={t.mottoLabel}>
+          <div className="max-w-[1320px] mx-auto px-5 sm:px-8 lg:px-12 pt-16 sm:pt-24 pb-6 grid grid-cols-1 md:grid-cols-12 gap-10 items-center">
+            <div className="md:col-span-4 flex justify-center md:justify-start">
+              <Logo tone="white" variant="full" className="w-48 sm:w-60" />
+            </div>
+            <figure className="md:col-span-8 md:pl-10 md:border-l border-paper/20">
+              <figcaption className="text-[12px] font-semibold uppercase tracking-[0.22em] text-sun">{t.mottoLabel}</figcaption>
+              <blockquote className="mt-4">
+                <p className="font-serif italic text-[2.1rem] sm:text-5xl lg:text-6xl leading-[1.1] text-balance">{t.motto}</p>
+              </blockquote>
+            </figure>
+          </div>
+          <div className="text-paper/25">
+            <AvilaRidge strokeWidth={1.5} showBirds className="h-16 sm:h-24" />
+          </div>
+        </section>
+
+        {/* Sommeliers */}
+        <section id="sommeliers" className="scroll-mt-24 px-5 sm:px-8 lg:px-12 max-w-[1320px] mx-auto w-full py-20 sm:py-28">
+          <SectionHeading eyebrow={t.teamEyebrow} title={t.teamTitle} subtitle={t.teamSubtitle} />
+          <ul className="mt-12 grid grid-cols-1 md:grid-cols-2 gap-5 sm:gap-6">
+            {TEAM.map((member) => (
+              <TeamCard key={member.id} member={member} lang={lang} />
+            ))}
+          </ul>
+        </section>
+
+        {/* Red de sommeliers */}
+        <section className="px-5 sm:px-8 lg:px-12 max-w-[1320px] mx-auto w-full pb-20 sm:pb-28">
+          <div className="relative text-center border border-outline-variant rounded-2xl bg-surface-container-lowest px-6 sm:px-12 pt-14 sm:pt-20 overflow-hidden">
+            <SunBurst className="w-16 mx-auto text-sun mb-5" />
+            <p className="eyebrow mb-4">{t.joinEyebrow}</p>
+            <h2 className="font-serif text-[2rem] sm:text-5xl leading-tight text-on-surface max-w-3xl mx-auto text-balance">
+              {t.joinTitle}
+            </h2>
+            <p className="mt-5 text-[15px] sm:text-base text-on-surface-variant max-w-xl mx-auto leading-relaxed">{t.joinText}</p>
+            <div className="mt-9 flex flex-col sm:flex-row gap-3 justify-center">
+              <Link
+                href="/sommeliers"
+                className="inline-flex items-center justify-center gap-2 h-[52px] px-7 bg-primary-container hover:bg-primary text-white text-[14px] font-semibold rounded transition-colors"
+              >
+                {t.joinCta}
+                <span className="material-symbols-outlined text-[18px]" aria-hidden="true">arrow_forward</span>
+              </Link>
+              <Link
+                href="/catas"
+                className="inline-flex items-center justify-center gap-2 h-[52px] px-7 border border-on-surface/20 hover:border-primary-container hover:text-primary-container text-[14px] font-semibold rounded transition-colors"
+              >
+                {t.tastingsCta}
+              </Link>
+            </div>
+            <div className="mt-14 text-primary-container/30">
+              <AvilaRidge strokeWidth={1.5} showBirds className="h-16 sm:h-24" />
             </div>
           </div>
         </section>
@@ -144,5 +115,45 @@ export default function NosotrosPage() {
 
       <Footer currentLang={lang} />
     </div>
+  );
+}
+
+function TeamCard({ member, lang }: { member: TeamMember; lang: Language }) {
+  const t = NOSOTROS_COPY[lang];
+  return (
+    <li className="rounded-2xl border border-outline-variant bg-surface-container-lowest p-6 sm:p-8 flex flex-col">
+      <div className="flex items-center gap-5">
+        {member.photoUrl ? (
+          <span className="relative w-20 h-20 sm:w-24 sm:h-24 rounded-full overflow-hidden flex-shrink-0 bg-surface-container border border-outline-variant">
+            {/* Las fotos subidas pueden venir de Storage o como data URL: sin optimizar. */}
+            <Image src={member.photoUrl} alt={member.name} fill sizes="96px" unoptimized className="object-cover" />
+          </span>
+        ) : (
+          <span
+            className="w-20 h-20 sm:w-24 sm:h-24 rounded-full flex-shrink-0 flex items-center justify-center bg-primary-fixed text-primary-container border border-primary-container/15 font-serif text-[1.75rem] sm:text-[2rem] tracking-wide"
+            aria-hidden="true"
+          >
+            {teamInitials(member.name)}
+          </span>
+        )}
+        <div className="min-w-0">
+          <h3 className="font-serif text-2xl leading-tight text-on-surface">{member.name}</h3>
+          <p className="mt-1.5 text-[12px] font-semibold uppercase tracking-[0.14em] text-tertiary">{member.role[lang]}</p>
+        </div>
+      </div>
+      <p className="mt-6 text-[15px] sm:text-[16px] text-on-surface-variant leading-relaxed text-pretty">{member.bio[lang]}</p>
+      {member.instagram && (
+        <a
+          href={instagramUrl(member.instagram)}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="mt-5 self-start inline-flex items-center gap-2 min-h-[44px] text-[14px] font-semibold text-primary-container hover:text-primary"
+        >
+          <span className="material-symbols-outlined text-[18px]" aria-hidden="true">photo_camera</span>
+          <span className="sr-only">{t.instagramLabel(member.name)}: </span>
+          {member.instagram}
+        </a>
+      )}
+    </li>
   );
 }
