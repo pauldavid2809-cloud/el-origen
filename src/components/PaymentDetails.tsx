@@ -1,6 +1,7 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
+import QRCode from "qrcode";
 import type { Language } from "@/lib/i18n";
 import type { PaymentConfig } from "@/lib/settings";
 import { whatsappLink } from "@/lib/contact";
@@ -29,9 +30,9 @@ export function availableMethods(cfg: PaymentConfig): PaymentMethodId[] {
   return methods;
 }
 
-/** Si la configuración trae datos de Binance para mostrar (Pay ID o correo). */
+/** Si la configuración trae datos de Binance para mostrar (enlace de cobro, Pay ID o correo). */
 export function hasBinanceDetails(cfg: PaymentConfig): boolean {
-  return Boolean(cfg.binance.payId || cfg.binance.email);
+  return Boolean(cfg.binance.payLink || cfg.binance.payId || cfg.binance.email);
 }
 
 /** Tipos de cuenta habituales (los escribe el admin en español) con su traducción al inglés. */
@@ -65,6 +66,10 @@ const COPY = {
     binanceMissing: "Pídenos los datos de Binance por WhatsApp antes de pagar.",
     binanceAsk: "Solicitar datos de Binance",
     binanceMessage: "Hola, quiero pagar mi reserva de El Origen con Binance USDT. ¿Me envían los datos?",
+    binanceScan: "Escanea este código con la app de Binance",
+    binanceScanHint: "En Binance: Pagar → Escanear. Desde el celular también puedes tocar el botón.",
+    binanceOpen: "Abrir en Binance",
+    binanceQrAlt: "Código QR de cobro de Binance de El Origen",
   },
   en: {
     heading: "Payment details",
@@ -82,6 +87,10 @@ const COPY = {
     binanceMissing: "Request the Binance details via WhatsApp before paying.",
     binanceAsk: "Request Binance details",
     binanceMessage: "Hi, I'd like to pay my El Origen reservation with Binance USDT. Could you send me the details?",
+    binanceScan: "Scan this code with the Binance app",
+    binanceScanHint: "In Binance: Pay → Scan. On your phone you can also tap the button.",
+    binanceOpen: "Open in Binance",
+    binanceQrAlt: "El Origen's Binance payment QR code",
   },
 } as const;
 
@@ -157,6 +166,8 @@ export function PaymentDetails({ config, method, lang, selectedId, onSelect, cla
   }
 
   const selectable = Boolean(onSelect) && destinations.length > 1;
+  const payLink = method === "binance_usdt" ? config.binance.payLink : undefined;
+  const binanceMissing = method === "binance_usdt" && destinations.length === 0 && !payLink;
 
   return (
     <div className={`rounded-xl border border-outline-variant bg-surface-container-lowest ${className}`}>
@@ -165,7 +176,9 @@ export function PaymentDetails({ config, method, lang, selectedId, onSelect, cla
         {selectable && <p className="text-[12px] text-on-surface-variant mt-1">{t.choose}</p>}
       </div>
 
-      {method === "binance_usdt" && destinations.length === 0 ? (
+      {payLink && <BinancePayQr link={payLink} lang={lang} />}
+
+      {binanceMissing ? (
         <div className="px-4 py-4">
           <p className="text-[14px] text-on-surface-variant leading-relaxed">{t.binanceMissing}</p>
           <a
@@ -178,8 +191,8 @@ export function PaymentDetails({ config, method, lang, selectedId, onSelect, cla
             {t.binanceAsk}
           </a>
         </div>
-      ) : (
-        <ul className="divide-y divide-outline-variant">
+      ) : destinations.length > 0 ? (
+        <ul className={`divide-y divide-outline-variant ${payLink ? "border-t border-outline-variant" : ""}`}>
           {destinations.map((d) => {
             const active = selectedId === d.id;
             return (
@@ -227,7 +240,44 @@ export function PaymentDetails({ config, method, lang, selectedId, onSelect, cla
             );
           })}
         </ul>
-      )}
+      ) : null}
+    </div>
+  );
+}
+
+/** QR del enlace de cobro de Binance Pay y botón para abrirlo en la app. */
+function BinancePayQr({ link, lang }: { link: string; lang: Language }) {
+  const t = COPY[lang];
+  const [src, setSrc] = useState<string | null>(null);
+
+  useEffect(() => {
+    let alive = true;
+    QRCode.toDataURL(link, { width: 360, margin: 1, errorCorrectionLevel: "M", color: { dark: "#1E1E1E", light: "#FFFFFF" } })
+      .then((url) => alive && setSrc(url))
+      .catch(() => alive && setSrc(null));
+    return () => {
+      alive = false;
+    };
+  }, [link]);
+
+  return (
+    <div className="px-4 py-4 flex flex-col sm:flex-row items-center gap-4">
+      <div className="w-[180px] h-[180px] flex-shrink-0 rounded-lg border border-outline-variant bg-white p-2">
+        {src && <img src={src} alt={t.binanceQrAlt} width={164} height={164} className="w-full h-full" />}
+      </div>
+      <div className="min-w-0 text-center sm:text-left">
+        <p className="text-[14px] font-semibold text-on-surface">{t.binanceScan}</p>
+        <p className="text-[13px] text-on-surface-variant leading-relaxed mt-1">{t.binanceScanHint}</p>
+        <a
+          href={link}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="mt-3 inline-flex items-center gap-2 h-11 px-4 rounded bg-primary-container text-on-primary text-[13px] font-semibold hover:bg-primary"
+        >
+          <span className="material-symbols-outlined text-[18px]" aria-hidden="true">open_in_new</span>
+          {t.binanceOpen}
+        </a>
+      </div>
     </div>
   );
 }

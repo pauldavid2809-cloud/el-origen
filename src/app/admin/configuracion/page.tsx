@@ -20,7 +20,7 @@ interface FormState {
   pagoMovil: PmRow[];
   transfers: TrRow[];
   holderName: string;
-  binance: { enabled: boolean; payId: string; email: string; holder: string };
+  binance: { enabled: boolean; payLink: string; payId: string; email: string; holder: string };
   efectivo: { enabled: boolean; instructions: string; instructionsEn: string };
 }
 
@@ -29,7 +29,13 @@ function toForm(c: PaymentConfig): FormState {
     pagoMovil: c.pagoMovil.map((a) => keyed({ ...a })),
     transfers: c.transfers.map((a) => keyed({ ...a })),
     holderName: c.holderName ?? "",
-    binance: { enabled: c.binance.enabled, payId: c.binance.payId ?? "", email: c.binance.email ?? "", holder: c.binance.holder ?? "" },
+    binance: {
+      enabled: c.binance.enabled,
+      payLink: c.binance.payLink ?? "",
+      payId: c.binance.payId ?? "",
+      email: c.binance.email ?? "",
+      holder: c.binance.holder ?? "",
+    },
     efectivo: { enabled: c.efectivo.enabled, instructions: c.efectivo.instructions, instructionsEn: c.efectivo.instructionsEn ?? "" },
   };
 }
@@ -302,9 +308,24 @@ export default function AdminPaymentSettingsPage() {
             />
             {form.binance.enabled && (
               <>
-                {!form.binance.payId && !form.binance.email && (
-                  <p className="text-[13px] text-tertiary">Falta el Pay ID o el correo de Binance: sin ellos el cliente no sabrá a dónde enviar.</p>
+                {!form.binance.payLink && !form.binance.payId && !form.binance.email && (
+                  <p className="text-[13px] text-tertiary">Falta el enlace de cobro, el Pay ID o el correo de Binance: sin ellos el cliente no sabrá a dónde enviar.</p>
                 )}
+                <div>
+                  <label htmlFor={id("bn-link")} className={labelCls}>Enlace de cobro (QR de Binance)</label>
+                  <input
+                    id={id("bn-link")}
+                    type="url"
+                    inputMode="url"
+                    placeholder="https://app.binance.com/uni-qr/…"
+                    value={form.binance.payLink}
+                    onChange={(e) => update((f) => ({ ...f, binance: { ...f.binance, payLink: e.target.value } }))}
+                    className={inputCls}
+                  />
+                  <p className="text-[12px] text-on-surface-variant mt-1">
+                    En Binance: Pagar → Recibir → Compartir código QR → copiar enlace. El sitio lo muestra como QR y como botón.
+                  </p>
+                </div>
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                   <div>
                     <label htmlFor={id("bn-pay")} className={labelCls}>Pay ID</label>

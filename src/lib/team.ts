@@ -1,4 +1,4 @@
-/* Sommeliers y directores de cata de El Origen (textos del cliente, sin fotos aún → monograma). */
+/* Sommeliers y directores de cata de El Origen (textos y fotos del cliente; Instagram de sus perfiles). */
 
 export interface TeamMember {
   id: string;
@@ -7,11 +7,11 @@ export interface TeamMember {
   bio: { es: string; en: string };
   /** Usuario de Instagram con "@". */
   instagram?: string;
-  /** PENDIENTE CLIENTE: fotos de los sommeliers. Mientras falten, mostrar monograma con `teamInitials`. */
+  /** Foto cuadrada en public/images/team. Sin foto, se muestra el monograma (`teamInitials`). */
   photoUrl?: string;
 }
 
-// PENDIENTE CLIENTE: cargo exacto de cada sommelier (el rol se resume a partir de su presentación).
+// El rol se resume a partir de la presentación de cada uno y de su perfil de Instagram.
 export const TEAM: TeamMember[] = [
   {
     id: "belkis-croquer",
@@ -22,15 +22,18 @@ export const TEAM: TeamMember[] = [
       en: "Member of Venezuela Gastronómica and ambassador for an internationally renowned brand. Her training in Italian wines and descriptive tasting techniques ensures that every sip of our selection is a lesson in history and pleasure.",
     },
     instagram: "@belkiscroquer",
+    photoUrl: "/images/team/belkis-croquer.jpg",
   },
   {
     id: "fabian-lugo",
     name: "Fabián Lugo",
-    role: { es: "Catador · Productor de eventos", en: "Taster · Event producer" },
+    role: { es: "Periodista gastronómico · Catador", en: "Food & drinks journalist · Taster" },
     bio: {
       es: "Catador en concursos nacionales e internacionales de vinos, destilados y coctelería. Productor de eventos como Caracas Best Wine, El Vino Toma Caracas y Caracas Ron Festival. También se formó como cigar sommelier.",
       en: "Judge at national and international wine, spirits and cocktail competitions. Producer of events such as Caracas Best Wine, El Vino Toma Caracas and Caracas Ron Festival. He also trained as a cigar sommelier.",
     },
+    instagram: "@fabiangourmand",
+    photoUrl: "/images/team/fabian-lugo.jpg",
   },
   {
     id: "juan-carlos-arias",
@@ -40,6 +43,8 @@ export const TEAM: TeamMember[] = [
       es: "Fundador y director dedicado a la creación y dictado de cursos presenciales y online en Venezuela y Latinoamérica sobre el mundo y la cultura del whisky. Brand Ambassador de Buchanan's y embajador de marcas.",
       en: "Founder and director devoted to creating and teaching in-person and online courses across Venezuela and Latin America on the world and culture of whisky. Brand Ambassador for Buchanan's and ambassador for other brands.",
     },
+    instagram: "@jcwhisky",
+    photoUrl: "/images/team/juan-carlos-arias.jpg",
   },
   {
     id: "raiza-navarro",
@@ -49,6 +54,8 @@ export const TEAM: TeamMember[] = [
       es: "Sommelier desde 2009, iniciando con certificaciones de viñas y bodegas en el Nuevo y Viejo Mundo (Chile, Argentina, España y Francia), de la 8va promoción de la Academia de Sommeliers de Venezuela. Ha ejercido con distribuidores, importadores y bodegones en eventos, catas, inducciones, asesorías y servicio (Casa Oliveira, Intermarca, Askar, Distribuidora Mundo Licor, Otazu, Marfran, Albacete, Di Massi y BePlus).",
       en: "Sommelier since 2009, starting with vineyard and winery certifications in the New and Old World (Chile, Argentina, Spain and France), and part of the 8th graduating class of the Academia de Sommeliers de Venezuela. She has worked with distributors, importers and wine shops on events, tastings, staff trainings, consulting and service (Casa Oliveira, Intermarca, Askar, Distribuidora Mundo Licor, Otazu, Marfran, Albacete, Di Massi and BePlus).",
     },
+    instagram: "@navarroraiza",
+    photoUrl: "/images/team/raiza-navarro.jpg",
   },
 ];
 

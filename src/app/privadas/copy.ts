@@ -48,8 +48,8 @@ const es = {
   } satisfies Record<PrivateGuestRange, string>,
   restaurant: "Restaurante",
   restaurants: {
-    karnivoros_grill: "Karnivoros Grill",
-    maratea: "Maratea",
+    karnivoros_grill: "Karnivoros Grill · CCCT",
+    maratea: "Maratea · Las Mercedes",
   } satisfies Record<PrivateRestaurant, string>,
   message: "Detalles adicionales",
   messagePlaceholder: "Fecha tentativa, presupuesto o cualquier requerimiento especial.",
@@ -111,8 +111,8 @@ const en: typeof es = {
   },
   restaurant: "Restaurant",
   restaurants: {
-    karnivoros_grill: "Karnivoros Grill",
-    maratea: "Maratea",
+    karnivoros_grill: "Karnivoros Grill · CCCT",
+    maratea: "Maratea · Las Mercedes",
   },
   message: "Additional details",
   messagePlaceholder: "Tentative date, budget or any special requirement.",
