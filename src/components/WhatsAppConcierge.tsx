@@ -8,9 +8,10 @@ import { whatsappLink } from "@/lib/contact";
 
 /**
  * Rutas donde el botón flotante estorba: trabajo interno (panel y escáner de puerta) y pantallas
- * que se usan con el teléfono en la mano durante el evento (verificación de entrada y ficha en vivo).
+ * que se usan con el teléfono en la mano durante el evento (verificación de entrada y ficha en vivo), y la
+ * página de la orden, que ya tiene sus propios enlaces a WhatsApp junto a cada acción.
  */
-const HIDDEN_ON = ["/admin", "/puerta", "/verificar", "/cata-en-vivo"];
+const HIDDEN_ON = ["/admin", "/puerta", "/verificar", "/cata-en-vivo", "/orden"];
 
 export function WhatsAppConcierge() {
   const [lang] = useLang();

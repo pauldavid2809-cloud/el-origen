@@ -616,7 +616,7 @@ function Checkout({ tasting, rate, lang }: { tasting: Tasting; rate: number | nu
     <div className="rounded-2xl border border-outline-variant bg-surface-container-lowest shadow-card overflow-hidden">
       {/* Precio */}
       <div className="bg-primary-container text-paper px-5 sm:px-7 py-5">
-        <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-sun">{t.checkoutEyebrow}</p>
+        <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-tertiary-fixed">{t.checkoutEyebrow}</p>
         <div className="mt-1 flex flex-wrap items-end justify-between gap-x-4 gap-y-1">
           <h2 className="font-serif text-2xl">{t.checkoutTitle}</h2>
           <div className="text-right">
@@ -626,7 +626,7 @@ function Checkout({ tasting, rate, lang }: { tasting: Tasting; rate: number | nu
             </p>
             <p className="mt-1 text-[12px] text-paper/80">
               {bs(priceUsd) ?? t.noRate}
-              {rate && <span className="block text-paper/60">{t.rateNote(tasting.rateCurrency ?? "USD")}</span>}
+              {rate && <span className="block text-paper/75">{t.rateNote(tasting.rateCurrency ?? "USD")}</span>}
             </p>
           </div>
         </div>
@@ -659,7 +659,7 @@ function Checkout({ tasting, rate, lang }: { tasting: Tasting; rate: number | nu
                     onClick={() => goTo(n)}
                     aria-current={step === n ? "step" : undefined}
                     aria-label={t.stepAria(n, label)}
-                    className={`w-full h-10 rounded-full transition-colors ${
+                    className={`w-full h-11 rounded-full transition-colors ${
                       step === n ? "bg-primary-container text-white" : "text-on-surface-variant hover:text-on-surface"
                     }`}
                   >

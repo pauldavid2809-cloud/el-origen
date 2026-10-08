@@ -80,7 +80,7 @@ export default function LiveTastingPage() {
         const info: TicketInfo = data.ticket;
 
         const [tastingRes, notesRes] = await Promise.all([
-          fetch(`/api/tastings/${encodeURIComponent(info.tastingId)}`).then((r) => (r.ok ? r.json() : null)).catch(() => null),
+          fetch(`/api/tastings/${encodeURIComponent(info.tastingId)}?ticket=${encodeURIComponent(token)}`).then((r) => (r.ok ? r.json() : null)).catch(() => null),
           fetch(`/api/tasting-notes?token=${encodeURIComponent(token)}`, { cache: "no-store" })
             .then((r) => (r.ok ? r.json() : null))
             .catch(() => null),
