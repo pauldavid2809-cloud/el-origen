@@ -13,6 +13,10 @@ const nextConfig = {
       },
     ],
   },
+  // Demo para el cliente (página estática en public/demo, con datos de ejemplo).
+  async rewrites() {
+    return [{ source: "/demo", destination: "/demo/index.html" }];
+  },
 };
 
 module.exports = nextConfig;
