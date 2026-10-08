@@ -140,7 +140,7 @@ export default function AdminDashboardPage() {
               )}
               {newLeads > 0 && (
                 <Link
-                  href="/admin/privadas"
+                  href="/admin/solicitudes"
                   className="flex-1 flex items-center gap-3 rounded-xl border border-outline-variant bg-surface-container-lowest px-4 min-h-[56px] text-[14px] hover:border-primary-container"
                 >
                   <span className="material-symbols-outlined text-primary-container" aria-hidden="true">inbox</span>
@@ -197,7 +197,7 @@ export default function AdminDashboardPage() {
               label="Solicitudes nuevas"
               value={String(newLeads)}
               hint={`${stats.leads.private} privadas · ${stats.leads.brand} marcas · ${stats.leads.sommelier} sommeliers`}
-              href="/admin/privadas"
+              href="/admin/solicitudes"
             />
             <Metric
               icon="calendar_month"

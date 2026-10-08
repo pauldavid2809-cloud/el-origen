@@ -79,18 +79,26 @@ export default function VerifyTicketPage() {
     [token]
   );
 
+  // Solo el personal (sesión de admin o de puerta) valida contra /api/verify; el público ve su entrada.
   useEffect(() => {
-    call("verify");
+    let alive = true;
+    fetch("/api/door/auth", { cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d: { authenticated?: boolean; role?: "admin" | "puerta" | null } | null) => {
+        if (!alive) return;
+        if (!d?.authenticated) {
+          setMode("guest");
+          return;
+        }
+        // El escáner del panel es para admin; la puerta tiene el suyo.
+        setScannerHref(d.role === "admin" ? "/admin/scanner" : "/puerta");
+        call("verify");
+      })
+      .catch(() => alive && setMode("guest"));
+    return () => {
+      alive = false;
+    };
   }, [call]);
-
-  // El escáner del panel es para admin; la puerta tiene el suyo.
-  useEffect(() => {
-    if (mode !== "staff") return;
-    fetch("/api/admin/auth")
-      .then((r) => r.json())
-      .then((d) => setScannerHref(d.authenticated ? "/admin/scanner" : "/puerta"))
-      .catch(() => {});
-  }, [mode]);
 
   const langToggle = (
     <button

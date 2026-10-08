@@ -20,8 +20,7 @@ const NAV_ITEMS: NavItem[] = [
   { href: "/admin/reservas", label: "Reservas & Pagos", icon: "receipt_long" },
   { href: "/admin/cupones", label: "Cupones", icon: "sell" },
   { href: "/admin/miembros", label: "Miembros", icon: "group" },
-  // E2 puede mover la bandeja a /admin/solicitudes y dejar /admin/privadas redirigiendo.
-  { href: "/admin/privadas", label: "Solicitudes", icon: "inbox", also: ["/admin/solicitudes"] },
+  { href: "/admin/solicitudes", label: "Solicitudes", icon: "inbox", also: ["/admin/privadas"] },
   { href: "/admin/recuerdos", label: "Recuerdos", icon: "photo_library" },
   { href: "/admin/configuracion", label: "Configuración de pagos", icon: "account_balance" },
   { href: "/admin/automatizaciones", label: "Correo y WhatsApp", icon: "forum" },

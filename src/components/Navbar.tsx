@@ -2,20 +2,26 @@
 
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { translations, Language } from "@/lib/i18n";
+import { useLang } from "@/lib/useLang";
 import { Logo, AvilaRidge } from "@/components/Brand";
+import { AccountMenu } from "@/components/AccountMenu";
 
 interface NavbarProps {
+  /** Idioma que controla la página. Si se omite, la barra usa el idioma guardado (`useLang`). */
   currentLang?: Language;
   onLanguageChange?: (lang: Language) => void;
 }
 
-export function Navbar({ currentLang = "es", onLanguageChange }: NavbarProps) {
-  const [lang, setLang] = useState<Language>(currentLang);
+export function Navbar({ currentLang, onLanguageChange }: NavbarProps) {
+  const [storedLang, setStoredLang] = useLang();
+  const lang = currentLang ?? storedLang;
+  const t = translations[lang].nav;
+  const pathname = usePathname();
+
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
-
-  const t = translations[lang].nav;
 
   useEffect(() => {
     const handleScroll = () => setScrolled(window.scrollY > 12);
@@ -24,35 +30,59 @@ export function Navbar({ currentLang = "es", onLanguageChange }: NavbarProps) {
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
 
+  // Menú móvil: bloquea el scroll de fondo y se cierra con Escape.
   useEffect(() => {
-    if (currentLang) {
-      setLang(currentLang);
-    }
-  }, [currentLang]);
-
-  useEffect(() => {
-    document.body.style.overflow = mobileMenuOpen ? "hidden" : "";
+    if (!mobileMenuOpen) return;
+    document.body.style.overflow = "hidden";
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setMobileMenuOpen(false);
+    };
+    window.addEventListener("keydown", onKey);
     return () => {
       document.body.style.overflow = "";
+      window.removeEventListener("keydown", onKey);
     };
   }, [mobileMenuOpen]);
 
+  // Cierra el menú al cambiar de página.
+  useEffect(() => {
+    setMobileMenuOpen(false);
+  }, [pathname]);
+
   const handleLangToggle = () => {
-    const nextLang = lang === "es" ? "en" : "es";
-    setLang(nextLang);
-    try {
-      localStorage.setItem("el_origen_lang", nextLang);
-    } catch {}
-    if (onLanguageChange) onLanguageChange(nextLang);
+    const nextLang: Language = lang === "es" ? "en" : "es";
+    setStoredLang(nextLang); // persiste y sincroniza las demás instancias de useLang
+    onLanguageChange?.(nextLang);
   };
 
+  const closeMenu = () => setMobileMenuOpen(false);
+
   const navLinks = [
-    { href: "/catas", label: t.experiencias },
+    { href: "/catas", label: t.catas },
     { href: "/privadas", label: t.privadas },
-    { href: "/nosotros", label: t.bodega },
-    { href: "/#terroir", label: t.terroir },
+    { href: "/alianzas", label: t.alianzas },
+    { href: "/nosotros", label: t.nosotros },
+  ];
+  const secondaryLinks = [
+    { href: "/sommeliers", label: t.sommeliers },
     { href: "/#contacto", label: t.contacto },
   ];
+
+  const isActive = (href: string) => pathname === href || (href !== "/" && pathname?.startsWith(`${href}/`));
+
+  const langToggle = (className: string) => (
+    <button
+      type="button"
+      onClick={handleLangToggle}
+      className={className}
+      aria-label={t.switchLang}
+      lang={lang === "es" ? "en" : "es"}
+    >
+      <span className={lang === "es" ? "text-primary-container" : ""}>ES</span>
+      <span className="mx-1 text-outline" aria-hidden="true">/</span>
+      <span className={lang === "en" ? "text-primary-container" : ""}>EN</span>
+    </button>
+  );
 
   return (
     <>
@@ -63,55 +93,63 @@ export function Navbar({ currentLang = "es", onLanguageChange }: NavbarProps) {
             : "bg-transparent border-b border-transparent"
         }`}
       >
-        <div className="max-w-[1320px] mx-auto px-4 sm:px-8 lg:px-12 h-16 sm:h-20 flex items-center justify-between gap-6">
+        <div className="max-w-[1320px] mx-auto px-4 sm:px-8 lg:px-12 h-16 sm:h-20 flex items-center justify-between gap-3 sm:gap-6">
           {/* Marca */}
-          <Link href="/" className="flex items-center gap-3 group" onClick={() => setMobileMenuOpen(false)}>
-            <Logo variant="mark" className="w-12 sm:w-14 transition-transform duration-500 group-hover:-translate-y-0.5" priority />
-            <span className="font-serif text-[17px] sm:text-[19px] font-bold tracking-[0.14em] text-primary-container uppercase">
+          <Link href="/" className="flex items-center gap-2.5 sm:gap-3 group min-w-0" onClick={closeMenu} aria-label={t.home}>
+            <Logo variant="mark" className="w-11 sm:w-14 flex-shrink-0 transition-transform duration-500 group-hover:-translate-y-0.5" priority />
+            <span className="font-serif text-[16px] sm:text-[19px] font-bold tracking-[0.12em] sm:tracking-[0.14em] text-primary-container uppercase whitespace-nowrap">
               El Origen
             </span>
           </Link>
 
           {/* Navegación desktop */}
-          <nav className="hidden lg:flex items-center gap-8" aria-label="Principal">
-            {navLinks.map((link) => (
-              <Link
-                key={link.href}
-                href={link.href}
-                className="text-[14px] font-medium text-on-surface/80 hover:text-primary-container transition-colors relative py-1 after:absolute after:-bottom-0.5 after:left-0 after:h-px after:bg-primary-container after:transition-all after:duration-300 after:w-0 hover:after:w-full"
-              >
-                {link.label}
-              </Link>
-            ))}
+          <nav className="hidden lg:flex items-center gap-8" aria-label={t.mainLabel}>
+            {navLinks.map((link) => {
+              const active = isActive(link.href);
+              return (
+                <Link
+                  key={link.href}
+                  href={link.href}
+                  aria-current={active ? "page" : undefined}
+                  className={`text-[14px] font-medium transition-colors relative py-1 after:absolute after:-bottom-0.5 after:left-0 after:h-px after:bg-primary-container after:transition-all after:duration-300 hover:text-primary-container hover:after:w-full ${
+                    active ? "text-primary-container after:w-full" : "text-on-surface/80 after:w-0"
+                  }`}
+                >
+                  {link.label}
+                </Link>
+              );
+            })}
           </nav>
 
           {/* Acciones */}
-          <div className="flex items-center gap-2 sm:gap-3">
-            <button
-              onClick={handleLangToggle}
-              className="h-9 px-2.5 text-[12px] font-semibold tracking-[0.12em] text-on-surface/70 hover:text-primary-container transition-colors"
-              aria-label={lang === "es" ? "Switch to English" : "Cambiar a español"}
-            >
-              <span className={lang === "es" ? "text-primary-container" : ""}>ES</span>
-              <span className="mx-1 text-outline">/</span>
-              <span className={lang === "en" ? "text-primary-container" : ""}>EN</span>
-            </button>
+          <div className="flex items-center gap-1 sm:gap-2 flex-shrink-0">
+            {langToggle(
+              "h-11 px-2 text-[12px] font-semibold tracking-[0.12em] text-on-surface/70 hover:text-primary-container transition-colors"
+            )}
+
+            <span className="hidden sm:block">
+              <AccountMenu lang={lang} />
+            </span>
 
             <Link
               href="/catas"
-              className="hidden sm:inline-flex items-center gap-2 h-10 px-5 bg-primary-container hover:bg-primary text-white text-[13px] font-semibold tracking-wide rounded transition-colors"
+              className="hidden sm:inline-flex items-center gap-2 h-11 px-5 ml-1 bg-primary-container hover:bg-primary text-white text-[13px] font-semibold tracking-wide rounded transition-colors"
             >
               {t.reservar}
-              <span className="material-symbols-outlined text-[16px]">arrow_forward</span>
+              <span className="material-symbols-outlined text-[16px]" aria-hidden="true">arrow_forward</span>
             </Link>
 
             <button
-              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+              type="button"
+              onClick={() => setMobileMenuOpen((open) => !open)}
               className="lg:hidden w-11 h-11 flex items-center justify-center text-primary-container rounded hover:bg-primary-container/5"
-              aria-label={mobileMenuOpen ? "Cerrar menú" : "Abrir menú"}
+              aria-label={mobileMenuOpen ? t.closeMenu : t.openMenu}
               aria-expanded={mobileMenuOpen}
+              aria-controls="menu-movil"
             >
-              <span className="material-symbols-outlined text-[26px]">{mobileMenuOpen ? "close" : "menu"}</span>
+              <span className="material-symbols-outlined text-[26px]" aria-hidden="true">
+                {mobileMenuOpen ? "close" : "menu"}
+              </span>
             </button>
           </div>
         </div>
@@ -119,30 +157,49 @@ export function Navbar({ currentLang = "es", onLanguageChange }: NavbarProps) {
 
       {/* Menú móvil */}
       {mobileMenuOpen && (
-        <div className="fixed inset-0 z-40 bg-primary text-paper flex flex-col pt-24 animate-fade-in lg:hidden overflow-y-auto">
-          <nav className="flex flex-col px-6 sm:px-10" aria-label="Móvil">
+        <div
+          id="menu-movil"
+          className="fixed inset-0 z-40 bg-primary text-paper flex flex-col pt-20 sm:pt-24 animate-fade-in lg:hidden overflow-y-auto"
+        >
+          <nav className="flex flex-col px-6 sm:px-10" aria-label={t.mobileLabel}>
             {navLinks.map((link, i) => (
               <Link
                 key={link.href}
                 href={link.href}
-                onClick={() => setMobileMenuOpen(false)}
+                onClick={closeMenu}
+                aria-current={isActive(link.href) ? "page" : undefined}
                 className="flex items-baseline gap-4 py-4 border-b border-paper/15 font-serif text-[28px] sm:text-4xl hover:text-sun transition-colors"
               >
-                <span className="font-sans text-[11px] tracking-[0.2em] text-sun tabular-nums">0{i + 1}</span>
+                <span className="font-sans text-[11px] tracking-[0.2em] text-sun tabular-nums" aria-hidden="true">
+                  0{i + 1}
+                </span>
                 {link.label}
               </Link>
             ))}
+            <div className="flex flex-wrap gap-x-6 pt-3">
+              {secondaryLinks.map((link) => (
+                <Link
+                  key={link.href}
+                  href={link.href}
+                  onClick={closeMenu}
+                  className="inline-flex items-center min-h-[44px] text-[15px] text-paper/80 hover:text-sun transition-colors"
+                >
+                  {link.label}
+                </Link>
+              ))}
+            </div>
           </nav>
 
-          <div className="px-6 sm:px-10 pt-8">
+          <div className="px-6 sm:px-10 pt-6 space-y-3">
             <Link
               href="/catas"
-              onClick={() => setMobileMenuOpen(false)}
+              onClick={closeMenu}
               className="w-full flex items-center justify-center gap-2 h-14 bg-paper text-primary text-[14px] font-semibold rounded"
             >
               {t.reservar}
-              <span className="material-symbols-outlined text-[18px]">arrow_forward</span>
+              <span className="material-symbols-outlined text-[18px]" aria-hidden="true">arrow_forward</span>
             </Link>
+            <AccountMenu lang={lang} variant="menu" onNavigate={closeMenu} />
           </div>
 
           <div className="mt-auto pt-12 text-paper/40">

@@ -428,7 +428,7 @@ function Checkout({ tasting, rate, lang }: { tasting: Tasting; rate: number | nu
   // Prellenado con la Cuenta Origen si hay sesión de miembro.
   useEffect(() => {
     let alive = true;
-    fetch("/api/members/me", { cache: "no-store" })
+    fetch("/api/members/me?orders=0", { cache: "no-store" })
       .then((r) => (r.ok ? r.json() : null))
       .then((data) => {
         const m = data?.member;

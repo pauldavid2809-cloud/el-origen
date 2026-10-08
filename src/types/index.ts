@@ -91,40 +91,6 @@ export interface Coupon {
   active: boolean;
 }
 
-/** @deprecated Las reservas reales son `Order` de `@/lib/orders`. */
-export interface Reservation {
-  id: string;
-  token: string;
-  code: string; // e.g. "#EO-8492A"
-  tastingId: string;
-  tastingTitle: string;
-  tastingDate: string;
-  tastingTime: string;
-  customerName: string;
-  customerEmail: string;
-  customerPhone: string;
-  spotsCount: number;
-  dietaryRestrictions?: string;
-  selectedAddOns: {
-    id: string;
-    title: string;
-    price: number;
-    quantity: number;
-  }[];
-  subtotal: number;
-  discountAmount: number;
-  couponCode?: string;
-  totalAmount: number;
-  paymentMethod: "stripe" | "bank_transfer" | "test";
-  paymentStatus: "paid" | "pending_transfer" | "cancelled";
-  transferReceiptUrl?: string;
-  checkinStatus: "pending" | "checked_in";
-  checkedInAt?: string;
-  checkedInBy?: string;
-  createdAt: string;
-  notes?: string;
-}
-
 export interface TastingSensoryNote {
   id: string;
   reservationToken: string;

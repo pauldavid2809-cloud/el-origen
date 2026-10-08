@@ -1,16 +1,14 @@
-import { Metadata } from "next";
+import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "Catas Privadas & Eventos Corporativos en Caracas",
+  title: "Experiencias Privadas & Eventos Corporativos",
   description:
-    "Organice experiencias de cata privadas, agasajos ejecutivos y aniversarios con sommelier exclusivo y maridaje gourmet en Caracas, Venezuela.",
-  alternates: {
-    canonical: "/privadas",
-  },
+    "Diseñamos veladas de cata a medida para marcas, empresas y celebraciones exclusivas en Caracas: cata guiada, maridaje de autor y cristalería de alta gama para 10 a 60 invitados.",
+  alternates: { canonical: "/privadas" },
   openGraph: {
-    title: "Catas Privadas & Eventos Corporativos | El Origen Caracas",
-    description: "Degustaciones exclusivas y eventos a medida en Caracas con sommelier y servicio premium.",
-    url: "https://el-origen-two.vercel.app/privadas",
+    title: "Experiencias Privadas & Eventos Corporativos | El Origen",
+    description: "Veladas de cata a medida para marcas, empresas y celebraciones exclusivas en Caracas.",
+    url: "/privadas",
   },
 };
 

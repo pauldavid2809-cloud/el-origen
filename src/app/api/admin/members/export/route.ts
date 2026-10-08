@@ -29,7 +29,7 @@ export async function GET() {
   }));
 
   const sheet = XLSX.utils.json_to_sheet(rows.length ? rows : [{ Nombre: "Sin miembros registrados" }]);
-  sheet["!cols"] = [{ wch: 28 }, { wch: 32 }, { wch: 18 }, { wch: 10 }, { wch: 10 }, { wch: 20 }, { wch: 20 }, { wch: 20 }];
+  sheet["!cols"] = [28, 32, 18, 16, 12, 20, 20, 20, 10, 18, 16, 18].map((wch) => ({ wch }));
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, sheet, "Miembros");
   const buf = XLSX.write(wb, { type: "buffer", bookType: "xlsx" }) as Buffer;

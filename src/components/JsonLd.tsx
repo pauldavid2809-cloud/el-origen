@@ -1,100 +1,67 @@
 import React from "react";
+import { CONTACT } from "@/lib/contact";
+import { MOTTO, translations } from "@/lib/i18n";
 
+const SITE_URL = (process.env.NEXT_PUBLIC_APP_URL || "https://el-origen-two.vercel.app").replace(/\/+$/, "");
+
+/* Horario de atención real (BUSINESS_HOURS en contact.ts) en formato schema.org. */
+const OPENING_HOURS = [
+  { days: ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"], opens: "08:00", closes: "13:30" },
+  { days: ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"], opens: "19:00", closes: "23:00" },
+  { days: ["Saturday"], opens: "08:00", closes: "10:00" },
+  { days: ["Saturday"], opens: "15:00", closes: "16:00" },
+  { days: ["Saturday"], opens: "19:00", closes: "23:00" },
+].map((h) => ({
+  "@type": "OpeningHoursSpecification",
+  dayOfWeek: h.days,
+  opens: h.opens,
+  closes: h.closes,
+}));
+
+/** Datos estructurados del sitio. Sin dirección ni coordenadas: El Origen no tiene oficina y cada cata indica su lugar. */
 export function JsonLd() {
-  const eventOrganizerSchema = {
+  const organization = {
     "@context": "https://schema.org",
-    "@type": ["EventVenue", "FoodEstablishment"],
-    "name": "El Origen | Experiencias de Cata & Vinos de Colección",
-    "alternateName": "El Origen Caracas",
-    "url": "https://el-origen-two.vercel.app",
-    "logo": "https://el-origen-two.vercel.app/images/logo-color-full.png",
-    "image": [
-      "https://images.unsplash.com/photo-1510812431401-41d2bd2722f3?q=80&w=1200&auto=format&fit=crop",
-      "https://images.unsplash.com/photo-1506377247377-2a5b3b417ebb?q=80&w=1200&auto=format&fit=crop"
-    ],
-    "description": "Experiencias boutique de cata de vino y degustaciones guiadas por sommeliers en Caracas, Venezuela. Venta de cupos online, maridaje de autor y eventos privados.",
-    "telephone": "+58-414-1074007",
-    "email": "experiencethewine22@gmail.com",
-    "priceRange": "$$$",
-    "currenciesAccepted": "USD, VES",
-    "paymentAccepted": "Pago Móvil, Transferencia bancaria, Stripe, Apple Pay, Credit Card",
-    "servesCuisine": "Wine Tasting, Gourmet Pairings, Charcuterie & Cheese",
-    "address": {
-      "@type": "PostalAddress",
-      "streetAddress": "Caracas",
-      "addressLocality": "Caracas",
-      "addressRegion": "Distrito Capital",
-      "postalCode": "1060",
-      "addressCountry": "VE"
-    },
-    "geo": {
-      "@type": "GeoCoordinates",
-      "latitude": 10.4806,
-      "longitude": -66.9036
-    },
-    "openingHoursSpecification": [
+    "@type": "Organization",
+    "@id": `${SITE_URL}/#organization`,
+    name: "El Origen",
+    alternateName: "El Origen Caracas",
+    slogan: MOTTO.es,
+    url: SITE_URL,
+    logo: `${SITE_URL}/images/logo-color-full.png`,
+    description: translations.es.footer.description,
+    email: CONTACT.email,
+    telephone: CONTACT.phoneIntl,
+    areaServed: { "@type": "City", name: "Caracas" },
+    contactPoint: [
       {
-        "@type": "OpeningHoursSpecification",
-        "dayOfWeek": ["Thursday", "Friday", "Saturday", "Sunday"],
-        "opens": "18:00",
-        "closes": "23:00"
-      }
+        "@type": "ContactPoint",
+        contactType: "customer service",
+        name: CONTACT.ownerName,
+        telephone: CONTACT.phoneIntl,
+        email: CONTACT.email,
+        url: `https://wa.me/${CONTACT.whatsappNumber}`,
+        availableLanguage: ["Spanish", "English"],
+        hoursAvailable: OPENING_HOURS,
+      },
     ],
-    "sameAs": [
-      "https://www.instagram.com/elorigen.vzla",
-      "https://wa.me/584141074007"
-    ]
+    sameAs: [CONTACT.instagramUrl, `https://wa.me/${CONTACT.whatsappNumber}`],
   };
 
-  const faqSchema = {
+  const faq = {
     "@context": "https://schema.org",
     "@type": "FAQPage",
-    "mainEntity": [
-      {
-        "@type": "Question",
-        "name": "¿Cuál es el formato y duración de las catas en El Origen Caracas?",
-        "acceptedAnswer": {
-          "@type": "Answer",
-          "text": "Nuestras experiencias de cata tienen una duración aproximada de 2 horas y media. Incluyen una selección curada de 4 a 5 etiquetas de vinos de colección, maridaje de autor paso a paso y la guía en vivo de un sommelier certificado."
-        }
-      },
-      {
-        "@type": "Question",
-        "name": "¿Cuáles son los métodos de pago aceptados?",
-        "acceptedAnswer": {
-          "@type": "Answer",
-          "text": "Aceptamos Pago Móvil y transferencias en bolívares (Banco de Venezuela y Banco Mercantil) a la tasa oficial del BCV del día, así como tarjetas internacionales en USD (Stripe / Apple Pay). Los datos de pago aparecen al reservar."
-        }
-      },
-      {
-        "@type": "Question",
-        "name": "¿Se adaptan los maridajes a restricciones dietéticas o celiaquía?",
-        "acceptedAnswer": {
-          "@type": "Answer",
-          "text": "Sí, disponemos de opciones 100% Sin TACC / Celíacos, vegetarianas y libres de frutos secos. Solo debe indicarlo en el paso 2 del proceso de reserva online."
-        }
-      },
-      {
-        "@type": "Question",
-        "name": "¿Cuál es la política de reprogramación o cancelación de cupos?",
-        "acceptedAnswer": {
-          "@type": "Answer",
-          "text": "Puede reprogramar su cupo sin ningún costo con hasta 48 horas de anticipación a la fecha seleccionada, o transferir su entrada digital QR a otra persona."
-        }
-      }
-    ]
+    mainEntity: translations.es.faq.items.map((item) => ({
+      "@type": "Question",
+      name: item.q,
+      acceptedAnswer: { "@type": "Answer", text: item.a },
+    })),
   };
 
   return (
     <>
-      <script
-        type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(eventOrganizerSchema) }}
-      />
-      <script
-        type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(faqSchema) }}
-      />
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(organization) }} />
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(faq) }} />
     </>
   );
 }

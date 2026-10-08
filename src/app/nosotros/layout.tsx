@@ -1,16 +1,14 @@
-import { Metadata } from "next";
+import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "Nuestra Propuesta & Curaduría de Vinos | El Origen Caracas",
+  title: "Nosotros: nuestra historia y sommeliers",
   description:
-    "Descubra la filosofía de El Origen: curaduría de vinos de colección internacionales, cristalería de alta gama y maridajes gastronómicos de autor en Caracas, Venezuela.",
-  alternates: {
-    canonical: "/nosotros",
-  },
+    "El Origen nació en Caracas a inicios de 2026 para transformar la manera en que se vive la gastronomía y los licores de alta gama en Venezuela. Conoce a los sommeliers y directores de cata que guían cada experiencia.",
+  alternates: { canonical: "/nosotros" },
   openGraph: {
-    title: "Nuestra Propuesta & Curaduría de Vinos | El Origen Caracas",
-    description: "Experiencias boutique de cata y maridaje de autor guiadas por sommeliers en Caracas.",
-    url: "https://el-origen-two.vercel.app/nosotros",
+    title: "Nosotros | El Origen",
+    description: "El Origen, allí el inicio de todo. Catas guiadas, maridaje de autor y networking de alto nivel en Caracas.",
+    url: "/nosotros",
   },
 };
 

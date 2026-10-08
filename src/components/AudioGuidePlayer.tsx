@@ -1,143 +1,167 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
-import Image from "next/image";
+import React, { useEffect, useId, useRef, useState } from "react";
+import type { Language } from "@/lib/i18n";
+import { teamInitials } from "@/lib/team";
+
+/* Guía narrada de cada copa: lee en voz alta la historia que el admin escribió para el producto
+   (síntesis de voz del navegador) y siempre ofrece el texto para leerlo. */
+
+const COPY = {
+  es: {
+    badge: "Guía de la copa",
+    listen: "Escuchar",
+    stop: "Detener",
+    showText: "Leer el texto",
+    hideText: "Ocultar el texto",
+    noVoice: "Su navegador no puede leer el texto en voz alta; puede leerlo aquí.",
+  },
+  en: {
+    badge: "Glass guide",
+    listen: "Listen",
+    stop: "Stop",
+    showText: "Read the text",
+    hideText: "Hide the text",
+    noVoice: "Your browser cannot read the text aloud; you can read it here.",
+  },
+};
 
 interface AudioGuidePlayerProps {
+  lang: Language;
   title: string;
-  winemakerName?: string;
-  winemakerRole?: string;
-  avatarUrl?: string;
   storyText: string;
-  durationSeconds?: number;
+  /** Sommelier que guía la cata (se muestra con monograma mientras no haya foto). */
+  guideName?: string;
+  guideRole?: string;
+  /** Idioma en que está escrito el texto (los textos del admin están en español). */
+  textLang?: Language;
 }
 
-export function AudioGuidePlayer({
-  title,
-  winemakerName = "Alejandro Morales",
-  winemakerRole = "Enólogo Jefe • El Origen",
-  avatarUrl = "https://images.unsplash.com/photo-1534528741775-53994a69daeb?q=80&w=400&auto=format&fit=crop",
-  storyText,
-  durationSeconds = 75,
-}: AudioGuidePlayerProps) {
-  const [isPlaying, setIsPlaying] = useState(false);
+export function AudioGuidePlayer({ lang, title, storyText, guideName, guideRole, textLang = "es" }: AudioGuidePlayerProps) {
+  const t = COPY[lang];
+  const [supported, setSupported] = useState(true);
+  const [speaking, setSpeaking] = useState(false);
   const [progress, setProgress] = useState(0);
-  const [showTranscript, setShowTranscript] = useState(false);
+  const [showText, setShowText] = useState(false);
+  const utteranceRef = useRef<SpeechSynthesisUtterance | null>(null);
+  const textId = useId();
 
   useEffect(() => {
-    let interval: NodeJS.Timeout;
-    if (isPlaying) {
-      interval = setInterval(() => {
-        setProgress((prev) => {
-          if (prev >= durationSeconds) {
-            setIsPlaying(false);
-            return 0;
-          }
-          return prev + 1;
-        });
-      }, 1000);
-    }
-    return () => clearInterval(interval);
-  }, [isPlaying, durationSeconds]);
+    setSupported(typeof window !== "undefined" && "speechSynthesis" in window && "SpeechSynthesisUtterance" in window);
+  }, []);
 
-  const togglePlay = () => {
-    setIsPlaying(!isPlaying);
+  // Al cambiar de copa o salir de la página se corta la lectura.
+  useEffect(() => {
+    setProgress(0);
+    setSpeaking(false);
+    return () => {
+      if (utteranceRef.current && typeof window !== "undefined" && "speechSynthesis" in window) {
+        utteranceRef.current = null;
+        window.speechSynthesis.cancel();
+      }
+    };
+  }, [storyText]);
+
+  const stop = () => {
+    utteranceRef.current = null;
+    window.speechSynthesis.cancel();
+    setSpeaking(false);
+    setProgress(0);
   };
 
-  const formatTime = (secs: number) => {
-    const m = Math.floor(secs / 60);
-    const s = secs % 60;
-    return `${m}:${s < 10 ? "0" : ""}${s}`;
+  const play = () => {
+    const synth = window.speechSynthesis;
+    synth.cancel();
+    const utterance = new SpeechSynthesisUtterance(storyText);
+    const prefix = textLang === "es" ? "es" : "en";
+    const voices = synth.getVoices().filter((v) => v.lang.toLowerCase().startsWith(prefix));
+    const voice = voices.find((v) => /VE|419|MX|US/i.test(v.lang)) ?? voices[0];
+    if (voice) utterance.voice = voice;
+    utterance.lang = voice?.lang ?? (prefix === "es" ? "es-VE" : "en-US");
+    utterance.rate = 0.95;
+    utterance.onboundary = (e) => {
+      if (utteranceRef.current === utterance) setProgress(Math.min(1, e.charIndex / Math.max(1, storyText.length)));
+    };
+    const finish = () => {
+      if (utteranceRef.current !== utterance) return;
+      utteranceRef.current = null;
+      setSpeaking(false);
+      setProgress(0);
+    };
+    utterance.onend = finish;
+    utterance.onerror = finish;
+    utteranceRef.current = utterance;
+    setSpeaking(true);
+    setProgress(0);
+    synth.speak(utterance);
   };
+
+  const textVisible = showText || !supported;
 
   return (
-    <div className="bg-white border border-outline-variant/40 rounded-2xl p-5 sm:p-6 soft-shadow">
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-        {/* Winemaker info */}
-        <div className="flex items-center gap-3.5">
-          <div className="relative w-12 h-12 rounded-full overflow-hidden border border-outline-variant/40 flex-shrink-0">
-            <Image
-              src={avatarUrl}
-              alt={winemakerName}
-              fill
-              className="object-cover"
-            />
-          </div>
-          <div>
-            <div className="flex items-center gap-1.5 mb-0.5">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-600 animate-pulse-soft" />
-              <span className="text-[10px] font-semibold uppercase tracking-wider text-primary">
-                La Voz del Enólogo
-              </span>
-            </div>
-            <h4 className="font-serif text-base font-semibold text-on-surface leading-tight">
-              {title}
-            </h4>
-            <p className="text-[12px] text-on-surface-variant/70">{winemakerName} • {winemakerRole}</p>
-          </div>
-        </div>
-
-        {/* Play Controls */}
-        <div className="flex items-center gap-4 w-full sm:w-auto justify-between sm:justify-end">
-          <button
-            onClick={togglePlay}
-            className="w-10 h-10 rounded-full bg-primary-container text-white flex items-center justify-center hover:bg-primary transition-all duration-200 ease-out active:scale-[0.94] shadow-sm"
-            aria-label={isPlaying ? "Pausar audio" : "Reproducir audio"}
+    <section className="rounded-2xl border border-outline-variant bg-surface-container-lowest p-5 sm:p-6">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div className="flex items-center gap-3.5 min-w-0">
+          <span
+            className="w-12 h-12 rounded-full bg-primary-container text-white font-serif text-[17px] flex items-center justify-center flex-shrink-0"
+            aria-hidden="true"
           >
-            <span className="material-symbols-outlined text-[22px]">
-              {isPlaying ? "pause" : "play_arrow"}
-            </span>
-          </button>
-
-          {/* Soundwave animation */}
-          <div className="flex items-center gap-1 h-6 px-2">
-            {[35, 65, 45, 90, 60, 80, 40, 70, 50, 85].map((height, idx) => (
-              <span
-                key={idx}
-                className={`w-1 rounded-full transition-all duration-300 ease-out ${
-                  isPlaying ? "bg-primary" : "bg-outline-variant/60"
-                }`}
-                style={{
-                  height: isPlaying ? `${Math.max(25, (height * ((idx % 3) + 1)) % 100)}%` : "20%",
-                  transitionDelay: `${idx * 40}ms`,
-                }}
-              />
-            ))}
+            {guideName ? teamInitials(guideName) : <span className="material-symbols-outlined">record_voice_over</span>}
+          </span>
+          <div className="min-w-0">
+            <p className="eyebrow">{t.badge}</p>
+            <h3 className="font-serif text-lg leading-tight mt-0.5 break-words">{title}</h3>
+            {guideName && (
+              <p className="text-[13px] text-on-surface-variant">
+                {guideName}
+                {guideRole ? ` · ${guideRole}` : ""}
+              </p>
+            )}
           </div>
-
-          <span className="text-[12px] font-medium text-on-surface-variant/70 min-w-[55px] text-right font-mono">
-            {formatTime(progress)} / {formatTime(durationSeconds)}
-          </span>
         </div>
+
+        {supported && (
+          <button
+            type="button"
+            onClick={speaking ? stop : play}
+            className="inline-flex items-center justify-center gap-2 h-12 px-5 rounded bg-primary-container hover:bg-primary text-white text-[14px] font-semibold flex-shrink-0"
+          >
+            <span className="material-symbols-outlined text-[22px]" aria-hidden="true">
+              {speaking ? "stop" : "play_arrow"}
+            </span>
+            {speaking ? t.stop : t.listen}
+          </button>
+        )}
       </div>
 
-      {/* Progress Bar */}
-      <div className="mt-4 w-full bg-surface-container h-1 rounded-full overflow-hidden">
-        <div
-          className="bg-primary h-full transition-all duration-300 ease-out rounded-full"
-          style={{ width: `${(progress / durationSeconds) * 100}%` }}
-        />
-      </div>
-
-      {/* Transcript Toggle */}
-      <div className="mt-3 text-right">
-        <button
-          onClick={() => setShowTranscript(!showTranscript)}
-          className="text-[11px] font-medium text-on-surface-variant/70 hover:text-primary transition-colors duration-200 inline-flex items-center gap-1"
-        >
-          <span>{showTranscript ? "Ocultar transcripción" : "Leer transcripción"}</span>
-          <span className="material-symbols-outlined text-[14px]">
-            {showTranscript ? "expand_less" : "expand_more"}
-          </span>
-        </button>
-      </div>
-
-      {/* Transcript Text */}
-      {showTranscript && (
-        <div className="mt-3 p-4 bg-surface-container-low rounded-xl border border-outline-variant/30 text-[13px] text-on-surface-variant leading-relaxed animate-fade-in">
-          <p className="italic">"{storyText}"</p>
+      {supported && (
+        <div className="mt-4 h-1 w-full rounded-full bg-surface-container overflow-hidden" aria-hidden="true">
+          <div className="h-full bg-primary-container transition-[width] duration-300" style={{ width: `${progress * 100}%` }} />
         </div>
       )}
-    </div>
+
+      {supported ? (
+        <button
+          type="button"
+          onClick={() => setShowText(!showText)}
+          aria-expanded={showText}
+          aria-controls={textId}
+          className="mt-2 inline-flex items-center gap-1 min-h-11 text-[13px] font-semibold text-on-surface-variant hover:text-primary-container"
+        >
+          {showText ? t.hideText : t.showText}
+          <span className="material-symbols-outlined text-[18px]" aria-hidden="true">
+            {showText ? "expand_less" : "expand_more"}
+          </span>
+        </button>
+      ) : (
+        <p className="mt-3 text-[13px] text-on-surface-variant">{t.noVoice}</p>
+      )}
+
+      {textVisible && (
+        <p id={textId} lang={textLang} className="mt-2 rounded-xl bg-surface-container-low p-4 text-[15px] leading-relaxed text-on-surface-variant">
+          {storyText}
+        </p>
+      )}
+    </section>
   );
 }

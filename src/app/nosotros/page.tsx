@@ -1,116 +1,157 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
-import { PageHeader, Logo, SunBurst } from "@/components/Brand";
-import { translations, Language } from "@/lib/i18n";
+import { AvilaRidge, Logo, PageHeader, SectionHeading, SunBurst } from "@/components/Brand";
+import { useLang } from "@/lib/useLang";
+import type { Language } from "@/lib/i18n";
+import { TEAM, instagramUrl, teamInitials, type TeamMember } from "@/lib/team";
+import { NOSOTROS_COPY } from "./copy";
 
 export default function NosotrosPage() {
-  const [lang, setLang] = useState<Language>("es");
-
-  useEffect(() => {
-    const saved = localStorage.getItem("el_origen_lang") as Language | null;
-    if (saved === "en" || saved === "es") {
-      setLang(saved);
-    }
-  }, []);
-
-  const handleLanguageChange = (newLang: Language) => {
-    setLang(newLang);
-    localStorage.setItem("el_origen_lang", newLang);
-  };
-
-  const t = translations[lang];
-
-  const rows = [
-    {
-      badge: t.winery.section1Badge,
-      title: t.winery.section1Title,
-      p: [t.winery.section1P1, t.winery.section1P2],
-      img: "https://images.unsplash.com/photo-1506377247377-2a5b3b417ebb?q=80&w=1200&auto=format&fit=crop",
-      alt: lang === "es" ? "Copa de vino tinto frente a un viñedo" : "Glass of red wine overlooking a vineyard",
-    },
-    {
-      badge: t.winery.section2Badge,
-      title: t.winery.section2Title,
-      p: [t.winery.section2P1, t.winery.section2P2],
-      img: "https://images.unsplash.com/photo-1528823872057-9c018a7a7553?q=80&w=1200&auto=format&fit=crop",
-      alt: lang === "es" ? "Tanques de acero en una bodega" : "Steel tanks in a winery cellar",
-    },
-  ];
+  const [lang, setLang] = useLang();
+  const t = NOSOTROS_COPY[lang];
 
   return (
     <div className="bg-background text-on-background min-h-screen flex flex-col">
-      <Navbar currentLang={lang} onLanguageChange={handleLanguageChange} />
+      <Navbar currentLang={lang} onLanguageChange={setLang} />
 
       <main className="flex-grow">
         <PageHeader
-          eyebrow={t.winery.badge}
+          eyebrow={t.eyebrow}
           title={
             <>
-              {t.winery.titleMain} <em className="italic font-normal text-primary-container">{t.winery.titleHighlight}</em>
+              {t.titleMain} <em className="italic font-normal text-primary-container">{t.titleHighlight}</em>
             </>
           }
-          subtitle={t.winery.subtitle}
+          subtitle={t.subtitle}
         />
 
-        {/* El logo como manifiesto */}
-        <section className="px-5 sm:px-8 lg:px-12 max-w-[1320px] mx-auto w-full py-16 sm:py-24 grid grid-cols-1 md:grid-cols-12 gap-10 items-center">
-          <div className="md:col-span-5 flex justify-center">
-            <Logo variant="full" className="w-64 sm:w-80" />
+        {/* Historia */}
+        <section className="px-5 sm:px-8 lg:px-12 max-w-[1320px] mx-auto w-full pt-12 sm:pt-16 pb-20 sm:pb-28 grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-16">
+          <div className="lg:col-span-4">
+            <p className="eyebrow mb-4">{t.historyEyebrow}</p>
+            <h2 className="font-serif text-[2rem] sm:text-5xl leading-[1.1] text-on-surface">{t.historyTitle}</h2>
           </div>
-          <blockquote className="md:col-span-7 md:pl-10 md:border-l border-outline-variant">
-            <p className="font-serif text-[1.65rem] sm:text-4xl leading-snug text-on-surface text-balance">
-              {lang === "es"
-                ? "La montaña, el sol y la copa: volver al origen de cada vino, con Caracas como punto de partida."
-                : "The mountain, the sun and the glass: going back to the origin of every wine, with Caracas as our starting point."}
-            </p>
-          </blockquote>
+          <div className="lg:col-span-8 space-y-6 max-w-3xl">
+            {t.history.map((p, i) => (
+              <p
+                key={i}
+                className={
+                  i === 0
+                    ? "font-serif text-[1.3rem] sm:text-[1.6rem] leading-snug text-on-surface text-pretty"
+                    : "text-[16px] sm:text-[18px] text-on-surface-variant leading-relaxed text-pretty"
+                }
+              >
+                {p}
+              </p>
+            ))}
+          </div>
         </section>
 
-        <section className="px-5 sm:px-8 lg:px-12 max-w-[1320px] mx-auto w-full pb-12 space-y-24 sm:space-y-32">
-          {rows.map((row, i) => (
-            <div key={i} className="grid grid-cols-1 lg:grid-cols-12 gap-12 lg:gap-16 items-center">
-              <div className={`lg:col-span-5 ${i % 2 ? "lg:order-2 lg:col-start-8" : ""}`}>
-                <div className="relative arch overflow-hidden aspect-[4/5] max-w-md mx-auto bg-surface-container border border-outline-variant">
-                  <Image src={row.img} alt={row.alt} fill sizes="(min-width: 1024px) 35vw, 90vw" className="object-cover" />
-                </div>
-              </div>
-
-              <div className={`lg:col-span-6 ${i % 2 ? "lg:order-1 lg:col-start-1" : "lg:col-start-7"} space-y-5`}>
-                <p className="eyebrow">{row.badge}</p>
-                <h2 className="font-serif text-[2rem] sm:text-5xl leading-[1.1] text-on-surface text-balance">{row.title}</h2>
-                {row.p.map((para, j) => (
-                  <p key={j} className="text-[16px] text-on-surface-variant leading-relaxed">
-                    {para}
-                  </p>
-                ))}
-              </div>
+        {/* Lema */}
+        <section className="bg-primary-container text-paper relative overflow-hidden" aria-label={t.mottoLabel}>
+          <div className="max-w-[1320px] mx-auto px-5 sm:px-8 lg:px-12 pt-16 sm:pt-24 pb-6 grid grid-cols-1 md:grid-cols-12 gap-10 items-center">
+            <div className="md:col-span-4 flex justify-center md:justify-start">
+              <Logo tone="white" variant="full" className="w-48 sm:w-60" />
             </div>
-          ))}
+            <figure className="md:col-span-8 md:pl-10 md:border-l border-paper/20">
+              <figcaption className="text-[12px] font-semibold uppercase tracking-[0.22em] text-sun">{t.mottoLabel}</figcaption>
+              <blockquote className="mt-4">
+                <p className="font-serif italic text-[2.1rem] sm:text-5xl lg:text-6xl leading-[1.1] text-balance">{t.motto}</p>
+              </blockquote>
+            </figure>
+          </div>
+          <div className="text-paper/25">
+            <AvilaRidge strokeWidth={1.5} showBirds className="h-16 sm:h-24" />
+          </div>
         </section>
 
-        {/* CTA */}
-        <section className="px-5 sm:px-8 lg:px-12 max-w-[1320px] mx-auto w-full py-24 sm:py-32">
-          <div className="relative overflow-hidden rounded-2xl bg-primary-container text-paper text-center px-6 py-16 sm:py-20">
-            <SunBurst className="w-20 mx-auto text-sun mb-6" />
-            <h2 className="font-serif text-[2rem] sm:text-5xl leading-tight max-w-2xl mx-auto text-balance">{t.winery.ctaTitle}</h2>
-            <p className="mt-5 text-[15px] sm:text-base text-paper/80 max-w-xl mx-auto">{t.winery.ctaSubtitle}</p>
-            <Link
-              href="/catas"
-              className="mt-9 inline-flex items-center justify-center gap-2 h-[52px] px-7 bg-paper text-primary hover:bg-white text-[14px] font-semibold rounded transition-colors"
-            >
-              {t.winery.ctaButton}
-              <span className="material-symbols-outlined text-[18px]">arrow_forward</span>
-            </Link>
+        {/* Sommeliers */}
+        <section id="sommeliers" className="scroll-mt-24 px-5 sm:px-8 lg:px-12 max-w-[1320px] mx-auto w-full py-20 sm:py-28">
+          <SectionHeading eyebrow={t.teamEyebrow} title={t.teamTitle} subtitle={t.teamSubtitle} />
+          <ul className="mt-12 grid grid-cols-1 md:grid-cols-2 gap-5 sm:gap-6">
+            {TEAM.map((member) => (
+              <TeamCard key={member.id} member={member} lang={lang} />
+            ))}
+          </ul>
+        </section>
+
+        {/* Red de sommeliers */}
+        <section className="px-5 sm:px-8 lg:px-12 max-w-[1320px] mx-auto w-full pb-20 sm:pb-28">
+          <div className="relative text-center border border-outline-variant rounded-2xl bg-surface-container-lowest px-6 sm:px-12 pt-14 sm:pt-20 overflow-hidden">
+            <SunBurst className="w-16 mx-auto text-sun mb-5" />
+            <p className="eyebrow mb-4">{t.joinEyebrow}</p>
+            <h2 className="font-serif text-[2rem] sm:text-5xl leading-tight text-on-surface max-w-3xl mx-auto text-balance">
+              {t.joinTitle}
+            </h2>
+            <p className="mt-5 text-[15px] sm:text-base text-on-surface-variant max-w-xl mx-auto leading-relaxed">{t.joinText}</p>
+            <div className="mt-9 flex flex-col sm:flex-row gap-3 justify-center">
+              <Link
+                href="/sommeliers"
+                className="inline-flex items-center justify-center gap-2 h-[52px] px-7 bg-primary-container hover:bg-primary text-white text-[14px] font-semibold rounded transition-colors"
+              >
+                {t.joinCta}
+                <span className="material-symbols-outlined text-[18px]" aria-hidden="true">arrow_forward</span>
+              </Link>
+              <Link
+                href="/catas"
+                className="inline-flex items-center justify-center gap-2 h-[52px] px-7 border border-on-surface/20 hover:border-primary-container hover:text-primary-container text-[14px] font-semibold rounded transition-colors"
+              >
+                {t.tastingsCta}
+              </Link>
+            </div>
+            <div className="mt-14 text-primary-container/30">
+              <AvilaRidge strokeWidth={1.5} showBirds className="h-16 sm:h-24" />
+            </div>
           </div>
         </section>
       </main>
 
       <Footer currentLang={lang} />
     </div>
+  );
+}
+
+function TeamCard({ member, lang }: { member: TeamMember; lang: Language }) {
+  const t = NOSOTROS_COPY[lang];
+  return (
+    <li className="rounded-2xl border border-outline-variant bg-surface-container-lowest p-6 sm:p-8 flex flex-col">
+      <div className="flex items-center gap-5">
+        {member.photoUrl ? (
+          <span className="relative w-20 h-20 sm:w-24 sm:h-24 rounded-full overflow-hidden flex-shrink-0 bg-surface-container border border-outline-variant">
+            {/* Las fotos subidas pueden venir de Storage o como data URL: sin optimizar. */}
+            <Image src={member.photoUrl} alt={member.name} fill sizes="96px" unoptimized className="object-cover" />
+          </span>
+        ) : (
+          <span
+            className="w-20 h-20 sm:w-24 sm:h-24 rounded-full flex-shrink-0 flex items-center justify-center bg-primary-fixed text-primary-container border border-primary-container/15 font-serif text-[1.75rem] sm:text-[2rem] tracking-wide"
+            aria-hidden="true"
+          >
+            {teamInitials(member.name)}
+          </span>
+        )}
+        <div className="min-w-0">
+          <h3 className="font-serif text-2xl leading-tight text-on-surface">{member.name}</h3>
+          <p className="mt-1.5 text-[12px] font-semibold uppercase tracking-[0.14em] text-tertiary">{member.role[lang]}</p>
+        </div>
+      </div>
+      <p className="mt-6 text-[15px] sm:text-[16px] text-on-surface-variant leading-relaxed text-pretty">{member.bio[lang]}</p>
+      {member.instagram && (
+        <a
+          href={instagramUrl(member.instagram)}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="mt-5 self-start inline-flex items-center gap-2 min-h-[44px] text-[14px] font-semibold text-primary-container hover:text-primary"
+        >
+          <span className="material-symbols-outlined text-[18px]" aria-hidden="true">photo_camera</span>
+          <span className="sr-only">{t.instagramLabel(member.name)}: </span>
+          {member.instagram}
+        </a>
+      )}
+    </li>
   );
 }

@@ -1,79 +1,57 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
-import { TastingCard } from "@/components/TastingCard";
+import { TastingCard, TastingsEmptyState, TastingsLoadError, useBcvRates } from "@/components/TastingCard";
 import { CommercialShowcase } from "@/components/CommercialShowcase";
 import { PartnersSection } from "@/components/PartnersSection";
 import { AvilaRidge, SectionHeading, SunBurst } from "@/components/Brand";
 import { Tasting } from "@/types";
-import { translations, Language } from "@/lib/i18n";
-import { whatsappLink } from "@/lib/contact";
+import { translations } from "@/lib/i18n";
+import { useLang } from "@/lib/useLang";
+import { BUSINESS_HOURS, CONTACT, whatsappLink } from "@/lib/contact";
+import { TEAM, instagramUrl, teamInitials } from "@/lib/team";
+
+/** Ficha de cata en vivo de demostración. */
+const LIVE_DEMO_PATH = "/cata-en-vivo/tok-demo-1234";
+
+type LoadState = "loading" | "ready" | "error";
 
 export default function HomePage() {
-  const [lang, setLang] = useState<Language>("es");
-  const [tastings, setTastings] = useState<Tasting[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [openFaq, setOpenFaq] = useState<number | null>(0);
-
-  useEffect(() => {
-    const saved = localStorage.getItem("el_origen_lang") as Language | null;
-    if (saved === "en" || saved === "es") {
-      setLang(saved);
-    }
-  }, []);
-
-  const handleLanguageChange = (newLang: Language) => {
-    setLang(newLang);
-    localStorage.setItem("el_origen_lang", newLang);
-  };
-
+  const [lang, setLang] = useLang();
   const t = translations[lang];
-  const es = lang === "es";
 
-  useEffect(() => {
-    async function fetchTastings() {
-      try {
-        const res = await fetch("/api/tastings");
-        const data = await res.json();
-        if (data.success) {
-          setTastings(data.tastings);
-        }
-      } catch {
-        // fallback
-      } finally {
-        setLoading(false);
-      }
+  const [tastings, setTastings] = useState<Tasting[]>([]);
+  const [status, setStatus] = useState<LoadState>("loading");
+  const [openFaq, setOpenFaq] = useState<number | null>(0);
+  const rates = useBcvRates();
+
+  const loadTastings = useCallback(async () => {
+    setStatus("loading");
+    try {
+      const res = await fetch("/api/tastings");
+      const data = await res.json();
+      if (!res.ok || !data.success) throw new Error(data.message);
+      setTastings(Array.isArray(data.tastings) ? data.tastings : []);
+      setStatus("ready");
+    } catch {
+      setStatus("error");
     }
-    fetchTastings();
   }, []);
 
-  const next = tastings.find((x) => x.availableSpots > 0) ?? tastings[0];
+  useEffect(() => {
+    loadTastings();
+  }, [loadTastings]);
 
-  const stats = [
-    { value: t.hero.statAltitudeValue, label: t.hero.statAltitudeLabel },
-    { value: t.hero.statCapacityValue, label: t.hero.statCapacityLabel },
-    { value: t.hero.statCheckinValue, label: t.hero.statCheckinLabel },
-  ];
-
-  const ritual = es
-    ? [
-        { n: "01", title: "Curaduría", text: "Etiquetas de colección elegidas copa a copa con un hilo conductor en cada fecha." },
-        { n: "02", title: "Maridaje", text: "Bocados de autor junto a aliados gastronómicos de Caracas." },
-        { n: "03", title: "Conversación", text: "Grupos pequeños guiados por sommelier, sin prisa y sin solemnidad." },
-      ]
-    : [
-        { n: "01", title: "Curation", text: "Collection labels chosen glass by glass, with a common thread on every date." },
-        { n: "02", title: "Pairing", text: "Signature bites alongside culinary partners from Caracas." },
-        { n: "03", title: "Conversation", text: "Small groups guided by a sommelier — unhurried and never stuffy." },
-      ];
+  const next = tastings.find((x) => x.availableSpots > 0 && x.status !== "sold_out") ?? tastings[0];
+  const featured = tastings.slice(0, 3);
 
   return (
     <div className="bg-background text-on-background min-h-screen flex flex-col">
-      <Navbar currentLang={lang} onLanguageChange={handleLanguageChange} />
+      <Navbar currentLang={lang} onLanguageChange={setLang} />
 
       <main className="flex-grow">
         {/* ─── HERO ─── */}
@@ -84,27 +62,24 @@ export default function HomePage() {
                 <span className="h-px w-8 bg-primary-container/40" />
                 {t.hero.eyebrow}
               </p>
-              <h1 className="font-serif text-[2.75rem] leading-[1.04] sm:text-6xl lg:text-[5.25rem] text-on-surface text-balance">
-                {t.hero.titleMain}{" "}
-                <em className="italic font-normal text-primary-container">{t.hero.titleHighlight}</em>
+              <h1 className="font-serif text-[2.6rem] leading-[1.06] sm:text-6xl lg:text-[5rem] text-on-surface text-balance">
+                {t.hero.titleMain} <em className="italic font-normal text-primary-container">{t.hero.titleHighlight}</em>
               </h1>
-              <p className="mt-7 text-[16px] sm:text-lg leading-relaxed text-on-surface-variant max-w-xl text-pretty">
-                {t.hero.subtitle}
-              </p>
+              <p className="mt-7 text-[16px] sm:text-lg leading-relaxed text-on-surface-variant max-w-xl text-pretty">{t.hero.subtitle}</p>
               <div className="mt-9 flex flex-col sm:flex-row gap-3">
                 <Link
                   href="/catas"
                   className="inline-flex items-center justify-center gap-2 h-[52px] px-7 bg-primary-container hover:bg-primary text-white text-[14px] font-semibold rounded transition-colors"
                 >
                   {t.hero.ctaPrimary}
-                  <span className="material-symbols-outlined text-[18px]">arrow_forward</span>
+                  <span className="material-symbols-outlined text-[18px]" aria-hidden="true">arrow_forward</span>
                 </Link>
-                <a
-                  href="#proximas-catas"
+                <Link
+                  href="/registro"
                   className="inline-flex items-center justify-center gap-2 h-[52px] px-7 border border-on-surface/20 hover:border-primary-container text-on-surface hover:text-primary-container text-[14px] font-semibold rounded transition-colors"
                 >
                   {t.hero.ctaSecondary}
-                </a>
+                </Link>
               </div>
             </div>
 
@@ -114,7 +89,7 @@ export default function HomePage() {
               <div className="relative arch overflow-hidden aspect-[4/5] bg-surface-container border border-outline-variant">
                 <Image
                   src="https://images.unsplash.com/photo-1510812431401-41d2bd2722f3?q=80&w=1200&auto=format&fit=crop"
-                  alt={es ? "Copa de vino tinto servida en una cata de El Origen" : "Red wine served at an El Origen tasting"}
+                  alt={t.hero.imageAlt}
                   fill
                   priority
                   sizes="(min-width: 1024px) 40vw, 90vw"
@@ -132,9 +107,7 @@ export default function HomePage() {
                     <span className="text-[10px] font-semibold tracking-[0.2em] mt-1">{next.dateDisplay.split(" ")[1]}</span>
                   </span>
                   <span className="p-3.5 min-w-0">
-                    <span className="block text-[10px] font-semibold uppercase tracking-[0.18em] text-tertiary">
-                      {es ? "Próxima cata" : "Next tasting"}
-                    </span>
+                    <span className="block text-[10px] font-semibold uppercase tracking-[0.18em] text-tertiary">{t.hero.nextTasting}</span>
                     <span className="block font-serif text-[15px] leading-snug text-on-surface line-clamp-2 mt-0.5">{next.title}</span>
                   </span>
                 </Link>
@@ -142,14 +115,14 @@ export default function HomePage() {
             </div>
           </div>
 
-          {/* Línea del Ávila → banda vino */}
+          {/* Línea del Ávila → banda vino con datos de la experiencia */}
           <div className="mt-20 sm:mt-24 text-primary-container relative">
             <AvilaRidge fill="var(--wine)" stroke="var(--wine)" showBirds showValley={false} className="h-20 sm:h-32 -mb-px" />
           </div>
           <div className="bg-primary-container text-paper">
             <dl className="max-w-[1320px] mx-auto px-5 sm:px-8 lg:px-12 pb-12 sm:pb-16 pt-4 grid grid-cols-1 sm:grid-cols-3 gap-8 sm:gap-6">
-              {stats.map((s, i) => (
-                <div key={i} className={`sm:px-6 ${i > 0 ? "sm:border-l border-paper/20" : ""}`}>
+              {t.hero.stats.map((s, i) => (
+                <div key={s.label} className={`sm:px-6 ${i > 0 ? "sm:border-l border-paper/20" : ""}`}>
                   <dt className="text-[12px] font-semibold uppercase tracking-[0.2em] text-sun">{s.label}</dt>
                   <dd className="font-serif text-3xl sm:text-4xl mt-2">{s.value}</dd>
                 </div>
@@ -162,38 +135,46 @@ export default function HomePage() {
         <section id="proximas-catas" className="scroll-mt-24 py-24 sm:py-32 px-5 sm:px-8 lg:px-12 max-w-[1320px] mx-auto w-full">
           <div className="flex flex-col md:flex-row justify-between md:items-end gap-8 mb-12 sm:mb-16">
             <SectionHeading index="01" eyebrow={t.tastings.badge} title={t.tastings.title} subtitle={t.tastings.subtitle} />
-            <Link
-              href="/catas"
-              className="group inline-flex items-center gap-2 text-[14px] font-semibold text-primary-container whitespace-nowrap"
-            >
-              {t.tastings.viewAll}
-              <span className="material-symbols-outlined text-[18px] transition-transform group-hover:translate-x-1">arrow_forward</span>
-            </Link>
+            {tastings.length > 0 && (
+              <Link
+                href="/catas"
+                className="group inline-flex items-center gap-2 min-h-[44px] text-[14px] font-semibold text-primary-container whitespace-nowrap"
+              >
+                {t.tastings.viewAll}
+                <span className="material-symbols-outlined text-[18px] transition-transform group-hover:translate-x-1" aria-hidden="true">
+                  arrow_forward
+                </span>
+              </Link>
+            )}
           </div>
 
-          {loading ? (
+          {status === "loading" ? (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6" aria-busy="true" aria-label={t.tastings.loading}>
               {[0, 1, 2].map((i) => (
                 <div key={i} className="h-[520px] rounded-xl border border-outline-variant bg-surface-container-low animate-pulse" />
               ))}
             </div>
+          ) : status === "error" ? (
+            <TastingsLoadError lang={lang} onRetry={loadTastings} />
+          ) : featured.length === 0 ? (
+            <TastingsEmptyState lang={lang} />
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8">
-              {tastings.map((tasting) => (
-                <TastingCard key={tasting.id} tasting={tasting} currentLang={lang} />
+              {featured.map((tasting) => (
+                <TastingCard key={tasting.id} tasting={tasting} currentLang={lang} rates={rates} />
               ))}
             </div>
           )}
         </section>
 
-        {/* ─── CURADURÍA ─── */}
-        <section id="terroir" className="scroll-mt-24 bg-surface-container-low border-y border-outline-variant">
+        {/* ─── NOSOTROS ─── */}
+        <section id="nosotros" className="scroll-mt-24 bg-surface-container-low border-y border-outline-variant">
           <div className="max-w-[1320px] mx-auto px-5 sm:px-8 lg:px-12 py-24 sm:py-32 grid grid-cols-1 lg:grid-cols-12 gap-14 lg:gap-16 items-center">
             <div className="lg:col-span-5 grid grid-cols-5 gap-4 items-end">
               <div className="col-span-3 relative arch overflow-hidden aspect-[3/4] bg-surface-container">
                 <Image
                   src="https://images.unsplash.com/photo-1506377247377-2a5b3b417ebb?q=80&w=900&auto=format&fit=crop"
-                  alt={es ? "Copa de vino tinto frente a un viñedo" : "Glass of red wine overlooking a vineyard"}
+                  alt={t.story.imageMainAlt}
                   fill
                   sizes="(min-width: 1024px) 25vw, 60vw"
                   className="object-cover"
@@ -202,7 +183,7 @@ export default function HomePage() {
               <div className="col-span-2 relative rounded-lg overflow-hidden aspect-[3/4] bg-surface-container mb-10">
                 <Image
                   src="https://images.unsplash.com/photo-1528823872057-9c018a7a7553?q=80&w=600&auto=format&fit=crop"
-                  alt={es ? "Tanques de acero en una bodega" : "Steel tanks in a winery cellar"}
+                  alt={t.story.imageSideAlt}
                   fill
                   sizes="(min-width: 1024px) 16vw, 40vw"
                   className="object-cover"
@@ -211,51 +192,109 @@ export default function HomePage() {
             </div>
 
             <div className="lg:col-span-7 lg:pl-8">
-              <SectionHeading index="02" eyebrow={t.terroir.badge} title={t.terroir.title} />
+              <SectionHeading index="02" eyebrow={t.story.badge} title={t.story.title} />
               <div className="mt-6 space-y-4 text-[16px] leading-relaxed text-on-surface-variant max-w-xl">
-                <p>{t.terroir.p1}</p>
-                <p>{t.terroir.p2}</p>
+                <p>{t.story.p1}</p>
+                <p>{t.story.p2}</p>
               </div>
 
               <ol className="mt-10 grid grid-cols-1 sm:grid-cols-3 gap-6 sm:gap-5 border-t border-outline-variant pt-8">
-                {ritual.map((r) => (
+                {t.story.ritual.map((r) => (
                   <li key={r.n}>
-                    <span className="font-serif italic text-tertiary text-lg">{r.n}</span>
+                    <span className="font-serif italic text-tertiary text-lg" aria-hidden="true">{r.n}</span>
                     <h3 className="font-serif text-xl text-on-surface mt-1">{r.title}</h3>
                     <p className="text-[14px] text-on-surface-variant leading-relaxed mt-2">{r.text}</p>
                   </li>
                 ))}
               </ol>
 
-              <Link
-                href="/nosotros"
-                className="group mt-10 inline-flex items-center gap-2 text-[14px] font-semibold text-primary-container"
-              >
-                {t.terroir.cta}
-                <span className="material-symbols-outlined text-[18px] transition-transform group-hover:translate-x-1">arrow_forward</span>
+              <Link href="/nosotros" className="group mt-10 inline-flex items-center gap-2 min-h-[44px] text-[14px] font-semibold text-primary-container">
+                {t.story.cta}
+                <span className="material-symbols-outlined text-[18px] transition-transform group-hover:translate-x-1" aria-hidden="true">
+                  arrow_forward
+                </span>
               </Link>
             </div>
           </div>
         </section>
 
-        {/* ─── FICHA SENSORIAL ─── */}
-        <section className="px-5 sm:px-8 lg:px-12 max-w-[1320px] mx-auto w-full py-24 sm:py-32">
+        {/* ─── SOMMELIERS ─── */}
+        <section id="sommeliers" className="scroll-mt-24 py-24 sm:py-32 px-5 sm:px-8 lg:px-12 max-w-[1320px] mx-auto w-full">
+          <div className="flex flex-col md:flex-row justify-between md:items-end gap-8 mb-12 sm:mb-14">
+            <SectionHeading index="03" eyebrow={t.team.badge} title={t.team.title} subtitle={t.team.subtitle} />
+            <Link
+              href="/nosotros#sommeliers"
+              className="group inline-flex items-center gap-2 min-h-[44px] text-[14px] font-semibold text-primary-container whitespace-nowrap"
+            >
+              {t.team.cta}
+              <span className="material-symbols-outlined text-[18px] transition-transform group-hover:translate-x-1" aria-hidden="true">
+                arrow_forward
+              </span>
+            </Link>
+          </div>
+
+          <ul className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 sm:gap-6">
+            {TEAM.map((member) => (
+              <li key={member.id} className="flex flex-col p-6 sm:p-7 rounded-xl border border-outline-variant bg-surface-container-lowest">
+                <div className="flex items-center gap-4">
+                  {member.photoUrl ? (
+                    // Las fotos pueden venir de Supabase Storage o ser data URL: <img> evita depender de images.remotePatterns.
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={member.photoUrl} alt="" className="w-16 h-16 rounded-full object-cover flex-shrink-0 border border-outline-variant" />
+                  ) : (
+                    <span
+                      className="w-16 h-16 rounded-full flex-shrink-0 bg-primary-container text-paper flex items-center justify-center font-serif text-[22px] tracking-wide"
+                      aria-hidden="true"
+                    >
+                      {teamInitials(member.name)}
+                    </span>
+                  )}
+                  <div className="min-w-0">
+                    <h3 className="font-serif text-[21px] leading-snug text-on-surface">{member.name}</h3>
+                    <p className="text-[12px] font-semibold uppercase tracking-[0.14em] text-tertiary mt-1 leading-snug">{member.role[lang]}</p>
+                  </div>
+                </div>
+                <p className="mt-5 text-[14px] text-on-surface-variant leading-relaxed line-clamp-4">{member.bio[lang]}</p>
+                {member.instagram && (
+                  <a
+                    href={instagramUrl(member.instagram)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    aria-label={t.team.instagram(member.instagram)}
+                    className="mt-auto pt-4 inline-flex items-center gap-1.5 min-h-[44px] text-[13px] font-semibold text-primary-container hover:text-primary"
+                  >
+                    <span className="material-symbols-outlined text-[16px]" aria-hidden="true">photo_camera</span>
+                    {member.instagram}
+                  </a>
+                )}
+              </li>
+            ))}
+          </ul>
+
+          <Link
+            href="/sommeliers"
+            className="group mt-8 inline-flex items-center gap-2 min-h-[44px] text-[14px] font-semibold text-on-surface-variant hover:text-primary-container transition-colors"
+          >
+            {t.team.join}
+            <span className="material-symbols-outlined text-[18px] transition-transform group-hover:translate-x-1" aria-hidden="true">
+              arrow_forward
+            </span>
+          </Link>
+        </section>
+
+        {/* ─── FICHA DE CATA INTERACTIVA ─── */}
+        <section className="px-5 sm:px-8 lg:px-12 max-w-[1320px] mx-auto w-full pb-24 sm:pb-32">
           <div className="relative overflow-hidden rounded-2xl bg-ink text-paper">
             <div className="grid grid-cols-1 lg:grid-cols-12 items-center">
               <div className="lg:col-span-7 p-8 sm:p-14 lg:p-16 relative z-10">
-                <SectionHeading
-                  index="03"
-                  eyebrow={t.liveDemo.badge}
-                  title={t.liveDemo.title}
-                  subtitle={t.liveDemo.description}
-                  tone="dark"
-                />
+                <SectionHeading index="04" eyebrow={t.liveDemo.badge} title={t.liveDemo.title} subtitle={t.liveDemo.description} tone="dark" />
+                <p className="mt-4 text-[13px] text-paper/60 leading-relaxed max-w-xl">{t.liveDemo.note}</p>
                 <Link
-                  href="/cata-en-vivo/tok-demo-1234"
+                  href={LIVE_DEMO_PATH}
                   className="mt-9 inline-flex items-center gap-2 h-[52px] px-7 bg-sun hover:bg-tertiary-fixed-dim text-ink text-[14px] font-semibold rounded transition-colors"
                 >
                   {t.liveDemo.cta}
-                  <span className="material-symbols-outlined text-[18px]">arrow_forward</span>
+                  <span className="material-symbols-outlined text-[18px]" aria-hidden="true">arrow_forward</span>
                 </Link>
               </div>
 
@@ -265,7 +304,15 @@ export default function HomePage() {
                   {Array.from({ length: 12 }).map((_, i) => {
                     const a = (i * 30 * Math.PI) / 180;
                     return (
-                      <line key={i} x1={100 + Math.cos(a) * 34} y1={100 + Math.sin(a) * 34} x2={100 + Math.cos(a) * 92} y2={100 + Math.sin(a) * 92} stroke="currentColor" strokeOpacity="0.25" />
+                      <line
+                        key={i}
+                        x1={100 + Math.cos(a) * 34}
+                        y1={100 + Math.sin(a) * 34}
+                        x2={100 + Math.cos(a) * 92}
+                        y2={100 + Math.sin(a) * 92}
+                        stroke="currentColor"
+                        strokeOpacity="0.25"
+                      />
                     );
                   })}
                   {[34, 58, 92].map((r) => (
@@ -290,35 +337,43 @@ export default function HomePage() {
         </section>
 
         {/* ─── ALIADOS ─── */}
-        <PartnersSection currentLang={lang} />
+        <PartnersSection currentLang={lang} index="05" />
 
-        {/* ─── MARCAS & PATROCINIO ─── */}
-        <CommercialShowcase currentLang={lang} />
+        {/* ─── ALIANZAS, SOMMELIERS Y PRIVADAS ─── */}
+        <CommercialShowcase currentLang={lang} index="06" />
 
         {/* ─── FAQ ─── */}
         <section className="py-24 sm:py-32 px-5 sm:px-8 lg:px-12 max-w-[1320px] mx-auto w-full grid grid-cols-1 lg:grid-cols-12 gap-12">
           <div className="lg:col-span-4">
-            <SectionHeading index="06" eyebrow={t.faq.badge} title={t.faq.title} />
+            <SectionHeading index="07" eyebrow={t.faq.badge} title={t.faq.title} />
           </div>
           <div className="lg:col-span-8 border-t border-outline-variant">
             {t.faq.items.map((faq, idx) => {
               const open = openFaq === idx;
+              const panelId = `faq-${idx}`;
               return (
-                <div key={idx} className="border-b border-outline-variant">
-                  <button
-                    onClick={() => setOpenFaq(open ? null : idx)}
-                    aria-expanded={open}
-                    className="w-full flex items-start justify-between text-left gap-6 py-6 font-serif text-[19px] sm:text-[22px] leading-snug text-on-surface hover:text-primary-container transition-colors"
-                  >
-                    <span>{faq.q}</span>
-                    <span
-                      className={`material-symbols-outlined flex-shrink-0 mt-0.5 text-primary-container transition-transform duration-300 ${open ? "rotate-45" : ""}`}
+                <div key={faq.q} className="border-b border-outline-variant">
+                  <h3>
+                    <button
+                      type="button"
+                      onClick={() => setOpenFaq(open ? null : idx)}
+                      aria-expanded={open}
+                      aria-controls={panelId}
+                      className="w-full flex items-start justify-between text-left gap-6 py-6 font-serif text-[19px] sm:text-[22px] leading-snug text-on-surface hover:text-primary-container transition-colors"
                     >
-                      add
-                    </span>
-                  </button>
+                      <span>{faq.q}</span>
+                      <span
+                        className={`material-symbols-outlined flex-shrink-0 mt-0.5 text-primary-container transition-transform duration-300 ${open ? "rotate-45" : ""}`}
+                        aria-hidden="true"
+                      >
+                        add
+                      </span>
+                    </button>
+                  </h3>
                   {open && (
-                    <p className="pb-7 -mt-1 pr-10 text-[15px] text-on-surface-variant leading-relaxed animate-fade-in">{faq.a}</p>
+                    <p id={panelId} className="pb-7 -mt-1 pr-10 text-[15px] text-on-surface-variant leading-relaxed animate-fade-in">
+                      {faq.a}
+                    </p>
                   )}
                 </div>
               );
@@ -326,30 +381,44 @@ export default function HomePage() {
           </div>
         </section>
 
-        {/* ─── CONTACTO / PRIVADAS ─── */}
+        {/* ─── CONTACTO ─── */}
         <section id="contacto" className="scroll-mt-24 px-5 sm:px-8 lg:px-12 max-w-[1320px] mx-auto w-full pb-20 sm:pb-28">
           <div className="relative text-center border border-outline-variant rounded-2xl bg-surface-container-lowest px-6 sm:px-12 pt-14 sm:pt-20 overflow-hidden">
-            <p className="eyebrow mb-5">{es ? "Catas privadas" : "Private tastings"}</p>
-            <h2 className="font-serif text-[2rem] sm:text-5xl leading-tight text-on-surface max-w-2xl mx-auto text-balance">{t.custom.title}</h2>
-            <p className="mt-5 text-[15px] sm:text-base text-on-surface-variant max-w-xl mx-auto leading-relaxed">{t.custom.subtitle}</p>
+            <p className="eyebrow mb-5">{t.contactSection.badge}</p>
+            <h2 className="font-serif text-[2rem] sm:text-5xl leading-tight text-on-surface max-w-2xl mx-auto text-balance">
+              {t.contactSection.title}
+            </h2>
+            <p className="mt-5 text-[15px] sm:text-base text-on-surface-variant max-w-xl mx-auto leading-relaxed">
+              {t.contactSection.subtitle(CONTACT.ownerName)}
+            </p>
             <div className="mt-9 flex flex-col sm:flex-row gap-3 justify-center">
-              <Link
-                href="/privadas"
-                className="inline-flex items-center justify-center gap-2 h-[52px] px-7 bg-primary-container hover:bg-primary text-white text-[14px] font-semibold rounded transition-colors"
-              >
-                {t.custom.cta}
-              </Link>
               <a
                 href={whatsappLink()}
                 target="_blank"
                 rel="noopener noreferrer"
+                className="inline-flex items-center justify-center gap-2 h-[52px] px-7 bg-primary-container hover:bg-primary text-white text-[14px] font-semibold rounded transition-colors"
+              >
+                <span className="material-symbols-outlined text-[18px]" aria-hidden="true">chat</span>
+                {t.contactSection.whatsapp}
+              </a>
+              <Link
+                href="/registro"
                 className="inline-flex items-center justify-center gap-2 h-[52px] px-7 border border-on-surface/20 hover:border-primary-container hover:text-primary-container text-[14px] font-semibold rounded transition-colors"
               >
-                <span className="material-symbols-outlined text-[18px]">chat</span>
-                WhatsApp
-              </a>
+                {t.contactSection.account}
+              </Link>
             </div>
-            <div className="mt-14 text-primary-container/30">
+
+            <div className="mt-10 max-w-md mx-auto">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-tertiary">{t.contactSection.hours}</p>
+              <ul className="mt-3 space-y-1.5 text-[14px] text-on-surface-variant leading-relaxed">
+                {BUSINESS_HOURS[lang].map((line) => (
+                  <li key={line}>{line}</li>
+                ))}
+              </ul>
+            </div>
+
+            <div className="mt-12 text-primary-container/30">
               <AvilaRidge strokeWidth={1.5} showBirds className="h-16 sm:h-24" />
             </div>
           </div>
