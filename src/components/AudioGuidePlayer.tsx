@@ -30,14 +30,15 @@ interface AudioGuidePlayerProps {
   lang: Language;
   title: string;
   storyText: string;
-  /** Sommelier que guía la cata (se muestra con monograma mientras no haya foto). */
+  /** Sommelier que guía la cata (se muestra con su foto o, si no tiene, con monograma). */
   guideName?: string;
   guideRole?: string;
+  guidePhotoUrl?: string;
   /** Idioma en que está escrito el texto (los textos del admin están en español). */
   textLang?: Language;
 }
 
-export function AudioGuidePlayer({ lang, title, storyText, guideName, guideRole, textLang = "es" }: AudioGuidePlayerProps) {
+export function AudioGuidePlayer({ lang, title, storyText, guideName, guideRole, guidePhotoUrl, textLang = "es" }: AudioGuidePlayerProps) {
   const t = COPY[lang];
   const [supported, setSupported] = useState(true);
   const [speaking, setSpeaking] = useState(false);
@@ -102,12 +103,17 @@ export function AudioGuidePlayer({ lang, title, storyText, guideName, guideRole,
     <section className="rounded-2xl border border-outline-variant bg-surface-container-lowest p-5 sm:p-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div className="flex items-center gap-3.5 min-w-0">
-          <span
-            className="w-12 h-12 rounded-full bg-primary-container text-white font-serif text-[17px] flex items-center justify-center flex-shrink-0"
-            aria-hidden="true"
-          >
-            {guideName ? teamInitials(guideName) : <span className="material-symbols-outlined">record_voice_over</span>}
-          </span>
+          {guidePhotoUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={guidePhotoUrl} alt="" className="w-12 h-12 rounded-full object-cover flex-shrink-0" />
+          ) : (
+            <span
+              className="w-12 h-12 rounded-full bg-primary-container text-white font-serif text-[17px] flex items-center justify-center flex-shrink-0"
+              aria-hidden="true"
+            >
+              {guideName ? teamInitials(guideName) : <span className="material-symbols-outlined">record_voice_over</span>}
+            </span>
+          )}
           <div className="min-w-0">
             <p className="eyebrow">{t.badge}</p>
             <h3 className="font-serif text-lg leading-tight mt-0.5 break-words">{title}</h3>

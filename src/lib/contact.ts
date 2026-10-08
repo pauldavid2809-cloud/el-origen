@@ -34,6 +34,9 @@ export const PAYMENT_ID = "24.698.668";
    es 0412.399.38.48. Se conserva 0412-399-3848 por defecto; se corrige desde Admin → Configuración de pagos. */
 export const PAGO_MOVIL_PHONE = "0412-399-3848";
 
+/** Enlace de cobro de Binance Pay de El Origen (el QR de "Recibir" de su app de Binance). */
+export const BINANCE_PAY_LINK = "https://app.binance.com/uni-qr/Vb5DmVUj";
+
 export const BANK_ACCOUNTS = {
   bdv: { bank: "Banco de Venezuela", accountType: "Cuenta corriente", number: "0102 0245 1200 0024 1704" },
   mercantil: { bank: "Banco Mercantil", accountType: "Cuenta corriente", number: "0105 0019 2810 1931 2823" },

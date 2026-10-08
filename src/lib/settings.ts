@@ -1,5 +1,5 @@
 import "server-only";
-import { BANK_ACCOUNTS, PAGO_MOVIL_PHONE, PAYMENT_ID } from "./contact";
+import { BANK_ACCOUNTS, BINANCE_PAY_LINK, PAGO_MOVIL_PHONE, PAYMENT_ID } from "./contact";
 import { getAdminClient, getSetting, setSetting } from "./orders";
 
 /* Configuración de pagos editable desde el panel (app_settings → key "payment_config"). */
@@ -24,7 +24,8 @@ export interface PaymentConfig {
   transfers: TransferAccount[];
   /** PENDIENTE CLIENTE: titular de las cuentas (y si se muestra en la página). */
   holderName?: string;
-  binance: { enabled: boolean; payId?: string; email?: string; holder?: string };
+  /** `payLink`: enlace de cobro de Binance Pay (el sitio lo muestra como QR y como botón); "" = sin enlace. */
+  binance: { enabled: boolean; payLink?: string; payId?: string; email?: string; holder?: string };
   /** `instructionsEn`: versión en inglés opcional (si falta, la página traduce solo el texto por defecto). */
   efectivo: { enabled: boolean; instructions: string; instructionsEn?: string };
 }
@@ -41,8 +42,7 @@ export const DEFAULT_PAYMENT_CONFIG: PaymentConfig = {
     { id: "tr-bdv", ...BANK_ACCOUNTS.bdv, docId: PAYMENT_ID },
     { id: "tr-mercantil", ...BANK_ACCOUNTS.mercantil, docId: PAYMENT_ID },
   ],
-  // PENDIENTE CLIENTE: Pay ID / correo y titular de Binance.
-  binance: { enabled: true },
+  binance: { enabled: true, payLink: BINANCE_PAY_LINK },
   efectivo: { enabled: true, instructions: "Entrega previa acordada por WhatsApp" },
 };
 
@@ -50,6 +50,16 @@ export class PaymentConfigError extends Error {}
 
 const str = (v: unknown, max = 120): string => (typeof v === "string" ? v.replace(/\s+/g, " ").trim().slice(0, max) : "");
 const optional = (v: unknown, max = 120): string | undefined => str(v, max) || undefined;
+
+/** Enlace https de un dominio de Binance (lo que genera "Recibir → Compartir código QR"). */
+function isBinanceLink(v: string): boolean {
+  try {
+    const u = new URL(v);
+    return u.protocol === "https:" && (u.hostname === "binance.com" || u.hostname.endsWith(".binance.com"));
+  } catch {
+    return false;
+  }
+}
 
 function slugId(v: unknown, prefix: string, index: number, used: Set<string>): string {
   let id = str(v, 40).toLowerCase().replace(/[^a-z0-9-]+/g, "-").replace(/^-+|-+$/g, "");
@@ -104,12 +114,24 @@ export function normalizePaymentConfig(input: unknown): PaymentConfig {
   if (binanceEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(binanceEmail)) {
     throw new PaymentConfigError("Binance: el correo no es válido.");
   }
+  // Una configuración guardada antes de existir el campo no trae la clave: recibe el enlace por defecto.
+  // El panel siempre envía la clave, así que un "" guardado significa que se quitó a propósito.
+  const binancePayLink = b.payLink === undefined ? DEFAULT_PAYMENT_CONFIG.binance.payLink ?? "" : str(b.payLink, 300);
+  if (binancePayLink && !isBinanceLink(binancePayLink)) {
+    throw new PaymentConfigError("Binance: el enlace de cobro debe ser un enlace de Binance (https://app.binance.com/…).");
+  }
 
   return {
     pagoMovil,
     transfers,
     holderName: optional(raw.holderName),
-    binance: { enabled: b.enabled !== false, payId: optional(b.payId, 40), email: binanceEmail, holder: optional(b.holder) },
+    binance: {
+      enabled: b.enabled !== false,
+      payLink: binancePayLink,
+      payId: optional(b.payId, 40),
+      email: binanceEmail,
+      holder: optional(b.holder),
+    },
     efectivo: {
       enabled: e.enabled !== false,
       instructions: str(e.instructions, 300) || DEFAULT_PAYMENT_CONFIG.efectivo.instructions,

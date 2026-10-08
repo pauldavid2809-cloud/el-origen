@@ -13,21 +13,41 @@ interface Partner {
   instagram?: string;
 }
 
-/* Aliados de El Origen (lista del cliente, en su orden). */
-// PENDIENTE CLIENTE: usuarios de Instagram de COCUY La Capilla, Casa Oliveira, Karnivoros Grill, Dimasi Wine y Empresa Paul.
+/* Aliados de El Origen (lista del cliente, en su orden; rubro e Instagram de sus perfiles). */
+// PENDIENTE CLIENTE: nombre comercial exacto, rubro e Instagram de "Empresa Paul"; Instagram de Dimasi Wine
+// (confirmar si se escribe "Dimasi Wine" o "Di Massi", como aparece en la presentación de Raiza Navarro).
 const PARTNERS: Partner[] = [
-  { name: "COCUY La Capilla", category: { es: "Cocuy", en: "Cocuy" }, icon: "liquor" },
-  { name: "Casa Oliveira", category: { es: "Vinos & licores", en: "Wines & spirits" }, icon: "wine_bar" },
-  { name: "Karnivoros Grill", category: { es: "Restaurante", en: "Restaurant" }, icon: "outdoor_grill" },
+  {
+    name: "COCUY La Capilla",
+    category: { es: "Cocuy · Denominación de Origen", en: "Cocuy · Designation of origin" },
+    icon: "liquor",
+    instagram: "@cocuylacapilla",
+  },
+  {
+    name: "Casa Oliveira",
+    category: { es: "Vinos, destilados y alimentos", en: "Wines, spirits & fine food" },
+    icon: "wine_bar",
+    instagram: "@casaoliveira.ve",
+  },
+  {
+    name: "Karnivoros Grill",
+    category: { es: "Restaurante de carnes · CCCT", en: "Steakhouse · CCCT" },
+    icon: "outdoor_grill",
+    instagram: "@karnivoros.grill",
+  },
   {
     name: "Acqua Panna & S.Pellegrino",
-    category: { es: "Aguas minerales", en: "Mineral waters" },
+    category: { es: "Aguas minerales · Brandsimex", en: "Mineral waters · Brandsimex" },
     icon: "water_drop",
     instagram: "@brandsimex_vzla",
   },
-  { name: "Maratea", category: { es: "Restaurante", en: "Restaurant" }, icon: "restaurant", instagram: "@maratea.ccs" },
+  {
+    name: "Maratea",
+    category: { es: "Trattoria italo-venezolana · Las Mercedes", en: "Italian-Venezuelan trattoria · Las Mercedes" },
+    icon: "restaurant",
+    instagram: "@maratea.ccs",
+  },
   { name: "Dimasi Wine", category: { es: "Vinos", en: "Wines" }, icon: "wine_bar" },
-  // PENDIENTE CLIENTE: rubro y nombre comercial exacto de "Empresa Paul".
   { name: "Empresa Paul", category: { es: "Aliado", en: "Partner" }, icon: "handshake" },
 ];
 
