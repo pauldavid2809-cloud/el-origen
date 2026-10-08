@@ -24,7 +24,7 @@ export interface PaymentConfig {
   transfers: TransferAccount[];
   /** PENDIENTE CLIENTE: titular de las cuentas (y si se muestra en la página). */
   holderName?: string;
-  /** `payLink`: enlace de cobro de Binance Pay (el sitio lo muestra como QR y como botón). */
+  /** `payLink`: enlace de cobro de Binance Pay (el sitio lo muestra como QR y como botón); "" = sin enlace. */
   binance: { enabled: boolean; payLink?: string; payId?: string; email?: string; holder?: string };
   /** `instructionsEn`: versión en inglés opcional (si falta, la página traduce solo el texto por defecto). */
   efectivo: { enabled: boolean; instructions: string; instructionsEn?: string };
@@ -114,7 +114,9 @@ export function normalizePaymentConfig(input: unknown): PaymentConfig {
   if (binanceEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(binanceEmail)) {
     throw new PaymentConfigError("Binance: el correo no es válido.");
   }
-  const binancePayLink = optional(b.payLink, 300);
+  // Una configuración guardada antes de existir el campo no trae la clave: recibe el enlace por defecto.
+  // El panel siempre envía la clave, así que un "" guardado significa que se quitó a propósito.
+  const binancePayLink = b.payLink === undefined ? DEFAULT_PAYMENT_CONFIG.binance.payLink ?? "" : str(b.payLink, 300);
   if (binancePayLink && !isBinanceLink(binancePayLink)) {
     throw new PaymentConfigError("Binance: el enlace de cobro debe ser un enlace de Binance (https://app.binance.com/…).");
   }

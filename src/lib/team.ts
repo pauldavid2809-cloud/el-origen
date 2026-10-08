@@ -11,7 +11,8 @@ export interface TeamMember {
   photoUrl?: string;
 }
 
-// El rol se resume a partir de la presentación de cada uno y de su perfil de Instagram.
+// PENDIENTE CLIENTE: cargo exacto de Belkis Croquer, Juan Carlos Arias y Raiza Navarro (se resume de su
+// presentación). El de Fabián Lugo se tomó de su perfil de Instagram.
 export const TEAM: TeamMember[] = [
   {
     id: "belkis-croquer",

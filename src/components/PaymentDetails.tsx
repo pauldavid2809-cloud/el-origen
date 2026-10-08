@@ -1,7 +1,6 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import QRCode from "qrcode";
 import type { Language } from "@/lib/i18n";
 import type { PaymentConfig } from "@/lib/settings";
 import { whatsappLink } from "@/lib/contact";
@@ -161,7 +160,7 @@ export function PaymentDetails({ config, method, lang, selectedId, onSelect, cla
     const fields: Field[] = [];
     if (b.payId) fields.push({ name: t.payId, value: b.payId });
     if (b.email) fields.push({ name: t.email, value: b.email });
-    if (fields.length && b.holder) fields.push({ name: t.holder, value: b.holder });
+    if (b.holder && (fields.length || b.payLink)) fields.push({ name: t.holder, value: b.holder });
     if (fields.length) destinations = [{ id: "binance", title: "Binance USDT", fields }];
   }
 
@@ -252,7 +251,11 @@ function BinancePayQr({ link, lang }: { link: string; lang: Language }) {
 
   useEffect(() => {
     let alive = true;
-    QRCode.toDataURL(link, { width: 360, margin: 1, errorCorrectionLevel: "M", color: { dark: "#1E1E1E", light: "#FFFFFF" } })
+    // Carga diferida: formatUsd/formatBs de este módulo se usan en páginas sin QR.
+    import("qrcode")
+      .then(({ default: QRCode }) =>
+        QRCode.toDataURL(link, { width: 360, margin: 1, errorCorrectionLevel: "M", color: { dark: "#1E1E1E", light: "#FFFFFF" } })
+      )
       .then((url) => alive && setSrc(url))
       .catch(() => alive && setSrc(null));
     return () => {

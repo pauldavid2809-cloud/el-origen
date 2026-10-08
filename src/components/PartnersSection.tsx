@@ -14,7 +14,8 @@ interface Partner {
 }
 
 /* Aliados de El Origen (lista del cliente, en su orden; rubro e Instagram de sus perfiles). */
-// PENDIENTE CLIENTE: usuario de Instagram de Dimasi Wine, y rubro e Instagram de "Empresa Paul".
+// PENDIENTE CLIENTE: nombre comercial exacto, rubro e Instagram de "Empresa Paul"; Instagram de Dimasi Wine
+// (confirmar si se escribe "Dimasi Wine" o "Di Massi", como aparece en la presentación de Raiza Navarro).
 const PARTNERS: Partner[] = [
   {
     name: "COCUY La Capilla",

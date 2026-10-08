@@ -110,12 +110,12 @@ export default function LiveTastingPage() {
     return ticket ? [{ name: ticket.tastingTitle, vintage: "", type: "", description: "", aromaProfile: [] }] : [];
   }, [demo, t.demoProducts, tasting, ticket]);
 
-  const guides: CertificateSigner[] = useMemo(
+  const guides: (CertificateSigner & { photoUrl?: string })[] = useMemo(
     () =>
       (tasting?.sommelierIds ?? [])
         .map((id) => getTeamMember(id))
         .filter((m): m is NonNullable<typeof m> => Boolean(m))
-        .map((m) => ({ name: m.name, role: m.role[lang] })),
+        .map((m) => ({ name: m.name, role: m.role[lang], photoUrl: m.photoUrl })),
     [tasting, lang]
   );
 
@@ -290,6 +290,7 @@ export default function LiveTastingPage() {
               storyText={story}
               guideName={guide?.name}
               guideRole={guide?.role}
+              guidePhotoUrl={guide?.photoUrl}
               textLang={demo ? lang : "es"}
             />
           )}

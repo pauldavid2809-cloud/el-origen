@@ -605,9 +605,14 @@ export function CataForm({ source, mode, heldSpots = 0, rates, onClose, onSaved 
                 return (
                   <label key={m.id} className={`flex items-center gap-3 min-h-[56px] px-3 rounded border cursor-pointer ${checked ? "border-primary-container bg-primary-fixed/50" : "border-outline-variant"}`}>
                     <input type="checkbox" checked={checked} onChange={() => toggleSommelier(m.id)} className="accent-[#7D2A46] w-4 h-4" />
-                    <span className="w-9 h-9 flex-shrink-0 rounded-full bg-primary-container text-white text-[12px] font-semibold flex items-center justify-center" aria-hidden="true">
-                      {teamInitials(m.name)}
-                    </span>
+                    {m.photoUrl ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={m.photoUrl} alt="" className="w-9 h-9 flex-shrink-0 rounded-full object-cover" />
+                    ) : (
+                      <span className="w-9 h-9 flex-shrink-0 rounded-full bg-primary-container text-white text-[12px] font-semibold flex items-center justify-center" aria-hidden="true">
+                        {teamInitials(m.name)}
+                      </span>
+                    )}
                     <span className="min-w-0">
                       <span className="block text-[14px] font-semibold">{m.name}</span>
                       <span className="block text-[12px] text-on-surface-variant truncate">{m.role.es}</span>
