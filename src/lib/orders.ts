@@ -105,7 +105,15 @@ export function getAdminClient(): SupabaseClient | null {
   if (admin !== undefined) return admin;
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  admin = url && key && !url.includes("placeholder") ? createClient(url, key, { auth: { persistSession: false } }) : null;
+  // Next.js guarda en su caché de datos las respuestas de fetch() aunque la ruta sea dinámica:
+  // sin `no-store`, una consulta repetida (catas, órdenes, cupos) devolvería datos viejos.
+  admin =
+    url && key && !url.includes("placeholder")
+      ? createClient(url, key, {
+          auth: { persistSession: false },
+          global: { fetch: (input, init) => fetch(input, { ...init, cache: "no-store" }) },
+        })
+      : null;
   if (!admin) console.warn("[datos] Supabase no configurado: los datos se guardan en memoria (solo pruebas).");
   return admin;
 }
