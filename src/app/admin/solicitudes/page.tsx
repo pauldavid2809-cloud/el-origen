@@ -1,21 +1,24 @@
 "use client";
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { BrandLead, LeadStatus, LeadType, PrivateInquiry, SommelierApplication } from "@/lib/leads";
+import type { BrandLead, LeadStatus, LeadType, PrivateInquiry, SommelierApplication, WaitlistEntry } from "@/lib/leads";
 import { PRIVADAS_COPY } from "@/app/privadas/copy";
 import { ALIANZAS_COPY } from "@/app/alianzas/copy";
 import { SOMMELIERS_COPY } from "@/app/sommeliers/copy";
 import { instagramUrl } from "@/lib/team";
 
-/* Bandeja de solicitudes de los formularios públicos: Privadas, Marcas y Sommeliers. */
+/* Bandeja de solicitudes de los formularios públicos: Privadas, Marcas, Sommeliers y Lista de espera. */
 
-type AnyLead = PrivateInquiry | BrandLead | SommelierApplication;
+type AnyLead = PrivateInquiry | BrandLead | SommelierApplication | WaitlistEntry;
 
 const TABS: { type: LeadType; slug: string; label: string; icon: string; empty: string }[] = [
   { type: "private", slug: "privadas", label: "Privadas", icon: "celebration", empty: "Aún no hay solicitudes de propuestas privadas." },
   { type: "brand", slug: "marcas", label: "Marcas", icon: "handshake", empty: "Aún no hay solicitudes de marcas aliadas." },
   { type: "sommelier", slug: "sommeliers", label: "Sommeliers", icon: "wine_bar", empty: "Aún no hay postulaciones de sommeliers." },
+  { type: "waitlist", slug: "espera", label: "En espera", icon: "hourglass_top", empty: "Aún no hay nadie en la lista de espera." },
 ];
+
+const NEXT_TASTING_LABEL = "La próxima cata que haya";
 
 const STATUS: Record<LeadStatus, { label: string; plural: string; badge: string }> = {
   new: { label: "Nueva", plural: "Nuevas", badge: "bg-primary-fixed text-on-primary-fixed-variant" },
@@ -81,6 +84,19 @@ function summary(type: LeadType, lead: AnyLead) {
       email: l.email,
       greeting: `Hola ${firstName(l.contactName)}, te escribimos de El Origen sobre la alianza con ${l.brand}.`,
       search: [l.brand, l.company, l.contactName, l.phone, l.email].join(" "),
+    };
+  }
+  if (type === "waitlist") {
+    const l = lead as WaitlistEntry;
+    return {
+      title: l.fullName,
+      subtitle: `${l.tastingTitle ?? NEXT_TASTING_LABEL} · ${l.spots} ${l.spots === 1 ? "persona" : "personas"}`,
+      phone: l.phone,
+      email: l.email,
+      greeting: `Hola ${firstName(l.fullName)}, te escribimos de El Origen por tu lugar en la lista de espera${
+        l.tastingTitle ? ` de «${l.tastingTitle}»` : ""
+      }.`,
+      search: [l.fullName, l.phone, l.email ?? "", l.tastingTitle ?? NEXT_TASTING_LABEL].join(" "),
     };
   }
   const l = lead as SommelierApplication;
@@ -209,7 +225,7 @@ export default function AdminSolicitudesPage() {
           <p className="eyebrow mb-2">Panel</p>
           <h1 className="font-serif text-3xl sm:text-4xl">Solicitudes</h1>
           <p className="text-[14px] text-on-surface-variant mt-1">
-            Propuestas privadas, marcas aliadas y postulaciones de sommeliers recibidas desde el sitio.
+            Propuestas privadas, marcas aliadas, postulaciones de sommeliers y lista de espera recibidas desde el sitio.
           </p>
         </div>
         <button
@@ -229,7 +245,7 @@ export default function AdminSolicitudesPage() {
       )}
 
       {/* Pestañas */}
-      <div role="tablist" aria-label="Tipo de solicitud" className="grid grid-cols-3 gap-1 p-1 rounded-xl bg-surface-container-low border border-outline-variant">
+      <div role="tablist" aria-label="Tipo de solicitud" className="grid grid-cols-2 sm:grid-cols-4 gap-1 p-1 rounded-xl bg-surface-container-low border border-outline-variant">
         {TABS.map((t, i) => {
           const active = t.type === tab;
           const pending = newCounts?.[t.type] ?? 0;
@@ -266,6 +282,8 @@ export default function AdminSolicitudesPage() {
       </div>
 
       <div id="solicitudes-panel" role="tabpanel" aria-labelledby={`tab-${current.slug}`} className="space-y-5">
+        {tab === "waitlist" && <ShareLink path="/lista-de-espera" />}
+
         {/* Filtros */}
         <div className="flex flex-col lg:flex-row gap-3 lg:items-center">
           <div className="flex flex-wrap gap-2" role="group" aria-label="Filtrar por estado">
@@ -428,6 +446,45 @@ function LeadCard({
   );
 }
 
+/** Enlace público de la lista de espera, listo para copiar y pegar en historias de Instagram. */
+function ShareLink({ path }: { path: string }) {
+  const [url, setUrl] = useState(path);
+  const [copied, setCopied] = useState(false);
+  useEffect(() => setUrl(`${window.location.origin}${path}`), [path]);
+
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(url);
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 2500);
+    } catch {
+      window.prompt("Copia el enlace:", url);
+    }
+  };
+
+  return (
+    <div className="rounded-xl border border-outline-variant bg-surface-container-low p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center gap-3">
+      <div className="min-w-0 flex-1">
+        <p className="text-[13px] font-semibold text-on-surface">Enlace para compartir</p>
+        <p className="text-[13px] text-on-surface-variant">
+          Ponlo en tus historias de Instagram o envíalo a quien se quedó sin cupo. Quien se anote aparece aquí.
+        </p>
+        <a href={url} target="_blank" rel="noopener noreferrer" className="mt-1 block text-[14px] text-primary-container font-semibold break-all hover:underline">
+          {url}
+        </a>
+      </div>
+      <button
+        type="button"
+        onClick={copy}
+        className="h-11 px-4 rounded border border-outline-variant bg-surface-container-lowest hover:border-primary-container text-[14px] font-semibold inline-flex items-center justify-center gap-2 sm:flex-shrink-0"
+      >
+        <span className="material-symbols-outlined text-[18px]" aria-hidden="true">{copied ? "check" : "content_copy"}</span>
+        <span aria-live="polite">{copied ? "Copiado" : "Copiar enlace"}</span>
+      </button>
+    </div>
+  );
+}
+
 function Detail({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div className="min-w-0">
@@ -478,6 +535,27 @@ function LeadDetails({ type, lead }: { type: LeadType; lead: AnyLead }) {
           <Detail label="Muestras">{l.wantsToSendSamples ? "Quiere enviar muestras" : "No"}</Detail>
         </dl>
         <Message label="Mensaje" text={l.message} />
+      </>
+    );
+  }
+
+  if (type === "waitlist") {
+    const l = lead as WaitlistEntry;
+    return (
+      <>
+        <dl className={grid}>
+          <Detail label="Cata">
+            {l.tastingId && l.tastingTitle ? (
+              <a href={`/catas/${encodeURIComponent(l.tastingId)}`} target="_blank" rel="noopener noreferrer" className="text-primary-container hover:underline">
+                {l.tastingTitle}
+              </a>
+            ) : (
+              l.tastingTitle ?? NEXT_TASTING_LABEL
+            )}
+          </Detail>
+          <Detail label="Personas">{l.spots}</Detail>
+        </dl>
+        <Message label="Comentario" text={l.message} />
       </>
     );
   }

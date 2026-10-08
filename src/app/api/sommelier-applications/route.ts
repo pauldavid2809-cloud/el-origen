@@ -5,7 +5,7 @@ export const dynamic = "force-dynamic";
 
 /**
  * Postulación a la red de sommeliers & directores de cata.
- * Body: { fullName, phone, email, instagram?, certification, specialties: string[], yearsExperience,
+ * Body: { fullName, phone, email, instagram, certification, specialties: string[], yearsExperience,
  *         cvUrl?, memorableExperience }
  */
 export const POST = leadPostHandler("sommelier-applications", (body) =>

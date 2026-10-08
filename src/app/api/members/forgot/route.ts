@@ -98,6 +98,6 @@ ${p(esc(t.ignore), "color:#6A5650;font-size:14px")}
 ${p(`${esc(t.fallback)}<br><a href="${esc(link)}" style="color:#7D2A46;word-break:break-all">${esc(link)}</a>`, "color:#6A5650;font-size:13px;margin:0")}
 </td></tr>
 <tr><td style="border-top:1px solid #DACDBC;padding:18px 28px;text-align:center;font-size:12px;color:#6A5650">
-${esc(t.support)}: ${esc(CONTACT.ownerName)} · <a href="https://wa.me/${CONTACT.whatsappNumber}" style="color:#7D2A46">${esc(CONTACT.phoneDisplay)}</a> · ${esc(CONTACT.instagramHandle)}
+${esc(t.support)}: <a href="https://wa.me/${CONTACT.whatsappNumber}" style="color:#7D2A46">${esc(CONTACT.phoneDisplay)}</a> · ${esc(CONTACT.instagramHandle)}
 </td></tr></table></td></tr></table></body></html>`;
 }

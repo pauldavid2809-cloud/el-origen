@@ -29,7 +29,7 @@ export function Footer({ currentLang }: FooterProps) {
     {
       href: whatsappLink(),
       icon: "chat",
-      label: `${t.footer.customerService} · ${CONTACT.ownerName}`,
+      label: t.footer.customerService,
       value: CONTACT.phoneDisplay,
     },
     { href: CONTACT.instagramUrl, icon: "photo_camera", label: "Instagram", value: CONTACT.instagramHandle },
@@ -38,8 +38,8 @@ export function Footer({ currentLang }: FooterProps) {
 
   return (
     <footer className="mt-auto text-paper">
-      {/* Silueta del Ávila como transición */}
-      <AvilaRidge fill="var(--wine-deep)" stroke="var(--wine-deep)" showValley={false} className="h-16 sm:h-24 -mb-px" />
+      {/* Silueta del Ávila con el Hotel Humboldt como transición */}
+      <AvilaRidge fill="var(--wine-deep)" stroke="var(--wine-deep)" showValley={false} showHumboldt className="h-16 sm:h-24 -mb-px" />
 
       <div className="bg-primary">
         {/* pb-24 deja libre la franja inferior que ocupa el botón flotante de WhatsApp (WhatsAppConcierge). */}

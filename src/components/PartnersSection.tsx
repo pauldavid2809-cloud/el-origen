@@ -18,7 +18,7 @@ interface Partner {
 // (confirmar si se escribe "Dimasi Wine" o "Di Massi", como aparece en la presentación de Raiza Navarro).
 const PARTNERS: Partner[] = [
   {
-    name: "COCUY La Capilla",
+    name: "Cocuy La Capilla",
     category: { es: "Cocuy · Denominación de Origen", en: "Cocuy · Designation of origin" },
     icon: "liquor",
     instagram: "@cocuylacapilla",

@@ -16,7 +16,6 @@ import {
   SuccessPanel,
   TextAreaField,
   TextField,
-  isBlank,
   isPhone,
   primaryButtonClass,
   secondaryButtonClass,
@@ -27,7 +26,7 @@ import {
 import { FORM_COPY } from "./_components/copy";
 import { PRIVADAS_COPY } from "./copy";
 
-type Field = "fullName" | "phone" | "email" | "eventType" | "guests";
+type Field = "fullName" | "company" | "phone" | "email" | "eventType" | "interest" | "guests" | "restaurant" | "message";
 
 export default function PrivateEventsPage() {
   const [lang, setLang] = useLang();
@@ -51,10 +50,14 @@ export default function PrivateEventsPage() {
   const validate = (): FieldErrors<Field> => {
     const errs: FieldErrors<Field> = {};
     if (fullName.trim().length < 3) errs.fullName = t.errors.fullName;
+    if (company.trim().length < 2) errs.company = t.errors.company;
     if (!isPhone(phone)) errs.phone = t.errors.phone;
-    if (!isBlank(email) && !EMAIL_RE.test(email.trim())) errs.email = t.errors.email;
+    if (!EMAIL_RE.test(email.trim())) errs.email = t.errors.email;
     if (!eventType) errs.eventType = t.errors.eventType;
+    if (interest.trim().length < 2) errs.interest = t.errors.interest;
     if (!guests) errs.guests = t.errors.guests;
+    if (!restaurant) errs.restaurant = t.errors.restaurant;
+    if (message.trim().length < 3) errs.message = t.errors.message;
     return errs;
   };
 
@@ -198,13 +201,13 @@ export default function PrivateEventsPage() {
                       required
                     />
                     <TextField
-                      id="privada-company"
-                      lang={lang}
+                      {...form.bind("company", setCompany)}
                       label={t.company}
+                      hint={t.companyHint}
                       value={company}
-                      onChange={setCompany}
                       autoComplete="organization"
                       maxLength={120}
+                      required
                     />
                     <TextField
                       {...form.bind("phone", setPhone)}
@@ -227,6 +230,7 @@ export default function PrivateEventsPage() {
                       autoCapitalize="none"
                       spellCheck={false}
                       maxLength={200}
+                      required
                     />
                     <SelectField
                       {...form.bind<PrivateEventType>("eventType", setEventType)}
@@ -237,13 +241,12 @@ export default function PrivateEventsPage() {
                       required
                     />
                     <TextField
-                      id="privada-interest"
-                      lang={lang}
+                      {...form.bind("interest", setInterest)}
                       label={t.interest}
                       placeholder={t.interestPlaceholder}
                       value={interest}
-                      onChange={setInterest}
                       maxLength={200}
+                      required
                     />
                   </div>
 
@@ -256,23 +259,21 @@ export default function PrivateEventsPage() {
                   />
 
                   <ChoiceGroup
-                    id="privada-restaurant"
-                    lang={lang}
+                    {...form.bind<PrivateRestaurant>("restaurant", setRestaurant)}
                     legend={t.restaurant}
                     options={toOptions(t.restaurants)}
                     value={restaurant}
-                    onChange={setRestaurant}
                     columns={2}
+                    required
                   />
 
                   <TextAreaField
-                    id="privada-message"
-                    lang={lang}
+                    {...form.bind("message", setMessage)}
                     label={t.message}
                     placeholder={t.messagePlaceholder}
                     value={message}
-                    onChange={setMessage}
                     maxLength={2000}
+                    required
                   />
                 </LeadFormShell>
               )}

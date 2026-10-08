@@ -2,10 +2,11 @@ import "server-only";
 import crypto from "crypto";
 import { getAdminClient } from "./orders";
 
-/* Imágenes públicas (fotos de catas y recuerdos) en Supabase Storage.
+/* Imágenes públicas (fotos de catas, recuerdos y publicidad) en Supabase Storage.
    Sin Supabase se devuelven como data URL (solo pruebas locales). */
 
-export type PublicImageFolder = "catas" | "recuerdos";
+export type PublicImageFolder = "catas" | "recuerdos" | "anuncios";
+export const PUBLIC_IMAGE_FOLDERS: readonly PublicImageFolder[] = ["catas", "recuerdos", "anuncios"];
 
 export const MAX_IMAGE_BYTES = 6 * 1024 * 1024;
 
@@ -30,7 +31,7 @@ function sniffImageType(data: Buffer): string | null {
  * Lanza `ImageUploadError` si el archivo no es válido.
  */
 export async function uploadPublicImage(folder: PublicImageFolder, data: Buffer, contentType: string): Promise<string> {
-  if (folder !== "catas" && folder !== "recuerdos") throw new ImageUploadError("Carpeta inválida.");
+  if (!PUBLIC_IMAGE_FOLDERS.includes(folder)) throw new ImageUploadError("Carpeta inválida.");
   if (!data?.length) throw new ImageUploadError("El archivo está vacío.");
   if (data.length > MAX_IMAGE_BYTES) throw new ImageUploadError("La imagen supera los 6 MB.");
   const declared = (contentType ?? "").toLowerCase().split(";")[0].trim().replace("image/jpg", "image/jpeg");

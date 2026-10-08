@@ -22,7 +22,7 @@ interface Stats {
     approvedUsd: number;
   }[];
   members: { total: number; last7Days: number };
-  leads: { private: number; brand: number; sommelier: number };
+  leads: { private: number; brand: number; sommelier: number; waitlist?: number };
   recentOrders: {
     code: string;
     customerName: string;
@@ -71,7 +71,7 @@ export default function AdminDashboardPage() {
     load();
   }, [load]);
 
-  const newLeads = stats ? stats.leads.private + stats.leads.brand + stats.leads.sommelier : 0;
+  const newLeads = stats ? stats.leads.private + stats.leads.brand + stats.leads.sommelier + (stats.leads.waitlist ?? 0) : 0;
 
   return (
     <div className="p-5 sm:p-8 lg:p-10 max-w-6xl mx-auto space-y-8">
@@ -196,7 +196,7 @@ export default function AdminDashboardPage() {
               icon="inbox"
               label="Solicitudes nuevas"
               value={String(newLeads)}
-              hint={`${stats.leads.private} privadas · ${stats.leads.brand} marcas · ${stats.leads.sommelier} sommeliers`}
+              hint={`${stats.leads.private} privadas · ${stats.leads.brand} marcas · ${stats.leads.sommelier} sommeliers · ${stats.leads.waitlist ?? 0} en espera`}
               href="/admin/solicitudes"
             />
             <Metric

@@ -37,7 +37,7 @@ export function JsonLd() {
       {
         "@type": "ContactPoint",
         contactType: "customer service",
-        name: CONTACT.ownerName,
+        name: "Atención al cliente El Origen",
         telephone: CONTACT.phoneIntl,
         email: CONTACT.email,
         url: `https://wa.me/${CONTACT.whatsappNumber}`,
