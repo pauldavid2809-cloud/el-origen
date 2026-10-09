@@ -3,6 +3,8 @@
 import React, { useEffect, useId, useRef, useState } from "react";
 import type { CataInput } from "@/lib/catas";
 import { TEAM, teamInitials } from "@/lib/team";
+import { shrinkImage } from "@/lib/shrinkImage";
+import { VENUES, getVenue, venueForLocation } from "@/lib/venues";
 import type { RateCurrency, Tasting, TastingCategory, TastingStatus } from "@/types";
 
 /* Formulario completo de una cata (crear, editar o duplicar). Envía un `CataInput` a /api/admin/catas. */
@@ -234,6 +236,30 @@ export function CataForm({ source, mode, heldSpots = 0, rates, onClose, onSaved 
     setS((prev) => ({ ...prev, [key]: prev[key].map((row, i) => (i === index ? { ...row, ...patch } : row)) }));
     setDirty(true);
   };
+  /** Restaurante aliado: llena lugar, dirección e Instagram (su reseña sale en la página de compra). */
+  const chooseVenue = (venueId: string) => {
+    const next = getVenue(venueId);
+    setS((prev) => {
+      const before = venueForLocation(prev.location);
+      if (next === before) return prev;
+      const fromBefore = (value: string, field: "address" | "mapsUrl") => !value || (before ? value === before[field] : false);
+      const handle = (h: string) => h.trim().replace(/^@/, "").toLowerCase();
+      const instagram = prev.instagram.filter((ig) => !before || handle(ig.handle) !== handle(before.instagram));
+      if (next && !instagram.some((ig) => handle(ig.handle) === handle(next.instagram))) {
+        instagram.push(k({ handle: next.instagram, label: "Lugar" }));
+      }
+      return {
+        ...prev,
+        location: next ? next.name : "",
+        locationAddress: fromBefore(prev.locationAddress, "address") ? next?.address ?? "" : prev.locationAddress,
+        mapsUrl: fromBefore(prev.mapsUrl, "mapsUrl") ? next?.mapsUrl ?? "" : prev.mapsUrl,
+        instagram,
+      };
+    });
+    setDirty(true);
+  };
+  const venue = venueForLocation(s.location);
+
   const removeRow = (key: "wines" | "pairings" | "instagram" | "addOns", index: number) => {
     setS((prev) => ({ ...prev, [key]: prev[key].filter((_, i) => i !== index) }));
     setDirty(true);
@@ -280,18 +306,21 @@ export function CataForm({ source, mode, heldSpots = 0, rates, onClose, onSaved 
       setError("Formato no permitido. Use una imagen JPG, PNG o WebP.");
       return;
     }
-    if (file.size > MAX_IMAGE_BYTES) {
-      setError("La imagen supera los 6 MB. Redúzcala (1600×1200 px es suficiente) e intente de nuevo.");
-      return;
-    }
     setUploading(true);
     try {
+      // Se reduce en el navegador (lado mayor 1600 px): Vercel rechaza subidas de más de 4,5 MB.
+      const image = await shrinkImage(file, 1600, 0.86);
+      if (image.size > MAX_IMAGE_BYTES) {
+        throw new Error("La imagen supera los 6 MB. Redúzcala (1600×1200 px es suficiente) e intente de nuevo.");
+      }
       const form = new FormData();
-      form.append("file", file);
+      form.append("file", image, image === file ? file.name : "portada.jpg");
       form.append("folder", "catas");
       const res = await fetch("/api/admin/upload", { method: "POST", body: form });
-      const data = await res.json();
-      if (!data.success) throw new Error(data.message);
+      const data = await res.json().catch(() => null);
+      if (!res.ok || !data?.success) {
+        throw new Error(data?.message || (res.status === 413 ? "La imagen es demasiado pesada. Use una de menos de 4 MB." : "No se pudo subir la imagen."));
+      }
       set("imageUrl", data.url);
     } catch (err) {
       setError((err as Error).message || "No se pudo subir la imagen.");
@@ -343,7 +372,7 @@ export function CataForm({ source, mode, heldSpots = 0, rates, onClose, onSaved 
     <div className="fixed inset-0 z-50 bg-ink/50 flex items-stretch sm:items-center justify-center sm:p-4" role="dialog" aria-modal="true" aria-labelledby={id("heading")}>
       <form
         onSubmit={submit}
-        className="relative w-full sm:max-w-3xl bg-background sm:rounded-2xl flex flex-col max-h-[100dvh] sm:max-h-[92vh] overflow-hidden"
+        className="relative w-full sm:max-w-3xl bg-background sm:rounded-2xl flex flex-col max-h-[100dvh] sm:max-h-[92vh] overflow-clip"
       >
         <header className="flex items-center justify-between gap-3 border-b border-outline-variant px-5 sm:px-6 h-16 flex-shrink-0">
           <h2 id={id("heading")} className="font-serif text-2xl truncate">
@@ -401,6 +430,22 @@ export function CataForm({ source, mode, heldSpots = 0, rates, onClose, onSaved 
                 <label htmlFor={id("timeEnd")} className={labelCls}>Hora de cierre</label>
                 <input id={id("timeEnd")} type="time" value={s.timeEnd} onChange={(e) => set("timeEnd", e.target.value)} className={inputCls} />
               </div>
+            </div>
+            <div>
+              <label htmlFor={id("venue")} className={labelCls}>Restaurante aliado</label>
+              <select id={id("venue")} value={venue?.id ?? ""} onChange={(e) => chooseVenue(e.target.value)} className={inputCls}>
+                <option value="">Otro lugar (escríbalo abajo)</option>
+                {VENUES.map((v) => (
+                  <option key={v.id} value={v.id}>
+                    {v.name}
+                  </option>
+                ))}
+              </select>
+              <p className={hintCls}>
+                {venue
+                  ? `La reseña de ${venue.name} aparece en la página de compra, junto al sommelier.`
+                  : "Al elegir un aliado se llenan el lugar, la dirección y su Instagram, y su reseña aparece en la página de compra."}
+              </p>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
@@ -492,9 +537,11 @@ export function CataForm({ source, mode, heldSpots = 0, rates, onClose, onSaved 
               </div>
               <div className="space-y-3">
                 <p className="text-[13px] text-on-surface-variant">
-                  Recomendado: <strong className="text-on-surface">1600×1200 px, 4:3, lo importante al centro</strong>. JPG, PNG o WebP de hasta 6 MB.
+                  Recomendado: <strong className="text-on-surface">1600×1200 px, 4:3, lo importante al centro</strong>. JPG, PNG o WebP; si es muy grande se reduce sola al subirla.
                 </p>
-                <div className="flex flex-wrap gap-2">
+                {/* relative: el input oculto queda dentro de la zona con scroll. Si su bloque contenedor fuera el
+                    form, al enfocarlo el navegador desplazaba el form y el diálogo quedaba en blanco. */}
+                <div className="relative flex flex-wrap gap-2">
                   <input
                     ref={fileRef}
                     id={id("file")}

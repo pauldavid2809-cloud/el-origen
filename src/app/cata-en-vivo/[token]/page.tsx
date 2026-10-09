@@ -322,7 +322,8 @@ export default function LiveTastingPage() {
             />
           )}
 
-          <div className="flex flex-col sm:flex-row items-center justify-between gap-3 rounded-2xl border border-outline-variant bg-surface-container-lowest p-4">
+          <div className="rounded-2xl border border-outline-variant bg-surface-container-lowest p-4">
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-3">
             <p className="text-[14px] text-on-surface-variant">{t.progress(ratedCount, products.length)}</p>
             <button
               type="button"
@@ -337,6 +338,11 @@ export default function LiveTastingPage() {
               <span className="material-symbols-outlined text-[20px]" aria-hidden="true">workspace_premium</span>
               {t.seeCertificate}
             </button>
+          </div>
+          <p className="mt-3 pt-3 border-t border-outline-variant text-[12px] leading-relaxed text-on-surface-variant flex gap-2">
+            <span className="material-symbols-outlined text-[16px] flex-shrink-0" aria-hidden="true">info</span>
+            {t.certificateNote}
+          </p>
           </div>
         </div>
       ) : (

@@ -22,6 +22,7 @@ const NAV_ITEMS: NavItem[] = [
   { href: "/admin/miembros", label: "Miembros", icon: "group" },
   { href: "/admin/solicitudes", label: "Solicitudes", icon: "inbox", also: ["/admin/privadas"] },
   { href: "/admin/recuerdos", label: "Recuerdos", icon: "photo_library" },
+  { href: "/admin/publicidad", label: "Publicidad", icon: "campaign" },
   { href: "/admin/configuracion", label: "Configuración de pagos", icon: "account_balance" },
   { href: "/admin/automatizaciones", label: "Correo y WhatsApp", icon: "forum" },
   { href: "/admin/scanner", label: "Escáner", icon: "qr_code_scanner" },

@@ -61,7 +61,7 @@ function shell(title: string, body: string): string {
 </td></tr>
 <tr><td style="padding:28px">${body}</td></tr>
 <tr><td style="border-top:1px solid #DACDBC;padding:18px 28px;text-align:center;font-size:12px;color:#6A5650">
-Atención al cliente: ${esc(CONTACT.ownerName)} · <a href="https://wa.me/${CONTACT.whatsappNumber}" style="color:#7D2A46">${esc(CONTACT.phoneDisplay)}</a> · ${esc(CONTACT.instagramHandle)}<br>${esc(CONTACT.email)}
+Atención al cliente: <a href="https://wa.me/${CONTACT.whatsappNumber}" style="color:#7D2A46">${esc(CONTACT.phoneDisplay)}</a> · ${esc(CONTACT.instagramHandle)}<br>${esc(CONTACT.email)}
 </td></tr></table></td></tr></table></body></html>`;
 }
 

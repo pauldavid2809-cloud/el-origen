@@ -10,7 +10,7 @@ export const dynamic = "force-dynamic";
 
 /**
  * Solicitud de propuesta privada (Experiencias Privadas & Eventos Corporativos).
- * Body: { fullName, company?, phone, email?, eventType, interest?, guests, restaurant?, message? }
+ * Body: { fullName, company, phone, email, eventType, interest, guests, restaurant, message } (todos obligatorios)
  * El listado para el panel está en GET /api/admin/leads?type=private.
  */
 export const POST = leadPostHandler("private-events", (body) =>

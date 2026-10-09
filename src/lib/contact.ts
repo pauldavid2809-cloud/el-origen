@@ -1,7 +1,6 @@
 /* Datos oficiales de contacto y pago de El Origen (fuente única). */
 
 export const CONTACT = {
-  ownerName: "Jaifred Pastran",
   /** WhatsApp Business: también es el número desde el que salen las entradas. */
   whatsappNumber: "584141074007",
   phoneDisplay: "0414-107-4007",

@@ -137,7 +137,7 @@ export const translations = {
       title: "Ficha de cata interactiva",
       description:
         "Durante la cata, cada asistente abre desde su teléfono la rueda de aromas, toma sus notas y califica cada copa. Al final se lleva su certificado de degustador.",
-      note: "El certificado es un recuerdo simbólico de la experiencia; no tiene validez oficial.",
+      note: "El certificado no tiene validez profesional ni académica: es un recuerdo y una fase más de la experiencia.",
       cta: "Probar la ficha",
     },
     partners: {
@@ -220,8 +220,7 @@ export const translations = {
     contactSection: {
       badge: "Contacto",
       title: "Conversemos",
-      subtitle: (owner: string) =>
-        `${owner} te atiende por WhatsApp para reservas, catas privadas y alianzas.`,
+      subtitle: "Te atendemos por WhatsApp para reservas, catas privadas y alianzas.",
       whatsapp: "Escribir por WhatsApp",
       account: "Crear mi Cuenta Origen",
       hours: "Horario de atención",
@@ -232,7 +231,7 @@ export const translations = {
       message: "Hola El Origen, quisiera consultar por las catas.",
     },
     footer: {
-      description: "Catas guiadas y experiencias de gastronomía y licores de alta gama en Caracas, Venezuela.",
+      description: "Catas guiadas, experiencias gastronómicas y licores de alta gama.",
       explore: "Explorar",
       contact: "Contacto",
       hours: "Horario de atención",
@@ -361,7 +360,7 @@ export const translations = {
       title: "Interactive tasting sheet",
       description:
         "During the tasting, each guest opens the aroma wheel on their phone, takes notes and scores every glass. At the end they take home their taster certificate.",
-      note: "The certificate is a symbolic keepsake of the experience; it has no official validity.",
+      note: "The certificate has no professional or academic validity: it is a keepsake and one more stage of the experience.",
       cta: "Try the tasting sheet",
     },
     partners: {
@@ -443,7 +442,7 @@ export const translations = {
     contactSection: {
       badge: "Contact",
       title: "Let's talk",
-      subtitle: (owner: string) => `${owner} will help you on WhatsApp with bookings, private tastings and partnerships.`,
+      subtitle: "We'll help you on WhatsApp with bookings, private tastings and partnerships.",
       whatsapp: "Message on WhatsApp",
       account: "Create my Origen Account",
       hours: "Opening hours",
@@ -454,7 +453,7 @@ export const translations = {
       message: "Hello El Origen, I would like to ask about the tastings.",
     },
     footer: {
-      description: "Guided tastings and high-end gastronomy and spirits experiences in Caracas, Venezuela.",
+      description: "Guided tastings, gastronomic experiences and high-end spirits.",
       explore: "Explore",
       contact: "Contact",
       hours: "Opening hours",

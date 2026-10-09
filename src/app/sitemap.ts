@@ -21,6 +21,7 @@ const STATIC_PAGES: [path: string, changeFrequency: ChangeFrequency, priority: n
   ["/alianzas", "monthly", 0.8],
   ["/nosotros", "monthly", 0.8],
   ["/sommeliers", "monthly", 0.7],
+  ["/lista-de-espera", "monthly", 0.6],
   ["/registro", "yearly", 0.5],
   ["/privacidad", "yearly", 0.3],
   ["/terminos", "yearly", 0.3],

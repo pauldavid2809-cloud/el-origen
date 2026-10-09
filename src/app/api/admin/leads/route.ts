@@ -1,15 +1,15 @@
 import { NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/auth";
-import { countNewLeads, listLeads, type LeadType } from "@/lib/leads";
+import { LEAD_TYPES, countNewLeads, listLeads, type LeadType } from "@/lib/leads";
 import { isPersistent } from "@/lib/orders";
 
 export const dynamic = "force-dynamic";
 
-const TYPES: readonly LeadType[] = ["private", "brand", "sommelier"];
+const TYPES: readonly LeadType[] = LEAD_TYPES;
 
 /**
  * Bandeja de solicitudes del panel.
- * GET ?type=private|brand|sommelier → { success, type, leads, newCounts, persistent }
+ * GET ?type=private|brand|sommelier|waitlist → { success, type, leads, newCounts, persistent }
  * (`newCounts` = solicitudes nuevas por tipo, para las pestañas).
  */
 export async function GET(request: Request) {

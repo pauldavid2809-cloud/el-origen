@@ -51,6 +51,33 @@ interface AvilaRidgeProps {
   showValley?: boolean;
   showBirds?: boolean;
   animate?: boolean;
+  /** Dibuja el Hotel Humboldt sobre la cumbre (requiere `fill`, que también colorea el edificio). */
+  showHumboldt?: boolean;
+}
+
+/* Cumbre del Ávila en el trazo: x 702 de 1440, y 19 de 170 (el hotel se apoya ahí). */
+const SUMMIT_LEFT = `${(702 / 1440) * 100}%`;
+const SUMMIT_BOTTOM = `${((170 - 21) / 170) * 100}%`;
+
+/** Silueta del Hotel Humboldt: torre cilíndrica con corona, sobre su base en la cumbre. */
+function HumboldtSilhouette({ fill, className = "", style }: { fill: string; className?: string; style?: React.CSSProperties }) {
+  const floors = [14, 19, 24, 29, 34, 39, 44];
+  return (
+    <svg viewBox="0 0 48 64" className={className} style={style} aria-hidden="true">
+      {/* antena */}
+      <rect x="23.4" y="0" width="1.2" height="7" fill={fill} />
+      {/* corona */}
+      <rect x="15" y="6" width="18" height="4" rx="1" fill={fill} />
+      {/* torre */}
+      <path d="M17 10 H31 L30.4 54 H17.6 Z" fill={fill} />
+      {/* franjas de los pisos */}
+      {floors.map((y) => (
+        <rect key={y} x="18.4" y={y} width="11.2" height="1.3" fill="#ffffff" opacity="0.16" />
+      ))}
+      {/* edificio bajo y estación */}
+      <path d="M4 64 V56 H14 V52 H34 V56 H44 V64 Z" fill={fill} />
+    </svg>
+  );
 }
 
 export function AvilaRidge({
@@ -61,8 +88,30 @@ export function AvilaRidge({
   showValley = true,
   showBirds = false,
   animate = false,
+  showHumboldt = false,
 }: AvilaRidgeProps) {
   const drawProps = animate ? { pathLength: 1, className: "animate-draw" } : {};
+  if (showHumboldt && fill) {
+    // El trazo se estira con preserveAspectRatio="none"; el hotel va en su propio SVG para no deformarse.
+    return (
+      <div className={`relative ${className}`} aria-hidden="true">
+        <AvilaRidge
+          fill={fill}
+          stroke={stroke}
+          strokeWidth={strokeWidth}
+          showValley={showValley}
+          showBirds={showBirds}
+          animate={animate}
+          className="h-full"
+        />
+        <HumboldtSilhouette
+          fill={fill}
+          className="absolute h-8 sm:h-12 w-auto -translate-x-1/2"
+          style={{ left: SUMMIT_LEFT, bottom: SUMMIT_BOTTOM }}
+        />
+      </div>
+    );
+  }
   return (
     <svg
       viewBox="0 0 1440 170"

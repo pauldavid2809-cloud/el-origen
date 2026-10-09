@@ -27,6 +27,7 @@ const es = {
   formSubtitle: "Cuéntanos sobre tu evento y te enviaremos una propuesta a la medida.",
   fullName: "Nombre completo",
   company: "Empresa / Marca",
+  companyHint: "Si es una celebración personal, escribe el motivo (p. ej. cumpleaños).",
   phone: "Teléfono de contacto (WhatsApp)",
   phoneHint: "Con código de área, p. ej. 0414-000-0000.",
   email: "Correo electrónico",
@@ -50,6 +51,7 @@ const es = {
   restaurants: {
     karnivoros_grill: "Karnivoros Grill · CCCT",
     maratea: "Maratea · Las Mercedes",
+    otro: "Otro lugar / por definir",
   } satisfies Record<PrivateRestaurant, string>,
   message: "Detalles adicionales",
   messagePlaceholder: "Fecha tentativa, presupuesto o cualquier requerimiento especial.",
@@ -60,6 +62,10 @@ const es = {
     email: "Escribe un correo válido.",
     eventType: "Selecciona el tipo de evento.",
     guests: "Selecciona el número estimado de invitados.",
+    company: "Indica la empresa, la marca o el motivo del evento.",
+    interest: "Indica qué licor o categoría te interesa.",
+    restaurant: "Selecciona un restaurante u «Otro lugar».",
+    message: "Cuéntanos la fecha tentativa, el presupuesto o lo que necesites.",
   },
   successTitle: "¡Solicitud recibida!",
   successText: (name: string) =>
@@ -90,6 +96,7 @@ const en: typeof es = {
   formSubtitle: "Tell us about your event and we'll send you a tailor-made proposal.",
   fullName: "Full name",
   company: "Company / Brand",
+  companyHint: "For a personal celebration, write the occasion (e.g. birthday).",
   phone: "Contact phone (WhatsApp)",
   phoneHint: "Include the area code, e.g. 0414-000-0000.",
   email: "Email",
@@ -113,6 +120,7 @@ const en: typeof es = {
   restaurants: {
     karnivoros_grill: "Karnivoros Grill · CCCT",
     maratea: "Maratea · Las Mercedes",
+    otro: "Another venue / to be decided",
   },
   message: "Additional details",
   messagePlaceholder: "Tentative date, budget or any special requirement.",
@@ -123,6 +131,10 @@ const en: typeof es = {
     email: "Enter a valid email address.",
     eventType: "Select the event type.",
     guests: "Select the estimated number of guests.",
+    company: "Enter the company, brand or occasion.",
+    interest: "Tell us which spirit or category interests you.",
+    restaurant: "Select a restaurant or “Another venue”.",
+    message: "Tell us the tentative date, budget or anything you need.",
   },
   successTitle: "Request received!",
   successText: (name: string) =>

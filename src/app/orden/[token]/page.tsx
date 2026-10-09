@@ -620,7 +620,7 @@ function PayAndReport({
                   </div>
                 </div>
 
-                <div>
+                <div className="relative">
                   <span className={labelClass} id="proof-label">{t.proof}</span>
                   <label
                     htmlFor="proof"

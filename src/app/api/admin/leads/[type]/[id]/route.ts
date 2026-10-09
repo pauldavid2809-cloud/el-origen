@@ -1,10 +1,10 @@
 import { NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/auth";
-import { LEAD_STATUSES, LeadInputError, updateLeadStatus, type LeadStatus, type LeadType } from "@/lib/leads";
+import { LEAD_STATUSES, LEAD_TYPES, LeadInputError, updateLeadStatus, type LeadStatus, type LeadType } from "@/lib/leads";
 
 export const dynamic = "force-dynamic";
 
-const TYPES: readonly LeadType[] = ["private", "brand", "sommelier"];
+const TYPES: readonly LeadType[] = LEAD_TYPES;
 
 type Params = { params: { type: string; id: string } };
 

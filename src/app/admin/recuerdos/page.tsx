@@ -3,6 +3,7 @@
 import React, { useCallback, useEffect, useId, useMemo, useState } from "react";
 import Link from "next/link";
 import type { Tasting } from "@/types";
+import { shrinkImage } from "@/lib/shrinkImage";
 
 /* Recuerdos: el admin sube las fotos de cada cata y se publican en /recuerdos/<id de la cata>. */
 
@@ -31,36 +32,6 @@ const STATUS_LABEL: Record<Tasting["status"], string> = {
 const inputCls =
   "w-full h-11 rounded border border-outline-variant bg-surface-container-lowest px-3 text-[14px] focus:border-primary-container focus:outline-none";
 const labelCls = "block text-[13px] font-semibold mb-1.5";
-
-/** Reduce la foto (lado mayor 2048 px, JPEG) para subirla rápido y sin pasar el límite del servidor. */
-async function shrinkImage(file: File): Promise<Blob> {
-  const url = URL.createObjectURL(file);
-  try {
-    const img = await new Promise<HTMLImageElement>((resolve, reject) => {
-      const el = new Image();
-      el.onload = () => resolve(el);
-      el.onerror = () => reject(new Error("decode"));
-      el.src = url;
-    });
-    const scale = Math.min(1, MAX_SIDE / Math.max(img.naturalWidth, img.naturalHeight));
-    if (scale === 1 && file.size < 1.5 * 1024 * 1024 && ACCEPT.includes(file.type)) return file;
-    const canvas = document.createElement("canvas");
-    canvas.width = Math.round(img.naturalWidth * scale);
-    canvas.height = Math.round(img.naturalHeight * scale);
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return file;
-    ctx.fillStyle = "#FFFFFF";
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-    const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/jpeg", JPEG_QUALITY));
-    return blob ?? file;
-  } catch {
-    // El navegador no pudo leerla: se envía tal cual y el servidor decide.
-    return file;
-  } finally {
-    URL.revokeObjectURL(url);
-  }
-}
 
 export default function AdminRecuerdosPage() {
   const ids = useId();
@@ -128,7 +99,7 @@ export default function AdminRecuerdosPage() {
     let uploaded = 0;
     for (const file of files) {
       try {
-        const blob = await shrinkImage(file);
+        const blob = await shrinkImage(file, MAX_SIDE, JPEG_QUALITY);
         const form = new FormData();
         form.append("file", blob, blob === file ? file.name : `${file.name.replace(/\.[^.]+$/, "")}.jpg`);
         form.append("tastingId", tastingId);

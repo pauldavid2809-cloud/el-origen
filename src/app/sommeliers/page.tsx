@@ -37,7 +37,7 @@ function validInstagram(v: string): boolean {
     .replace(/^https?:\/\/(www\.)?instagram\.com\//i, "")
     .replace(/[/?#].*$/, "")
     .replace(/^@/, "");
-  return !handle || /^[A-Za-z0-9._]{1,30}$/.test(handle);
+  return /^[A-Za-z0-9._]{1,30}$/.test(handle);
 }
 
 function validUrl(v: string): boolean {
@@ -233,6 +233,7 @@ export default function SommeliersPage() {
                         autoCorrect="off"
                         spellCheck={false}
                         maxLength={200}
+                        required
                       />
                     </div>
                   </FormSection>

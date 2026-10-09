@@ -1,0 +1,73 @@
+import type { Language } from "@/lib/i18n";
+
+const es = {
+  eyebrow: "Lista de espera",
+  titleMain: "¿Te quedaste",
+  titleHighlight: "fuera?",
+  subtitle: "Anótate y te escribimos por WhatsApp apenas se libere un cupo o abramos una nueva fecha.",
+  formEyebrow: "Sin compromiso",
+  formTitle: "Anótate en la lista",
+  formSubtitle: "Solo toma un minuto. Te avisamos en orden de llegada.",
+  fullName: "Nombre completo",
+  phone: "WhatsApp",
+  phoneHint: "Con código de área, p. ej. 0414-000-0000.",
+  email: "Correo electrónico",
+  tasting: "¿Para qué cata?",
+  tastingPlaceholder: "Selecciona una opción",
+  nextTasting: "La próxima cata que haya",
+  soldOut: "agotada",
+  spots: "¿Cuántas personas?",
+  spotsOption: (n: number) => (n === 1 ? "1 persona" : `${n} personas`),
+  message: "Comentario",
+  messagePlaceholder: "Algo que debamos saber (fechas que te funcionan, alergias…).",
+  submit: "Anotarme",
+  errors: {
+    fullName: "Indica tu nombre completo.",
+    phone: "Indica un número de WhatsApp válido.",
+    email: "Escribe un correo válido o déjalo vacío.",
+    tasting: "Elige una cata o «La próxima cata que haya».",
+    spots: "Indica cuántas personas.",
+  },
+  successTitle: "¡Estás en la lista!",
+  successText: (name: string) =>
+    `Gracias${name ? `, ${name}` : ""}. Te escribiremos por WhatsApp apenas se libere un cupo o abramos una nueva fecha.`,
+  seeTastings: "Ver próximas catas",
+  whatsappMessage: "Hola, me anoté en la lista de espera de El Origen.",
+};
+
+const en: typeof es = {
+  eyebrow: "Waiting list",
+  titleMain: "Missed",
+  titleHighlight: "out?",
+  subtitle: "Sign up and we'll message you on WhatsApp as soon as a spot opens up or we announce a new date.",
+  formEyebrow: "No commitment",
+  formTitle: "Join the list",
+  formSubtitle: "It only takes a minute. We notify people in the order they signed up.",
+  fullName: "Full name",
+  phone: "WhatsApp",
+  phoneHint: "Include the area code, e.g. 0414-000-0000.",
+  email: "Email",
+  tasting: "Which tasting?",
+  tastingPlaceholder: "Select an option",
+  nextTasting: "The next available tasting",
+  soldOut: "sold out",
+  spots: "How many people?",
+  spotsOption: (n: number) => (n === 1 ? "1 person" : `${n} people`),
+  message: "Comment",
+  messagePlaceholder: "Anything we should know (dates that work for you, allergies…).",
+  submit: "Sign me up",
+  errors: {
+    fullName: "Enter your full name.",
+    phone: "Enter a valid WhatsApp number.",
+    email: "Enter a valid email or leave it empty.",
+    tasting: "Choose a tasting or “The next available tasting”.",
+    spots: "Tell us how many people.",
+  },
+  successTitle: "You're on the list!",
+  successText: (name: string) =>
+    `Thank you${name ? `, ${name}` : ""}. We'll message you on WhatsApp as soon as a spot opens up or we announce a new date.`,
+  seeTastings: "See upcoming tastings",
+  whatsappMessage: "Hi, I joined El Origen's waiting list.",
+};
+
+export const WAITLIST_COPY: Record<Language, typeof es> = { es, en };

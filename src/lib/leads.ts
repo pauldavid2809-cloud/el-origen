@@ -1,21 +1,24 @@
 import "server-only";
 import crypto from "crypto";
 import { getAdminClient } from "./orders";
+import { WAITLIST_MAX_SPOTS } from "./waitlist";
 
 /* ─────────────────────────────────────────────────────────────
    Solicitudes de los formularios públicos:
    - private:   Experiencias Privadas & Eventos Corporativos (public.private_inquiries)
    - brand:     Alianzas Comerciales & Marcas Aliadas (public.brand_leads)
    - sommelier: Red de sommeliers & directores de cata (public.sommelier_applications)
+   - waitlist:  Lista de espera de las catas (public.waitlist)
    ───────────────────────────────────────────────────────────── */
 
-export type LeadType = "private" | "brand" | "sommelier";
+export type LeadType = "private" | "brand" | "sommelier" | "waitlist";
+export const LEAD_TYPES: readonly LeadType[] = ["private", "brand", "sommelier", "waitlist"];
 export type LeadStatus = "new" | "contacted" | "closed" | "archived";
 export const LEAD_STATUSES: readonly LeadStatus[] = ["new", "contacted", "closed", "archived"];
 
 export const PRIVATE_EVENT_TYPES = ["corporativo", "celebracion_privada", "alianza_comercial", "cena_navidena"] as const;
 export const PRIVATE_GUEST_RANGES = ["10-15", "15-25", "25+"] as const;
-export const PRIVATE_RESTAURANTS = ["karnivoros_grill", "maratea"] as const;
+export const PRIVATE_RESTAURANTS = ["karnivoros_grill", "maratea", "otro"] as const;
 export const BRAND_OBJECTIVES = ["patrocinar_edicion", "lanzamiento_producto", "cata_privada_b2b", "presencia_marca"] as const;
 export const SOMMELIER_SPECIALTIES = ["vinos_internacionales", "whisky_spirits", "cocuy_destilados", "habano_maridaje"] as const;
 
@@ -68,16 +71,30 @@ export interface SommelierApplication extends LeadBase {
   memorableExperience: string;
 }
 
+export interface WaitlistEntry extends LeadBase {
+  fullName: string;
+  phone: string;
+  email: string | null;
+  /** Cata de interés; null = la próxima que haya. */
+  tastingId: string | null;
+  /** Nombre de la cata al momento de anotarse (se conserva aunque la cata cambie). */
+  tastingTitle: string | null;
+  spots: number;
+  message: string | null;
+}
+
 export interface LeadByType {
   private: PrivateInquiry;
   brand: BrandLead;
   sommelier: SommelierApplication;
+  waitlist: WaitlistEntry;
 }
 
 type NewLead<T> = Omit<T, "id" | "status" | "createdAt">;
 export type PrivateInquiryInput = NewLead<PrivateInquiry>;
 export type BrandLeadInput = NewLead<BrandLead>;
 export type SommelierApplicationInput = NewLead<SommelierApplication>;
+export type WaitlistInput = NewLead<WaitlistEntry>;
 
 /** Error de validación (mensaje apto para el formulario → responder 400). */
 export class LeadInputError extends Error {}
@@ -140,14 +157,14 @@ function instagramHandle(v: unknown): string | null {
 function normalizePrivate(i: PrivateInquiryInput): PrivateInquiryInput {
   return {
     fullName: required(line(i.fullName, 120), "El nombre"),
-    company: line(i.company, 120),
+    company: required(line(i.company, 120), "La empresa, marca o motivo del evento"),
     phone: phone(i.phone),
-    email: optionalEmail(i.email),
+    email: email(i.email),
     eventType: oneOf(i.eventType, PRIVATE_EVENT_TYPES, "el tipo de evento"),
-    interest: line(i.interest, 200),
+    interest: required(line(i.interest, 200), "El licor o categoría de interés"),
     guests: oneOf(i.guests, PRIVATE_GUEST_RANGES, "el número estimado de invitados"),
-    restaurant: i.restaurant ? oneOf(i.restaurant, PRIVATE_RESTAURANTS, "un restaurante") : null,
-    message: para(i.message, 2000) || null,
+    restaurant: oneOf(i.restaurant, PRIVATE_RESTAURANTS, "un restaurante (u «Otro lugar»)"),
+    message: required(para(i.message, 2000), "Los detalles del evento"),
   };
 }
 
@@ -176,12 +193,29 @@ function normalizeSommelier(i: SommelierApplicationInput): SommelierApplicationI
     fullName: required(line(i.fullName, 120), "El nombre"),
     phone: phone(i.phone),
     email: email(i.email),
-    instagram: instagramHandle(i.instagram),
+    instagram: required(instagramHandle(i.instagram) ?? "", "Tu usuario de Instagram"),
     certification: required(line(i.certification, 200), "La titulación o certificación"),
     specialties,
     yearsExperience: years,
     cvUrl: optionalUrl(i.cvUrl),
     memorableExperience: required(para(i.memorableExperience, 3000), "Tu experiencia más memorable"),
+  };
+}
+
+function normalizeWaitlist(i: WaitlistInput): WaitlistInput {
+  const spots = Number(i.spots);
+  if (!Number.isInteger(spots) || spots < 1 || spots > WAITLIST_MAX_SPOTS) {
+    throw new LeadInputError(`Indica cuántas personas (de 1 a ${WAITLIST_MAX_SPOTS}).`);
+  }
+  const tastingId = line(i.tastingId, 60) || null;
+  return {
+    fullName: required(line(i.fullName, 120), "El nombre"),
+    phone: phone(i.phone),
+    email: optionalEmail(i.email),
+    tastingId,
+    tastingTitle: tastingId ? line(i.tastingTitle, 160) || null : null,
+    spots,
+    message: para(i.message, 1000) || null,
   };
 }
 
@@ -191,6 +225,7 @@ const TABLES: Record<LeadType, string> = {
   private: "private_inquiries",
   brand: "brand_leads",
   sommelier: "sommelier_applications",
+  waitlist: "waitlist",
 };
 
 const COLUMNS: { [T in LeadType]: [keyof LeadByType[T], string][] } = {
@@ -209,6 +244,10 @@ const COLUMNS: { [T in LeadType]: [keyof LeadByType[T], string][] } = {
     ["certification", "certification"], ["specialties", "specialties"], ["yearsExperience", "years_experience"],
     ["cvUrl", "cv_url"], ["memorableExperience", "memorable_experience"],
   ],
+  waitlist: [
+    ["fullName", "full_name"], ["phone", "phone"], ["email", "email"], ["tastingId", "tasting_id"],
+    ["tastingTitle", "tasting_title"], ["spots", "spots"], ["message", "message"],
+  ],
 };
 
 type Row = Record<string, unknown>;
@@ -225,6 +264,7 @@ function fromRow<T extends LeadType>(type: T, row: Row): LeadByType[T] {
     out.yearsExperience = Number(row.years_experience ?? 0);
   }
   if (type === "brand") out.wantsToSendSamples = Boolean(row.wants_samples);
+  if (type === "waitlist") out.spots = Number(row.spots ?? 1);
   return out as unknown as LeadByType[T];
 }
 
@@ -240,6 +280,7 @@ const memLeads = ((globalThis as unknown as { __eoLeads?: { [T in LeadType]: Map
   private: new Map(),
   brand: new Map(),
   sommelier: new Map(),
+  waitlist: new Map(),
 });
 
 /* ─── Operaciones ─── */
@@ -278,6 +319,10 @@ export function createSommelierApplication(input: SommelierApplicationInput): Pr
   return insertLead("sommelier", normalizeSommelier(input));
 }
 
+export function createWaitlistEntry(input: WaitlistInput): Promise<WaitlistEntry> {
+  return insertLead("waitlist", normalizeWaitlist(input));
+}
+
 /** Solicitudes de un tipo, las más recientes primero. */
 export async function listLeads<T extends LeadType>(type: T): Promise<LeadByType[T][]> {
   const sb = getAdminClient();
@@ -311,14 +356,13 @@ export async function updateLeadStatus<T extends LeadType>(type: T, id: string, 
 
 /** Cantidad de solicitudes nuevas por tipo (para el panel). */
 export async function countNewLeads(): Promise<Record<LeadType, number>> {
-  const types: LeadType[] = ["private", "brand", "sommelier"];
   const sb = getAdminClient();
   const counts = await Promise.all(
-    types.map(async (type) => {
-      if (!sb) return Array.from(memLeads[type].values()).filter((l) => l.status === "new").length;
+    LEAD_TYPES.map(async (type) => {
+      if (!sb) return Array.from((memLeads[type] as Map<string, LeadBase>).values()).filter((l) => l.status === "new").length;
       const { count } = await sb.from(TABLES[type]).select("id", { count: "exact", head: true }).eq("status", "new");
       return count ?? 0;
     })
   );
-  return { private: counts[0], brand: counts[1], sommelier: counts[2] };
+  return { private: counts[0], brand: counts[1], sommelier: counts[2], waitlist: counts[3] };
 }

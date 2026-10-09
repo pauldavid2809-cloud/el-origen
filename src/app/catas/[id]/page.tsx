@@ -15,6 +15,7 @@ import { useLang } from "@/lib/useLang";
 import type { Language } from "@/lib/i18n";
 import type { Tasting } from "@/types";
 import { formatTastingDate } from "@/lib/dates";
+import { venueForLocation } from "@/lib/venues";
 import { TASTING_COPY } from "./copy";
 
 /** Máximo de cupos por reserva (el servidor aplica el mismo límite). */
@@ -136,6 +137,7 @@ export default function TastingDetailPage() {
           <Products tasting={tasting} lang={lang} />
           <Pairings tasting={tasting} lang={lang} />
           <Sommeliers tasting={tasting} lang={lang} />
+          <VenueReview tasting={tasting} lang={lang} />
           <Instagram tasting={tasting} lang={lang} />
         </div>
       </div>
@@ -389,6 +391,47 @@ function SommelierCard({ person, lang }: { person: SommelierView; lang: Language
   );
 }
 
+/** Reseña del restaurante aliado donde se hace la cata (si el lugar es uno de ellos). */
+function VenueReview({ tasting, lang }: { tasting: Tasting; lang: Language }) {
+  const t = TASTING_COPY[lang];
+  const venue = venueForLocation(tasting.location);
+  if (!venue) return null;
+  return (
+    <section className="space-y-4">
+      <SectionTitle icon="restaurant">{t.venue}</SectionTitle>
+      <article className="rounded-2xl border border-outline-variant bg-surface-container-lowest p-5 sm:p-6">
+        <div className="flex items-center gap-3.5">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={venue.logoUrl} alt="" width={56} height={56} className="w-14 h-14 rounded-full object-cover flex-shrink-0 border border-outline-variant" />
+          <div className="min-w-0">
+            <h3 className="font-serif text-lg leading-snug text-on-surface">{venue.name}</h3>
+            <p className="text-[12px] text-on-surface-variant">{venue.kind[lang]}</p>
+          </div>
+        </div>
+        <p className="mt-3 text-[14px] text-on-surface-variant leading-relaxed">{venue.review[lang]}</p>
+        <div className="mt-2 flex flex-wrap items-center gap-x-5">
+          {(tasting.locationAddress || venue.address) && (
+            <span className="inline-flex items-center gap-1.5 min-h-11 text-[13px] text-on-surface">
+              <span className="material-symbols-outlined text-[18px] text-primary-container" aria-hidden="true">location_on</span>
+              {tasting.locationAddress || venue.address}
+            </span>
+          )}
+          <a
+            href={instagramUrl(venue.instagram)}
+            target="_blank"
+            rel="noopener noreferrer"
+            aria-label={t.instagramAria(venue.instagram)}
+            className="inline-flex items-center gap-1.5 min-h-11 text-[13px] font-semibold text-on-surface hover:text-primary-container"
+          >
+            <span className="material-symbols-outlined text-[18px]" aria-hidden="true">photo_camera</span>
+            {venue.instagram}
+          </a>
+        </div>
+      </article>
+    </section>
+  );
+}
+
 function Instagram({ tasting, lang }: { tasting: Tasting; lang: Language }) {
   const t = TASTING_COPY[lang];
   if (!tasting.instagram?.length) return null;
@@ -636,14 +679,21 @@ function Checkout({ tasting, rate, lang }: { tasting: Tasting; rate: number | nu
         <div className="p-5 sm:p-7">
           <p className="font-serif text-xl text-on-surface">{t.soldOutTitle}</p>
           <p className="mt-2 text-[14px] text-on-surface-variant leading-relaxed">{t.soldOutText}</p>
+          <Link
+            href={`/lista-de-espera?cata=${encodeURIComponent(tasting.id)}`}
+            className="mt-5 w-full h-12 inline-flex items-center justify-center gap-2 rounded bg-primary-container hover:bg-primary text-white text-[15px] font-semibold"
+          >
+            <span className="material-symbols-outlined text-[18px]" aria-hidden="true">hourglass_top</span>
+            {t.soldOutCta}
+          </Link>
           <a
             href={whatsappLink(t.soldOutMessage(tasting.title))}
             target="_blank"
             rel="noopener noreferrer"
-            className="mt-5 w-full h-12 inline-flex items-center justify-center gap-2 rounded bg-primary-container hover:bg-primary text-white text-[15px] font-semibold"
+            className="mt-2 w-full h-12 inline-flex items-center justify-center gap-2 rounded border border-outline-variant hover:border-primary-container text-on-surface text-[15px] font-semibold"
           >
             <span className="material-symbols-outlined text-[18px]" aria-hidden="true">chat</span>
-            {t.soldOutCta}
+            {t.soldOutWhatsapp}
           </a>
         </div>
       ) : (
