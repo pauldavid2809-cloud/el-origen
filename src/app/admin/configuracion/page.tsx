@@ -1,9 +1,10 @@
 "use client";
 
 import React, { useCallback, useEffect, useId, useState } from "react";
-import type { PagoMovilAccount, PaymentConfig, TransferAccount } from "@/lib/settings";
+import type { PagoMovilAccount, PaymentConfig, TransferAccount, ZelleAccount } from "@/lib/settings";
 
-/* Configuración de pagos que ve el cliente en la página de su orden (Pago Móvil, transferencias, Binance, efectivo). */
+/* Configuración de pagos que ve el cliente en la página de su orden (Pago Móvil, transferencias, Binance, Zelle, efectivo).
+   Cada cata elige cuáles de estos métodos acepta y qué cuenta Zelle muestra (Catas → Pagos de esta cata). */
 
 /* PENDIENTE CLIENTE: el PDF de respuestas dice Pago Móvil 0412-399-3838; el número usado hasta ahora es 0412-399-3848. */
 const PHONE_IN_USE = "0412-399-3848";
@@ -15,10 +16,12 @@ const keyed = <T,>(v: T): Keyed<T> => ({ ...v, _k: ++keySeq });
 
 type PmRow = Keyed<Omit<PagoMovilAccount, "id"> & { id?: string }>;
 type TrRow = Keyed<Omit<TransferAccount, "id"> & { id?: string }>;
+type ZeRow = Keyed<{ id?: string; account: string; holder: string; bank: string }>;
 
 interface FormState {
   pagoMovil: PmRow[];
   transfers: TrRow[];
+  zelle: ZeRow[];
   holderName: string;
   binance: { enabled: boolean; payLink: string; payId: string; email: string; holder: string };
   efectivo: { enabled: boolean; instructions: string; instructionsEn: string };
@@ -28,6 +31,7 @@ function toForm(c: PaymentConfig): FormState {
   return {
     pagoMovil: c.pagoMovil.map((a) => keyed({ ...a })),
     transfers: c.transfers.map((a) => keyed({ ...a })),
+    zelle: (c.zelle ?? []).map((a: ZelleAccount) => keyed({ id: a.id, account: a.account, holder: a.holder, bank: a.bank ?? "" })),
     holderName: c.holderName ?? "",
     binance: {
       enabled: c.binance.enabled,
@@ -46,6 +50,7 @@ function toPayload(f: FormState) {
   return {
     pagoMovil: f.pagoMovil.map(strip),
     transfers: f.transfers.map(strip),
+    zelle: f.zelle.map(strip),
     holderName: f.holderName,
     binance: f.binance,
     efectivo: f.efectivo,
@@ -106,6 +111,8 @@ export default function AdminPaymentSettingsPage() {
     update((f) => ({ ...f, pagoMovil: f.pagoMovil.map((a, j) => (j === i ? { ...a, ...patch } : a)) }));
   const updateTr = (i: number, patch: Partial<TrRow>) =>
     update((f) => ({ ...f, transfers: f.transfers.map((a, j) => (j === i ? { ...a, ...patch } : a)) }));
+  const updateZe = (i: number, patch: Partial<ZeRow>) =>
+    update((f) => ({ ...f, zelle: f.zelle.map((a, j) => (j === i ? { ...a, ...patch } : a)) }));
 
   const save = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -198,7 +205,7 @@ export default function AdminPaymentSettingsPage() {
           )}
 
           {/* Pago Móvil */}
-          <Card title="Pago Móvil" hint="Se paga en bolívares con la tasa BCV del día de la cata.">
+          <Card title="Pago Móvil" hint="Se paga en bolívares con la tasa de cada cata (BCV dólar, BCV euro o Binance).">
             {form.pagoMovil.map((a, i) => {
               const conflict = digits(a.phone) === digits(PHONE_IN_USE) || digits(a.phone) === digits(PHONE_IN_PDF);
               return (
@@ -342,6 +349,49 @@ export default function AdminPaymentSettingsPage() {
                 </div>
               </>
             )}
+          </Card>
+
+          {/* Zelle */}
+          <Card title="Zelle" hint="Se paga en dólares. Puede registrar varias cuentas y elegir en cada cata cuál se muestra.">
+            {form.zelle.map((a, i) => (
+              <div key={a._k} className="flex gap-1 items-start rounded-lg border border-outline-variant p-3 sm:p-4">
+                <div className="flex-1 grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div>
+                    <label htmlFor={id(`ze${a._k}-account`)} className={labelCls}>Correo o teléfono Zelle *</label>
+                    <input
+                      id={id(`ze${a._k}-account`)}
+                      required
+                      autoCapitalize="none"
+                      spellCheck={false}
+                      value={a.account}
+                      onChange={(e) => updateZe(i, { account: e.target.value })}
+                      placeholder="pagos@correo.com"
+                      className={inputCls}
+                    />
+                  </div>
+                  <div>
+                    <label htmlFor={id(`ze${a._k}-holder`)} className={labelCls}>Titular *</label>
+                    <input id={id(`ze${a._k}-holder`)} required value={a.holder} onChange={(e) => updateZe(i, { holder: e.target.value })} placeholder="Como aparece en Zelle" className={inputCls} />
+                  </div>
+                  <div>
+                    <label htmlFor={id(`ze${a._k}-bank`)} className={labelCls}>Banco</label>
+                    <input id={id(`ze${a._k}-bank`)} value={a.bank} onChange={(e) => updateZe(i, { bank: e.target.value })} placeholder="Opcional" className={inputCls} />
+                  </div>
+                </div>
+                <button type="button" onClick={() => update((f) => ({ ...f, zelle: f.zelle.filter((_, j) => j !== i) }))} className={`${removeBtn} mt-7`}>
+                  <span className="material-symbols-outlined" aria-hidden="true">delete</span>
+                  <span className="sr-only">Quitar Zelle {a.account}</span>
+                </button>
+              </div>
+            ))}
+            <button
+              type="button"
+              onClick={() => update((f) => ({ ...f, zelle: [...f.zelle, keyed({ account: "", holder: "", bank: "" })] }))}
+              className={smallBtn}
+            >
+              <span className="material-symbols-outlined text-[18px]" aria-hidden="true">add</span>
+              Agregar cuenta Zelle
+            </button>
           </Card>
 
           {/* Efectivo */}

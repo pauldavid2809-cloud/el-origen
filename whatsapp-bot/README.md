@@ -8,7 +8,7 @@ corre en una computadora.
 ## Cómo funciona
 
 1. Al aprobar una reserva, el sitio deja el WhatsApp **en cola**.
-2. El bot consulta la cola cada 10 segundos (`/api/whatsapp/queue`) y envía **una imagen con
+2. El bot consulta la cola cada 4 segundos (`/api/whatsapp/queue`) y envía **una imagen con
    código QR por persona** (una reserva de 3 cupos = 3 imágenes, para que cada invitado tenga la suya):
    - la primera imagen lleva el mensaje con los datos de la cata, el enlace a las entradas y las
      políticas de la experiencia (si el texto es muy largo, las políticas salen en un mensaje aparte);
@@ -27,7 +27,21 @@ panel del bot solo se abre desde esa misma computadora.
 - Marca como leídos los mensajes que recibe y responde una vez los "gracias".
 - Verifica que el número tenga WhatsApp antes de enviar.
 
-## Puesta en marcha
+## Paquete para el cliente (un clic, como el del congreso)
+
+Para entregar el bot a quien lo va a usar, sin que tenga que editar nada:
+
+```bash
+npm run empaquetar-bot -- --secret=<la misma WHATSAPP_QUEUE_SECRET de Vercel>
+```
+
+Genera `dist/Bot-WhatsApp-ElOrigen.zip` con el `.env` ya configurado (sitio `https://elorigenvzla.com`;
+otro con `--url=https://…`). El cliente extrae el .zip, hace doble clic en **`INICIAR-BOT.bat`**
+(detecta Node.js, instala lo necesario la primera vez y abre el panel) y escanea el QR. La guía
+para el cliente está en `LEEME-PRIMERO.txt`. El .zip lleva la clave del bot: compártalo solo con el
+cliente (`dist/` no se sube a git).
+
+## Puesta en marcha manual
 
 1. **En Vercel**, agregue la variable `WHATSAPP_QUEUE_SECRET` con una clave larga y aleatoria
    y vuelva a desplegar.
@@ -62,4 +76,4 @@ apenas se encienda. El correo con el QR sale igual desde el sitio.
 | `APP_URL` | Dirección del sitio publicado |
 | `WHATSAPP_QUEUE_SECRET` | Igual a la de Vercel |
 | `PORT` | Puerto del panel local (3001) |
-| `POLL_SECONDS` | Cada cuántos segundos revisa la cola (10) |
+| `POLL_SECONDS` | Cada cuántos segundos revisa la cola (4) |

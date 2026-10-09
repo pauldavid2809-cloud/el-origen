@@ -19,9 +19,21 @@ export interface TransferAccount {
   docId: string;
 }
 
+export interface ZelleAccount {
+  id: string;
+  /** Correo o teléfono registrado en Zelle. */
+  account: string;
+  /** Titular tal como aparece en Zelle. */
+  holder: string;
+  /** Banco de la cuenta (opcional). */
+  bank?: string;
+}
+
 export interface PaymentConfig {
   pagoMovil: PagoMovilAccount[];
   transfers: TransferAccount[];
+  /** Cuentas Zelle; cada cata elige cuál mostrar (Catas → Pagos). */
+  zelle: ZelleAccount[];
   /** PENDIENTE CLIENTE: titular de las cuentas (y si se muestra en la página). */
   holderName?: string;
   /** `payLink`: enlace de cobro de Binance Pay (el sitio lo muestra como QR y como botón); "" = sin enlace. */
@@ -42,6 +54,7 @@ export const DEFAULT_PAYMENT_CONFIG: PaymentConfig = {
     { id: "tr-bdv", ...BANK_ACCOUNTS.bdv, docId: PAYMENT_ID },
     { id: "tr-mercantil", ...BANK_ACCOUNTS.mercantil, docId: PAYMENT_ID },
   ],
+  zelle: [],
   binance: { enabled: true, payLink: BINANCE_PAY_LINK },
   efectivo: { enabled: true, instructions: "Entrega previa acordada por WhatsApp" },
 };
@@ -108,6 +121,20 @@ export function normalizePaymentConfig(input: unknown): PaymentConfig {
     return account;
   });
 
+  const zelle = asArray(raw.zelle).slice(0, 10).map((a, i) => {
+    const account: ZelleAccount = { id: slugId(a.id, "ze", i, used), account: str(a.account), holder: str(a.holder) };
+    const bank = optional(a.bank);
+    if (bank) account.bank = bank;
+    if (!account.account || !account.holder) {
+      throw new PaymentConfigError(`Zelle #${i + 1}: el correo o teléfono y el titular son obligatorios.`);
+    }
+    const isEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(account.account);
+    if (!isEmail && account.account.replace(/\D/g, "").length < 7) {
+      throw new PaymentConfigError(`Zelle #${i + 1}: escriba un correo o un teléfono válido.`);
+    }
+    return account;
+  });
+
   const b = (raw.binance && typeof raw.binance === "object" ? raw.binance : {}) as Record<string, unknown>;
   const e = (raw.efectivo && typeof raw.efectivo === "object" ? raw.efectivo : {}) as Record<string, unknown>;
   const binanceEmail = optional(b.email);
@@ -124,6 +151,7 @@ export function normalizePaymentConfig(input: unknown): PaymentConfig {
   return {
     pagoMovil,
     transfers,
+    zelle,
     holderName: optional(raw.holderName),
     binance: {
       enabled: b.enabled !== false,
@@ -153,7 +181,7 @@ export async function getPaymentConfig(): Promise<PaymentConfig> {
 /** Valida y guarda la configuración. Devuelve la versión normalizada. */
 export async function savePaymentConfig(cfg: unknown): Promise<PaymentConfig> {
   const clean = normalizePaymentConfig(cfg);
-  if (!clean.pagoMovil.length && !clean.transfers.length && !clean.binance.enabled && !clean.efectivo.enabled) {
+  if (!clean.pagoMovil.length && !clean.transfers.length && !clean.zelle.length && !clean.binance.enabled && !clean.efectivo.enabled) {
     throw new PaymentConfigError("Debe quedar al menos un método de pago activo.");
   }
   const sb = getAdminClient();
@@ -170,10 +198,16 @@ export async function savePaymentConfig(cfg: unknown): Promise<PaymentConfig> {
 export function findPaymentAccount(
   cfg: PaymentConfig,
   id: string
-): { kind: "pago_movil"; account: PagoMovilAccount } | { kind: "transferencia"; account: TransferAccount } | null {
+):
+  | { kind: "pago_movil"; account: PagoMovilAccount }
+  | { kind: "transferencia"; account: TransferAccount }
+  | { kind: "zelle"; account: ZelleAccount }
+  | null {
   const pm = cfg.pagoMovil.find((a) => a.id === id);
   if (pm) return { kind: "pago_movil", account: pm };
   const tr = cfg.transfers.find((a) => a.id === id);
   if (tr) return { kind: "transferencia", account: tr };
+  const ze = cfg.zelle.find((a) => a.id === id);
+  if (ze) return { kind: "zelle", account: ze };
   return null;
 }

@@ -4,6 +4,8 @@ import React, { useState } from "react";
 import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
 import { PageHeader, SectionHeading, SunBurst } from "@/components/Brand";
+import { PhotoStrip } from "@/components/PhotoStrip";
+import { PHOTOS } from "@/lib/photos";
 import { useLang } from "@/lib/useLang";
 import { useDocumentTitle } from "@/lib/useDocumentTitle";
 import { whatsappLink } from "@/lib/contact";
@@ -117,6 +119,12 @@ export default function AlianzasPage() {
               </p>
             ))}
           </div>
+          <PhotoStrip
+            photos={[PHOTOS.acquaPanna, PHOTOS.brindis, PHOTOS.platoAcquaPanna]}
+            lang={lang}
+            caption={t.photosCaption}
+            className="lg:col-span-12 mt-2 sm:mt-6"
+          />
         </section>
 
         {/* Razones para aliarse */}

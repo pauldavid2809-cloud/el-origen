@@ -1,5 +1,22 @@
-import type { Language } from "@/lib/i18n";
-import type { TastingCategory, RateCurrency } from "@/types";
+import { RATE_NAME, capitalize, type Language } from "@/lib/i18n";
+import type { PaymentMethodId, TastingCategory, RateCurrency } from "@/types";
+
+/** "a, b o c" / "a, b or c" */
+const joinList = (items: string[], or: string) =>
+  items.length <= 1 ? items.join("") : `${items.slice(0, -1).join(", ")} ${or} ${items[items.length - 1]}`;
+
+/** Métodos de pago de la cata en una frase (los de bolívares, con la tasa de la cata). */
+function methodsSentence(lang: Language, methods: PaymentMethodId[], currency: RateCurrency): string {
+  const es = lang === "es";
+  const bs = methods.filter((m) => m === "pago_movil" || m === "transferencia").map((m) => (m === "pago_movil" ? "Pago Móvil" : es ? "transferencia" : "bank transfer"));
+  const parts = [
+    bs.length ? `${joinList(bs, es ? "o" : "or")} (${RATE_NAME[lang][currency]}${es ? " del día" : " of the day"})` : "",
+    methods.includes("binance_usdt") ? "Binance USDT" : "",
+    methods.includes("zelle") ? "Zelle" : "",
+    methods.includes("efectivo") ? (es ? "efectivo con entrega previa acordada" : "cash with delivery arranged in advance") : "",
+  ].filter(Boolean);
+  return capitalize(joinList(parts, es ? "o" : "or"));
+}
 
 /* Textos del detalle de cata y su compra (ES/EN). */
 
@@ -38,8 +55,8 @@ const es = {
   checkoutTitle: "Comprar cupos",
   perPerson: "por persona",
   bsApprox: (bs: string) => `≈ Bs ${bs}`,
-  rateNote: (currency: RateCurrency) => `Tasa BCV ${currency === "EUR" ? "del euro" : "del dólar"} del día`,
-  noRate: "En bolívares a tasa BCV del día",
+  rateNote: (currency: RateCurrency) => `${capitalize(RATE_NAME.es[currency])} del día`,
+  noRate: "En bolívares a la tasa del día",
   steps: ["Cupos", "Datos", "Confirmar"],
   stepAria: (n: number, label: string) => `Paso ${n}: ${label}`,
   spotsLabel: "Cantidad de cupos",
@@ -97,8 +114,8 @@ const es = {
 
   // Resumen y pago
   howToPayTitle: "Cómo pagas",
-  howToPay:
-    "Pago Móvil o transferencia (tasa BCV del día), Binance USDT o efectivo con entrega previa acordada. Al continuar verás los datos de pago; tus cupos quedan apartados por 60 minutos mientras reportas el pago.",
+  howToPay: (methods: PaymentMethodId[], currency: RateCurrency) =>
+    `${methodsSentence("es", methods, currency)}. Al continuar verás los datos de pago; tus cupos quedan apartados por 60 minutos mientras reportas el pago.`,
   lineSpots: (n: number, price: string) => `Cupos (${n} × ${price})`,
   lineAddOns: "Adicionales",
   lineDiscount: (code: string) => `Descuento ${code}`,
@@ -146,8 +163,8 @@ const en: TastingCopy = {
   checkoutTitle: "Buy spots",
   perPerson: "per person",
   bsApprox: (bs) => `≈ Bs ${bs}`,
-  rateNote: (currency) => `BCV ${currency === "EUR" ? "euro" : "dollar"} rate of the day`,
-  noRate: "In bolívares at the BCV rate of the day",
+  rateNote: (currency) => `${RATE_NAME.en[currency]} of the day`,
+  noRate: "In bolívares at the rate of the day",
   steps: ["Spots", "Details", "Confirm"],
   stepAria: (n, label) => `Step ${n}: ${label}`,
   spotsLabel: "Number of spots",
@@ -202,8 +219,8 @@ const en: TastingCopy = {
   couponError: "The code could not be validated.",
 
   howToPayTitle: "How you pay",
-  howToPay:
-    "Pago Móvil or bank transfer (BCV rate of the day), Binance USDT or cash with delivery arranged in advance. Next you'll see the payment details; your spots are held for 60 minutes while you report the payment.",
+  howToPay: (methods, currency) =>
+    `${methodsSentence("en", methods, currency)}. Next you'll see the payment details; your spots are held for 60 minutes while you report the payment.`,
   lineSpots: (n, price) => `Spots (${n} × ${price})`,
   lineAddOns: "Add-ons",
   lineDiscount: (code) => `Discount ${code}`,

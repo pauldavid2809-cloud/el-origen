@@ -5,14 +5,7 @@ import { useParams } from "next/navigation";
 import Link from "next/link";
 import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
-import {
-  PaymentDetails,
-  availableMethods,
-  formatBs,
-  formatUsd,
-  hasBinanceDetails,
-  type PaymentMethodId,
-} from "@/components/PaymentDetails";
+import { PaymentDetails, formatBs, formatUsd, hasBinanceDetails } from "@/components/PaymentDetails";
 import { PurchasePolicies } from "@/components/PurchasePolicies";
 import { TicketQR, type PublicTicket } from "@/components/TicketQR";
 import { CONTACT, whatsappLink } from "@/lib/contact";
@@ -21,7 +14,8 @@ import { useLang } from "@/lib/useLang";
 import type { Language } from "@/lib/i18n";
 import type { PublicOrder } from "@/lib/orders";
 import type { PaymentConfig } from "@/lib/settings";
-import type { RateCurrency } from "@/types";
+import { availableMethods, isBsMethod } from "@/lib/paymentMethods";
+import type { PaymentMethodId, RateCurrency } from "@/types";
 import { ORDER_COPY, OTHER_BANK, VE_BANKS } from "./copy";
 
 interface RateInfo {
@@ -52,6 +46,8 @@ export default function OrderPage() {
   const [order, setOrder] = useState<OrderWithTickets | null>(null);
   const [rate, setRate] = useState<RateInfo | null>(null);
   const [payment, setPayment] = useState<PaymentConfig | null>(null);
+  /** Métodos que acepta la cata de esta orden (los envía el servidor). */
+  const [methods, setMethods] = useState<PaymentMethodId[] | null>(null);
   const [holdExpiresAt, setHoldExpiresAt] = useState<string | null>(null);
   const [notFound, setNotFound] = useState(false);
 
@@ -66,6 +62,7 @@ export default function OrderPage() {
       setOrder(data.order);
       setRate(data.rate ?? null);
       setPayment(data.payment ?? null);
+      setMethods(Array.isArray(data.methods) ? data.methods : null);
       setHoldExpiresAt(data.holdExpiresAt ?? null);
     } catch {
       /* se reintenta en el siguiente ciclo */
@@ -141,6 +138,7 @@ export default function OrderPage() {
                     token={token}
                     rate={rate}
                     payment={payment}
+                    offeredMethods={methods}
                     holdExpiresAt={holdExpiresAt}
                     lang={lang}
                     onDone={load}
@@ -249,6 +247,7 @@ function PayAndReport({
   token,
   rate,
   payment,
+  offeredMethods,
   holdExpiresAt,
   lang,
   onDone,
@@ -257,12 +256,13 @@ function PayAndReport({
   token: string;
   rate: RateInfo | null;
   payment: PaymentConfig | null;
+  offeredMethods: PaymentMethodId[] | null;
   holdExpiresAt: string | null;
   lang: Language;
   onDone: () => void;
 }) {
   const t = ORDER_COPY[lang];
-  const methods = payment ? availableMethods(payment) : [];
+  const methods = payment ? offeredMethods ?? availableMethods(payment) : [];
   const [method, setMethod] = useState<PaymentMethodId | null>(null);
   const [accountId, setAccountId] = useState("");
   const [reference, setReference] = useState("");
@@ -279,11 +279,11 @@ function PayAndReport({
   const accounts =
     active === "pago_movil" ? payment?.pagoMovil ?? [] : active === "transferencia" ? payment?.transfers ?? [] : [];
   const selectedAccount = accounts.find((a) => a.id === accountId) ?? accounts[0];
-  const inBs = active === "pago_movil" || active === "transferencia";
+  const inBs = isBsMethod(active);
 
   // Monto sugerido según el método elegido.
   useEffect(() => {
-    if (active === "binance_usdt") setAmount(usdtAmount(order.totalUsd));
+    if (active === "binance_usdt" || active === "zelle") setAmount(usdtAmount(order.totalUsd));
     else if (inBs) setAmount(rate ? formatBs(rate.amountBs, "es") : "");
   }, [active, inBs, rate, order.totalUsd]);
 
@@ -312,7 +312,7 @@ function PayAndReport({
         fd.set("payerPhone", order.customerPhone);
       } else if (active) {
         fd.set("paymentMethod", active);
-        fd.set("paymentBank", active === "binance_usdt" ? "binance" : selectedAccount?.id ?? "");
+        fd.set("paymentBank", active === "binance_usdt" ? "binance" : active === "zelle" ? payment?.zelle[0]?.id ?? "" : selectedAccount?.id ?? "");
         fd.set("paymentReference", reference);
         fd.set("paymentAmount", amount);
         if (inBs) {
@@ -448,10 +448,10 @@ function PayAndReport({
                       {hasBinanceDetails(payment) ? t.usdtLine : t.usdtLineNoDetails}
                     </p>
                   </>
-                ) : active === "efectivo" ? (
+                ) : active === "efectivo" || active === "zelle" ? (
                   <>
                     <p className="font-serif text-4xl text-on-surface mt-1">{totalLabel}</p>
-                    <p className="text-[13px] text-on-surface-variant mt-1">{t.cashLine}</p>
+                    <p className="text-[13px] text-on-surface-variant mt-1">{active === "zelle" ? t.zelleLine : t.cashLine}</p>
                   </>
                 ) : rate ? (
                   <>
@@ -460,6 +460,7 @@ function PayAndReport({
                       {t.rateLine(totalLabel, rate.currency, formatBs(rate.rate, lang))}
                     </p>
                     {rate.currency === "EUR" && <p className="text-[12px] text-on-surface-variant mt-0.5">{t.eurNote}</p>}
+                    {rate.currency === "BINANCE" && <p className="text-[12px] text-on-surface-variant mt-0.5">{t.binanceNote}</p>}
                   </>
                 ) : (
                   <>
@@ -541,12 +542,12 @@ function PayAndReport({
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-5 gap-y-5">
                   <div>
                     <label className={labelClass} htmlFor="ref">
-                      {active === "binance_usdt" ? t.binanceReference : t.reference}
+                      {active === "binance_usdt" ? t.binanceReference : active === "zelle" ? t.zelleReference : t.reference}
                     </label>
                     <input
                       id="ref"
                       required
-                      inputMode={active === "binance_usdt" ? "text" : "numeric"}
+                      inputMode={inBs ? "numeric" : "text"}
                       autoComplete="off"
                       value={reference}
                       onChange={(e) => setReference(e.target.value)}
@@ -556,7 +557,7 @@ function PayAndReport({
                   </div>
                   <div>
                     <label className={labelClass} htmlFor="amt">
-                      {active === "binance_usdt" ? t.amountUsdt : t.amountBs}
+                      {active === "binance_usdt" ? t.amountUsdt : active === "zelle" ? t.amountUsd : t.amountBs}
                     </label>
                     <input
                       id="amt"
@@ -689,7 +690,9 @@ function InReview({ order, lang }: { order: PublicOrder; lang: Language }) {
       ? null
       : method === "binance_usdt"
         ? `${order.paymentAmountBs} USDT`
-        : `Bs ${formatBs(order.paymentAmountBs, lang)}`;
+        : method === "zelle"
+          ? formatUsd(order.paymentAmountBs)
+          : `Bs ${formatBs(order.paymentAmountBs, lang)}`;
   const details: [string, string][] = [];
   if (method && t.methods[method]) details.push([t.method, t.methods[method].title]);
   if (order.paymentReference) details.push([t.reportedReference, order.paymentReference]);

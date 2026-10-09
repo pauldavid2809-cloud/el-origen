@@ -13,6 +13,7 @@ const es = {
 
   narrativeEyebrow: "Narrativa de valor",
   narrativeTitle: "Posiciona tu etiqueta en la mesa correcta.",
+  photosCaption: "Acqua Panna, marca aliada, en la mesa de nuestra cata en Maratea: así se integra una marca a la experiencia.",
   narrative: [
     "En **El Origen** transformamos la degustación tradicional en un canal de experiencia inmersiva para marcas de vinos, destilados y productos gourmet de alta gama. No ofrecemos simple presencia de logo; creamos el entorno perfecto para que tu portafolio sea apreciado por consumidores VIP, líderes de opinión, restauradores y compradores clave en Caracas.",
     "A través de catas guiadas de aforo reducido (20 a 40 invitados), la narrativa de nuestros sommeliers y maridajes diseñados a la medida, garantizamos que tu marca sea la verdadera protagonista de la velada.",
@@ -119,6 +120,7 @@ const en: typeof es = {
 
   narrativeEyebrow: "Our value",
   narrativeTitle: "Put your label on the right table.",
+  photosCaption: "Acqua Panna, a partner brand, on the table at our tasting at Maratea: this is how a brand becomes part of the experience.",
   narrative: [
     "At **El Origen** we turn the traditional tasting into an immersive experience channel for premium wine, spirits and gourmet brands. We don't offer mere logo placement; we create the perfect setting for your portfolio to be appreciated by VIP consumers, opinion leaders, restaurateurs and key buyers in Caracas.",
     "Through small guided tastings (20 to 40 guests), our sommeliers' storytelling and tailor-made pairings, we make sure your brand is the true star of the evening.",

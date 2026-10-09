@@ -1,0 +1,54 @@
+﻿BOT DE WHATSAPP DE EL ORIGEN · GUÍA RÁPIDA
+==========================================
+
+Qué hace: cada vez que en el panel se aprueba un pago (Reservas y pagos →
+"Aprobar y enviar QR" o "Marcar como pagado y enviar QR"), el bot envía por
+WhatsApp al comprador una imagen con el código QR de cada entrada.
+
+
+PASO 1 · REQUISITO (una sola vez)
+---------------------------------
+La computadora necesita Node.js (gratis). Si no lo tiene, al abrir el bot
+se abrirá https://nodejs.org: descargue la versión LTS, instálela con
+"Next" hasta terminar y vuelva a abrir el bot.
+
+
+PASO 2 · EXTRAER Y ABRIR
+------------------------
+1. Clic derecho sobre Bot-WhatsApp-ElOrigen.zip → "Extraer todo...".
+2. Abra la carpeta extraída y haga doble clic en INICIAR-BOT.bat.
+   La primera vez instala lo necesario (uno o dos minutos).
+3. Se abre el navegador en http://localhost:3001 con un código QR.
+
+
+PASO 3 · VINCULAR EL WHATSAPP (una sola vez)
+--------------------------------------------
+En el teléfono de El Origen: WhatsApp → Ajustes (o ⋮) → Dispositivos
+vinculados → Vincular un dispositivo, y escanee el QR de la pantalla.
+Está listo cuando el panel dice que WhatsApp está conectado.
+Pruebe con "Enviar prueba" a su propio número.
+
+
+EL DÍA A DÍA
+------------
+- Deje la ventana negra abierta mientras quiera que se envíen las entradas.
+- Si la computadora estuvo apagada no se pierde nada: las entradas aprobadas
+  esperan en cola y se envían apenas se abre el bot.
+- El bot revisa la cola cada 4 segundos y envía con pausas naturales
+  ("escribiendo...") para cuidar la línea.
+- Al reiniciar la computadora solo hay que abrir INICIAR-BOT.bat: no vuelve
+  a pedir el QR.
+
+
+CAMBIAR DE NÚMERO
+-----------------
+En http://localhost:3001 use la opción para desvincular y escanee de nuevo
+con el otro teléfono.
+
+
+IMPORTANTE
+----------
+- El archivo .env de esta carpeta tiene la clave que conecta el bot con la
+  página: no comparta esta carpeta ni el .zip.
+- La carpeta auth_info guarda la sesión de WhatsApp: no la borre (si la
+  borra, pedirá el QR otra vez).

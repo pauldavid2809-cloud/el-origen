@@ -53,7 +53,7 @@ const PARTNERS: Partner[] = [
 
 interface PartnersSectionProps {
   currentLang?: Language;
-  /** Número de sección en la portada ("05"). */
+  /** Número de sección en la portada ("06"). */
   index?: string;
 }
 

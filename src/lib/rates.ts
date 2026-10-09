@@ -1,7 +1,9 @@
 import "server-only";
 import type { RateCurrency } from "@/types";
 
-/* Tasas oficiales BCV del dólar y del euro (vía ve.dolarapi.com), con caché de 10 minutos por moneda. */
+/* Tasas en bolívares (vía ve.dolarapi.com), con caché de 10 minutos por tasa:
+   USD / EUR = oficiales BCV del dólar y del euro; BINANCE = dólar paralelo, que sigue al mercado P2P
+   (la API de Binance bloquea los servidores de EE. UU. donde corre Vercel, por eso no se consulta directo). */
 
 export interface BcvRate {
   rate: number;
@@ -14,6 +16,13 @@ export type Rate = BcvRate;
 const ENDPOINTS: Record<RateCurrency, string> = {
   USD: "https://ve.dolarapi.com/v1/dolares/oficial",
   EUR: "https://ve.dolarapi.com/v1/euros/oficial",
+  BINANCE: "https://ve.dolarapi.com/v1/dolares/paralelo",
+};
+
+const SOURCES: Record<RateCurrency, string> = {
+  USD: "BCV (dolarapi.com)",
+  EUR: "BCV (dolarapi.com)",
+  BINANCE: "Dólar paralelo (dolarapi.com)",
 };
 
 const TTL = 10 * 60 * 1000;
@@ -35,21 +44,22 @@ export async function getBcvRate(currency: RateCurrency): Promise<BcvRate | null
     if (!(rate > 0)) throw new Error("tasa inválida");
     const value: BcvRate = {
       rate,
-      source: "BCV (dolarapi.com)",
+      source: SOURCES[currency],
       updatedAt: data.fechaActualizacion ?? new Date().toISOString(),
     };
     cache[currency] = { value, at: Date.now() };
     return value;
   } catch (err) {
-    console.error(`[rates] No se pudo obtener la tasa BCV ${currency}:`, err);
+    console.error(`[rates] No se pudo obtener la tasa ${currency}:`, err);
     // Si la fuente falla, se usa la última tasa conocida (aunque haya vencido la caché).
     return hit?.value ?? null;
   }
 }
 
-export async function getBcvRates(): Promise<{ USD: BcvRate | null; EUR: BcvRate | null }> {
-  const [USD, EUR] = await Promise.all([getBcvRate("USD"), getBcvRate("EUR")]);
-  return { USD, EUR };
+/** Las tres tasas (BCV dólar, BCV euro y Binance/paralelo); `null` la que no responda. */
+export async function getBcvRates(): Promise<Record<RateCurrency, BcvRate | null>> {
+  const [USD, EUR, BINANCE] = await Promise.all([getBcvRate("USD"), getBcvRate("EUR"), getBcvRate("BINANCE")]);
+  return { USD, EUR, BINANCE };
 }
 
 /** @deprecated Use `getBcvRate("USD")`. */

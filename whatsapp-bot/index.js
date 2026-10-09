@@ -22,9 +22,10 @@ import makeWASocket, {
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PORT = Number(process.env.PORT || 3001);
-const APP_URL = (process.env.APP_URL || "https://el-origen-two.vercel.app").replace(/\/+$/, "");
+const APP_URL = (process.env.APP_URL || "https://elorigenvzla.com").replace(/\/+$/, "");
 const QUEUE_SECRET = process.env.WHATSAPP_QUEUE_SECRET || "";
-const POLL_MS = Math.max(5, Number(process.env.POLL_SECONDS || 10)) * 1000;
+// Cada 4 s por defecto (como el bot del congreso): la entrada sale casi al instante de aprobarla.
+const POLL_MS = Math.max(3, Number(process.env.POLL_SECONDS || 4)) * 1000;
 const AUTH_DIR = process.env.AUTH_DIR || path.join(__dirname, "auth_info");
 
 if (!QUEUE_SECRET) {

@@ -16,7 +16,7 @@ export const PURCHASE_POLICIES: Record<Language, PolicyItem[]> = {
     },
     {
       title: "Métodos de Pago",
-      body: "Aceptamos Pago Móvil (tasa BCV del día), Binance USDT y Efectivo (entrega previa acordada).",
+      body: "Según la cata, aceptamos Pago Móvil (a la tasa indicada en cada cata), Binance USDT, Zelle y Efectivo (entrega previa acordada).",
     },
     {
       title: "Política de Cancelación",
@@ -34,7 +34,7 @@ export const PURCHASE_POLICIES: Record<Language, PolicyItem[]> = {
     },
     {
       title: "Payment Methods",
-      body: "We accept Pago Móvil (BCV rate of the day), Binance USDT and Cash (delivery arranged in advance).",
+      body: "Depending on the tasting, we accept Pago Móvil (at the rate shown for each tasting), Binance USDT, Zelle and Cash (delivery arranged in advance).",
     },
     {
       title: "Cancellation Policy",

@@ -32,8 +32,11 @@ const METHOD_LABEL: Record<string, string> = {
   pago_movil: "Pago Móvil",
   transferencia: "Transferencia",
   binance_usdt: "Binance USDT",
+  zelle: "Zelle",
   efectivo: "Efectivo",
 };
+
+const RATE_SUFFIX: Record<string, string> = { EUR: " (tasa BCV euro)", BINANCE: " (tasa Binance)" };
 
 const MAIL_LABEL: Record<string, string> = { gmail: "Gmail", resend: "Resend" };
 
@@ -56,6 +59,7 @@ export default function AdminReservationsPage() {
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState<Tab>("in_review");
   const [tasting, setTasting] = useState("");
+  const [method, setMethod] = useState("");
   const [q, setQ] = useState("");
   const [busy, setBusy] = useState<string | null>(null);
   const [rejecting, setRejecting] = useState<AdminOrder | null>(null);
@@ -126,15 +130,36 @@ export default function AdminReservationsPage() {
     return Array.from(m.entries());
   }, [orders]);
 
+  /** Órdenes de la cata y el método elegidos (las pestañas cuentan sobre este filtro). */
+  const filtered = useMemo(
+    () => orders.filter((o) => (!tasting || o.tastingId === tasting) && (!method || o.paymentMethod === method)),
+    [orders, tasting, method]
+  );
+
   const counts = useMemo(() => {
     const c: Record<string, number> = {};
-    orders.forEach((o) => (c[o.status] = (c[o.status] ?? 0) + 1));
+    filtered.forEach((o) => (c[o.status] = (c[o.status] ?? 0) + 1));
     return c;
-  }, [orders]);
+  }, [filtered]);
 
-  const list = orders
+  /** Efectivo de la cata elegida: por cobrar (reportado, sin aprobar) y cobrado (aprobado). */
+  const cash = useMemo(() => {
+    const ofCata = orders.filter((o) => o.paymentMethod === "efectivo" && (!tasting || o.tastingId === tasting));
+    const sum = (list: AdminOrder[]) => ({
+      orders: list.length,
+      spots: list.reduce((n, o) => n + o.spotsCount, 0),
+      usd: list.reduce((n, o) => n + o.totalUsd, 0),
+    });
+    return { pending: sum(ofCata.filter((o) => o.status === "in_review")), paid: sum(ofCata.filter((o) => o.status === "approved")) };
+  }, [orders, tasting]);
+
+  const showCash = (status: "in_review" | "approved") => {
+    setMethod("efectivo");
+    setTab(status);
+  };
+
+  const list = filtered
     .filter((o) => o.status === tab)
-    .filter((o) => !tasting || o.tastingId === tasting)
     .filter((o) => {
       const s = q.trim().toLowerCase();
       if (!s) return true;
@@ -192,6 +217,39 @@ export default function AdminReservationsPage() {
 
       {wa && <DeliveryStatus wa={wa} />}
 
+      {(cash.pending.orders > 0 || cash.paid.orders > 0) && (
+        <section aria-label="Pagos en efectivo" className="rounded-xl border border-outline-variant bg-surface-container-lowest p-4 sm:p-5">
+          <div className="flex items-center gap-2">
+            <span className="material-symbols-outlined text-[20px] text-primary-container" aria-hidden="true">payments</span>
+            <h2 className="font-serif text-xl">Efectivo{tasting ? " en esta cata" : ""}</h2>
+          </div>
+          <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {(
+              [
+                ["in_review", "Por cobrar", cash.pending, "Al recibir el dinero, use «Marcar como pagado» para enviarle los QR."],
+                ["approved", "Cobrado", cash.paid, "Pagos en efectivo ya recibidos y con entradas enviadas."],
+              ] as const
+            ).map(([status, label, sum, hint]) => (
+              <button
+                key={status}
+                type="button"
+                onClick={() => showCash(status)}
+                className={`text-left rounded-lg border p-3.5 transition-colors hover:border-primary-container ${
+                  method === "efectivo" && tab === status ? "border-primary-container bg-primary-fixed/40" : "border-outline-variant"
+                }`}
+              >
+                <span className="block text-[12px] font-semibold uppercase tracking-wider text-on-surface-variant">{label}</span>
+                <span className="block font-serif text-2xl mt-0.5">{usd(sum.usd)}</span>
+                <span className="block text-[13px] text-on-surface-variant">
+                  {sum.orders} reserva{sum.orders === 1 ? "" : "s"} · {sum.spots} cupo{sum.spots === 1 ? "" : "s"}
+                </span>
+                <span className="block text-[12px] text-on-surface-variant mt-1.5">{hint}</span>
+              </button>
+            ))}
+          </div>
+        </section>
+      )}
+
       {!persistent && (
         <div className="rounded-lg border border-tertiary/40 bg-tertiary-fixed/60 p-4 text-[14px] text-on-tertiary-fixed-variant">
           <strong>Modo de prueba:</strong> Supabase no está configurado, las reservas se guardan en memoria y se pierden al reiniciar.
@@ -221,6 +279,12 @@ export default function AdminReservationsPage() {
           <select value={tasting} onChange={(e) => setTasting(e.target.value)} aria-label="Filtrar por cata" className="h-11 rounded border border-outline-variant bg-surface-container-lowest px-3 text-[14px] sm:w-80">
             <option value="">Todas las catas</option>
             {tastings.map(([id, label]) => (
+              <option key={id} value={id}>{label}</option>
+            ))}
+          </select>
+          <select value={method} onChange={(e) => setMethod(e.target.value)} aria-label="Filtrar por método de pago" className="h-11 rounded border border-outline-variant bg-surface-container-lowest px-3 text-[14px] sm:w-52">
+            <option value="">Todos los métodos</option>
+            {Object.entries(METHOD_LABEL).map(([id, label]) => (
               <option key={id} value={id}>{label}</option>
             ))}
           </select>
@@ -324,10 +388,12 @@ export default function AdminReservationsPage() {
                       className="h-10 px-4 rounded bg-emerald-700 hover:bg-emerald-800 text-white text-[13px] font-semibold inline-flex items-center gap-1.5 disabled:opacity-60"
                     >
                       <span className="material-symbols-outlined text-[18px]">check</span>
-                      Aprobar y enviar {o.spotsCount === 1 ? "QR" : `${o.spotsCount} QR`}
+                      {o.paymentMethod === "efectivo" ? "Marcar como pagado y enviar" : "Aprobar y enviar"}{" "}
+                      {o.spotsCount === 1 ? "QR" : `${o.spotsCount} QR`}
                     </button>
                   )}
-                  {o.status === "in_review" && (
+                  {/* El efectivo no se rechaza (no hay comprobante que corregir): si no paga, se anula. */}
+                  {o.status === "in_review" && o.paymentMethod !== "efectivo" && (
                     <button
                       disabled={busy === o.id}
                       onClick={() => {
@@ -488,15 +554,18 @@ function WhatsAppStatus({ wa }: { wa: DeliveryInfo }) {
   );
 }
 
-/** Resumen del pago reportado según el método (Bs, USDT o efectivo), con alerta si el monto no coincide. */
+/** Resumen del pago reportado según el método (Bs, USDT, USD por Zelle o efectivo), con alerta si el monto no coincide. */
 function PaymentSummary({ o }: { o: AdminOrder }) {
   const method = METHOD_LABEL[o.paymentMethod ?? ""] ?? o.paymentMethod;
   const cash = o.paymentMethod === "efectivo";
   const usdt = o.paymentMethod === "binance_usdt";
-  const expected = usdt ? o.totalUsd : o.bcvRate ? o.totalUsd * o.bcvRate : null;
+  const zelle = o.paymentMethod === "zelle";
+  /** Pagado en divisa: el monto esperado es el total en USD. */
+  const inUsd = usdt || zelle;
+  const expected = inUsd ? o.totalUsd : o.bcvRate ? o.totalUsd * o.bcvRate : null;
   const paid = o.paymentAmountBs;
-  const mismatch = !cash && expected !== null && paid !== null && Math.abs(paid - expected) > Math.max(usdt ? 0.5 : 1, expected * 0.01);
-  const amount = (n: number) => (usdt ? `${bs(n)} USDT` : `Bs ${bs(n)}`);
+  const mismatch = !cash && expected !== null && paid !== null && Math.abs(paid - expected) > Math.max(inUsd ? 0.5 : 1, expected * 0.01);
+  const amount = (n: number) => (usdt ? `${bs(n)} USDT` : zelle ? usd(n) : `Bs ${bs(n)}`);
 
   return (
     <div className="space-y-2">
@@ -504,18 +573,27 @@ function PaymentSummary({ o }: { o: AdminOrder }) {
         <div>
           <dt className="text-on-surface-variant">Total</dt>
           <dd className="font-semibold">{usd(o.totalUsd)}</dd>
-          {!usdt && !cash && expected !== null && (
+          {!inUsd && !cash && expected !== null && (
             <dd className="text-on-surface-variant">
               ≈ Bs {bs(expected)}
-              {o.rateCurrency === "EUR" && " (tasa EUR)"}
+              {RATE_SUFFIX[o.rateCurrency ?? ""] ?? ""}
             </dd>
           )}
         </div>
         {cash ? (
           <div className="col-span-1 sm:col-span-3">
             <dt className="text-on-surface-variant">Efectivo</dt>
-            <dd className="font-semibold">Entrega previa acordada por WhatsApp</dd>
-            <dd className="text-on-surface-variant">Apruebe cuando haya recibido el dinero.</dd>
+            {o.status === "approved" ? (
+              <>
+                <dd className="font-semibold text-emerald-800">Cobrado</dd>
+                <dd className="text-on-surface-variant">Marcado como pagado el {when(o.reviewedAt)}.</dd>
+              </>
+            ) : (
+              <>
+                <dd className="font-semibold">Por cobrar · entrega acordada por WhatsApp</dd>
+                <dd className="text-on-surface-variant">El cupo queda apartado hasta que lo marque como pagado o anule la reserva.</dd>
+              </>
+            )}
           </div>
         ) : (
           <>
@@ -527,7 +605,7 @@ function PaymentSummary({ o }: { o: AdminOrder }) {
               </dd>
             </div>
             <div>
-              <dt className="text-on-surface-variant">{usdt ? "Order ID / TxID" : "Referencia"}</dt>
+              <dt className="text-on-surface-variant">{usdt ? "Order ID / TxID" : zelle ? "Confirmación Zelle" : "Referencia"}</dt>
               <dd className="font-semibold tabular-nums break-all">{o.paymentReference ?? "—"}</dd>
             </div>
             <div>

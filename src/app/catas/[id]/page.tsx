@@ -936,7 +936,7 @@ function Checkout({ tasting, rate, lang }: { tasting: Tasting; rate: number | nu
                   <span className="material-symbols-outlined text-[18px] text-primary-container" aria-hidden="true">account_balance_wallet</span>
                   {t.howToPayTitle}
                 </p>
-                {t.howToPay}
+                {t.howToPay(tasting.paymentMethods ?? [], tasting.rateCurrency ?? "USD")}
               </div>
 
               <PurchasePolicies lang={lang} bare className="border-t border-outline-variant pt-6" />

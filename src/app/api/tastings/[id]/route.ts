@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { tastingWithAvailability } from "@/lib/availability";
 import { PUBLIC_CATA_STATUSES } from "@/lib/catas";
 import { findTicket, getOrderById } from "@/lib/orders";
+import { methodsForTasting } from "@/lib/paymentMethods";
+import { getPaymentConfig } from "@/lib/settings";
 
 export const dynamic = "force-dynamic";
 
@@ -27,10 +29,12 @@ async function ticketGrantsAccess(ticketToken: string | null, tastingId: string)
  */
 export async function GET(request: Request, { params }: { params: { id: string } }) {
   try {
-    const tasting = await tastingWithAvailability(decodeURIComponent(params.id));
-    if (!tasting) {
+    const [found, payment] = await Promise.all([tastingWithAvailability(decodeURIComponent(params.id)), getPaymentConfig()]);
+    if (!found) {
       return NextResponse.json({ success: false, message: "Cata no encontrada." }, { status: 404 });
     }
+    // Métodos que se ofrecen al pagar (los de la cata que estén activos en Configuración).
+    const tasting = { ...found, paymentMethods: methodsForTasting(found, payment) };
     if (PUBLIC_CATA_STATUSES.includes(tasting.status)) {
       return NextResponse.json({ success: true, tasting });
     }

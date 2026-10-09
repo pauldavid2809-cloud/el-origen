@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import { WhatsAppConcierge } from "@/components/WhatsAppConcierge";
 import { JsonLd } from "@/components/JsonLd";
+import { SITE_URL } from "@/lib/site";
 
 export const viewport: Viewport = {
   themeColor: "#5A1C31",
@@ -10,12 +11,12 @@ export const viewport: Viewport = {
   maximumScale: 5,
 };
 
-const SITE_URL = (process.env.NEXT_PUBLIC_APP_URL || "https://el-origen-two.vercel.app").replace(/\/+$/, "");
 
 const TITLE = "El Origen | Catas guiadas y experiencias en Caracas, Venezuela";
 const DESCRIPTION =
   "El Origen, allí el inicio de todo. Catas guiadas de vinos, destilados y licores de alta gama con sommeliers y maridaje de autor en Caracas. Reserva tu cupo en línea, con una entrada QR por persona.";
-const OG_IMAGE = "https://images.unsplash.com/photo-1510812431401-41d2bd2722f3?q=80&w=1200&auto=format&fit=crop";
+/** Foto real de una cata en la terraza de Maratea (1200×630, public/images). */
+const OG_IMAGE = "/images/og-el-origen.jpg";
 
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
@@ -62,7 +63,7 @@ export const metadata: Metadata = {
         url: OG_IMAGE,
         width: 1200,
         height: 630,
-        alt: "Copa de vino tinto — El Origen, catas guiadas en Caracas",
+        alt: "Terraza de Maratea llena de invitados durante una cata de El Origen en Caracas",
       },
     ],
     locale: "es_VE",

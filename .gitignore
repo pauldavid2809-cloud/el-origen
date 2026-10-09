@@ -13,6 +13,9 @@
 # production
 /build
 
+# paquete del bot para el cliente (lleva la clave del bot)
+/dist/
+
 # misc
 .DS_Store
 *.pem

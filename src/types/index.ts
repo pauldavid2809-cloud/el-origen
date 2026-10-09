@@ -1,7 +1,15 @@
 export type TastingCategory = "degustacion" | "reserva" | "atardecer" | "blancos" | "privada" | "icono";
 export type TastingStatus = "active" | "sold_out" | "draft" | "archived";
-/** Tasa BCV con la que se calcula el monto en bolívares de una cata. */
-export type RateCurrency = "USD" | "EUR";
+/**
+ * Tasa con la que se calcula el monto en bolívares de una cata:
+ * USD / EUR = tasa oficial BCV del dólar / del euro; BINANCE = dólar paralelo (referencia del mercado P2P de Binance).
+ */
+export type RateCurrency = "USD" | "EUR" | "BINANCE";
+export const RATE_CURRENCIES: readonly RateCurrency[] = ["USD", "EUR", "BINANCE"];
+
+/** Métodos de pago (sin tarjeta internacional). */
+export type PaymentMethodId = "pago_movil" | "transferencia" | "binance_usdt" | "zelle" | "efectivo";
+export const PAYMENT_METHOD_IDS: readonly PaymentMethodId[] = ["pago_movil", "transferencia", "binance_usdt", "zelle", "efectivo"];
 
 /** Producto a degustar (vino, destilado, cocuy…). */
 export interface TastingProduct {
@@ -47,6 +55,10 @@ export interface Tasting {
   priceUsd: number;
   priceFormatted: string; // e.g. "$55 USD"
   rateCurrency: RateCurrency;
+  /** Métodos de pago que acepta esta cata (se ofrecen solo los que además estén activos en Configuración). */
+  paymentMethods: PaymentMethodId[];
+  /** Cuenta Zelle de esta cata (id de Configuración → Zelle); null = la primera configurada. */
+  zelleAccountId: string | null;
   totalSpots: number;
   availableSpots: number;
   imageUrl: string;

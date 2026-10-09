@@ -1,8 +1,8 @@
 import React from "react";
 import { CONTACT } from "@/lib/contact";
 import { MOTTO, translations } from "@/lib/i18n";
+import { SITE_URL } from "@/lib/site";
 
-const SITE_URL = (process.env.NEXT_PUBLIC_APP_URL || "https://el-origen-two.vercel.app").replace(/\/+$/, "");
 
 /* Horario de atención real (BUSINESS_HOURS en contact.ts) en formato schema.org. */
 const OPENING_HOURS = [

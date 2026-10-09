@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
@@ -8,12 +8,13 @@ import { PageHeader, SectionHeading } from "@/components/Brand";
 import { useLang } from "@/lib/useLang";
 import { useDocumentTitle } from "@/lib/useDocumentTitle";
 import { whatsappLink } from "@/lib/contact";
-import { formatTastingDate } from "@/lib/dates";
-import { WAITLIST_MAX_SPOTS } from "@/lib/waitlist";
-import type { Tasting } from "@/types";
+import { WAITLIST_MAX_SPOTS, type WaitlistExperience, type WaitlistSchedule, type WineLevel } from "@/lib/waitlist";
 import {
+  ChoiceGroup,
   EMAIL_RE,
+  FormSection,
   LeadFormShell,
+  MultiChoiceGroup,
   SelectField,
   SuccessPanel,
   TextAreaField,
@@ -21,6 +22,7 @@ import {
   isPhone,
   primaryButtonClass,
   secondaryButtonClass,
+  toOptions,
   useLeadForm,
   type FieldErrors,
   type Option,
@@ -28,10 +30,7 @@ import {
 import { FORM_COPY } from "../privadas/_components/copy";
 import { WAITLIST_COPY } from "./copy";
 
-type Field = "fullName" | "phone" | "email" | "tasting" | "spots" | "message";
-
-/** Opción «La próxima cata que haya»: se envía como cata vacía. */
-const NEXT_TASTING = "proxima";
+type Field = "fullName" | "phone" | "email" | "spots" | "experiences" | "schedule" | "wineLevel" | "specialOccasion" | "message";
 
 const SPOT_VALUES = Array.from({ length: WAITLIST_MAX_SPOTS }, (_, i) => String(i + 1));
 
@@ -44,40 +43,22 @@ export default function WaitlistPage() {
   const [fullName, setFullName] = useState("");
   const [phone, setPhone] = useState("");
   const [email, setEmail] = useState("");
-  const [tasting, setTasting] = useState("");
   const [spots, setSpots] = useState("1");
+  const [experiences, setExperiences] = useState<WaitlistExperience[]>([]);
+  const [schedule, setSchedule] = useState<WaitlistSchedule | "">("");
+  const [wineLevel, setWineLevel] = useState<WineLevel | "">("");
+  const [specialOccasion, setSpecialOccasion] = useState("");
   const [message, setMessage] = useState("");
-  const [tastings, setTastings] = useState<Tasting[]>([]);
+  // Si el enlace trae ?cata=<id o slug> (botón de una cata agotada), se envía para saber de dónde vino.
+  const fromTasting = useRef("");
 
   const form = useLeadForm<Field>({ endpoint: "/api/waitlist", lang, idPrefix: "espera" });
   const whatsappHref = whatsappLink(t.whatsappMessage);
 
-  // Catas publicadas; si el enlace trae ?cata=<id o slug>, esa queda elegida.
   useEffect(() => {
-    let alive = true;
-    const wanted = new URLSearchParams(window.location.search).get("cata")?.trim() ?? "";
-    fetch("/api/tastings", { cache: "no-store" })
-      .then((r) => r.json())
-      .then((d) => {
-        if (!alive || !Array.isArray(d?.tastings)) return;
-        const list = d.tastings as Tasting[];
-        setTastings(list);
-        const match = wanted && list.find((x) => x.id === wanted || x.slug === wanted);
-        if (match) setTasting((cur) => cur || match.id);
-      })
-      .catch(() => {});
-    return () => {
-      alive = false;
-    };
+    fromTasting.current = new URLSearchParams(window.location.search).get("cata")?.trim().slice(0, 120) ?? "";
   }, []);
 
-  const tastingOptions: Option[] = [
-    { value: NEXT_TASTING, label: t.nextTasting },
-    ...tastings.map((x) => ({
-      value: x.id,
-      label: `${x.title} · ${formatTastingDate(x.date, lang, x.dateDisplay)}${x.status === "sold_out" ? ` (${t.soldOut})` : ""}`,
-    })),
-  ];
   const spotOptions: Option[] = SPOT_VALUES.map((v) => ({ value: v, label: t.spotsOption(Number(v)) }));
 
   const validate = (): FieldErrors<Field> => {
@@ -85,7 +66,6 @@ export default function WaitlistPage() {
     if (fullName.trim().length < 3) errs.fullName = t.errors.fullName;
     if (!isPhone(phone)) errs.phone = t.errors.phone;
     if (email.trim() && !EMAIL_RE.test(email.trim())) errs.email = t.errors.email;
-    if (!tasting) errs.tasting = t.errors.tasting;
     if (!SPOT_VALUES.includes(spots)) errs.spots = t.errors.spots;
     return errs;
   };
@@ -95,8 +75,12 @@ export default function WaitlistPage() {
       fullName,
       phone,
       email,
-      tastingId: tasting === NEXT_TASTING ? "" : tasting,
+      tastingId: fromTasting.current,
       spots: Number(spots),
+      experiences,
+      schedule,
+      wineLevel,
+      specialOccasion,
       message,
     });
     if (ok) document.getElementById("anotarme")?.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -166,64 +150,95 @@ export default function WaitlistPage() {
                   sending={form.status === "sending"}
                   submitLabel={t.submit}
                 >
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-5 gap-y-6">
-                    <TextField
-                      {...form.bind("fullName", setFullName)}
-                      label={t.fullName}
-                      value={fullName}
-                      autoComplete="name"
-                      maxLength={120}
-                      required
-                    />
-                    <TextField
-                      {...form.bind("phone", setPhone)}
-                      label={t.phone}
-                      hint={t.phoneHint}
-                      value={phone}
-                      type="tel"
-                      inputMode="tel"
-                      autoComplete="tel"
-                      maxLength={40}
-                      required
-                    />
-                    <TextField
-                      {...form.bind("email", setEmail)}
-                      label={t.email}
-                      value={email}
-                      type="email"
-                      inputMode="email"
-                      autoComplete="email"
-                      autoCapitalize="none"
-                      spellCheck={false}
-                      maxLength={200}
-                    />
-                    <SelectField
-                      {...form.bind("spots", setSpots)}
-                      label={t.spots}
-                      placeholder={t.tastingPlaceholder}
-                      options={spotOptions}
-                      value={spots}
-                      required
-                    />
-                  </div>
+                  <FormSection title={`1. ${t.sectionContact}`}>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-5 gap-y-6">
+                      <TextField
+                        {...form.bind("fullName", setFullName)}
+                        label={t.fullName}
+                        value={fullName}
+                        autoComplete="name"
+                        maxLength={120}
+                        required
+                      />
+                      <TextField
+                        {...form.bind("phone", setPhone)}
+                        label={t.phone}
+                        hint={t.phoneHint}
+                        value={phone}
+                        type="tel"
+                        inputMode="tel"
+                        autoComplete="tel"
+                        maxLength={40}
+                        required
+                      />
+                      <TextField
+                        {...form.bind("email", setEmail)}
+                        label={t.email}
+                        value={email}
+                        type="email"
+                        inputMode="email"
+                        autoComplete="email"
+                        autoCapitalize="none"
+                        spellCheck={false}
+                        maxLength={200}
+                      />
+                      <SelectField
+                        {...form.bind("spots", setSpots)}
+                        label={t.spots}
+                        placeholder={t.selectPlaceholder}
+                        options={spotOptions}
+                        value={spots}
+                        required
+                      />
+                    </div>
+                  </FormSection>
 
-                  <SelectField
-                    {...form.bind("tasting", setTasting)}
-                    label={t.tasting}
-                    placeholder={t.tastingPlaceholder}
-                    options={tastingOptions}
-                    value={tasting}
-                    required
-                  />
-
-                  <TextAreaField
-                    {...form.bind("message", setMessage)}
-                    label={t.message}
-                    placeholder={t.messagePlaceholder}
-                    value={message}
-                    maxLength={1000}
-                    rows={3}
-                  />
+                  <FormSection title={`2. ${t.sectionPreferences}`}>
+                    <MultiChoiceGroup
+                      id={form.idFor("experiences")}
+                      lang={lang}
+                      legend={t.experiences}
+                      hint={t.experiencesHint}
+                      options={toOptions(t.experienceOptions)}
+                      value={experiences}
+                      onChange={setExperiences}
+                      columns={2}
+                    />
+                    <ChoiceGroup
+                      id={form.idFor("schedule")}
+                      lang={lang}
+                      legend={t.schedule}
+                      options={toOptions(t.scheduleOptions)}
+                      value={schedule}
+                      onChange={setSchedule}
+                      columns={2}
+                    />
+                    <ChoiceGroup
+                      id={form.idFor("wineLevel")}
+                      lang={lang}
+                      legend={t.wineLevel}
+                      options={toOptions(t.wineLevelOptions)}
+                      value={wineLevel}
+                      onChange={setWineLevel}
+                      columns={3}
+                    />
+                    <TextField
+                      {...form.bind("specialOccasion", setSpecialOccasion)}
+                      label={t.specialOccasion}
+                      longLabel
+                      placeholder={t.specialOccasionPlaceholder}
+                      value={specialOccasion}
+                      maxLength={300}
+                    />
+                    <TextAreaField
+                      {...form.bind("message", setMessage)}
+                      label={t.message}
+                      placeholder={t.messagePlaceholder}
+                      value={message}
+                      maxLength={1000}
+                      rows={3}
+                    />
+                  </FormSection>
                 </LeadFormShell>
               )}
             </div>

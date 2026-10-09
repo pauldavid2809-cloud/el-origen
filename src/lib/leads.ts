@@ -1,7 +1,15 @@
 import "server-only";
 import crypto from "crypto";
 import { getAdminClient } from "./orders";
-import { WAITLIST_MAX_SPOTS } from "./waitlist";
+import {
+  WAITLIST_EXPERIENCES,
+  WAITLIST_MAX_SPOTS,
+  WAITLIST_SCHEDULES,
+  WINE_LEVELS,
+  type WaitlistExperience,
+  type WaitlistSchedule,
+  type WineLevel,
+} from "./waitlist";
 
 /* ─────────────────────────────────────────────────────────────
    Solicitudes de los formularios públicos:
@@ -75,11 +83,17 @@ export interface WaitlistEntry extends LeadBase {
   fullName: string;
   phone: string;
   email: string | null;
-  /** Cata de interés; null = la próxima que haya. */
+  /** Cata desde la que llegó (enlace «Lista de espera» de una cata agotada); null = sin cata concreta. */
   tastingId: string | null;
   /** Nombre de la cata al momento de anotarse (se conserva aunque la cata cambie). */
   tastingTitle: string | null;
   spots: number;
+  /** Preferencias (vacías en las anotaciones anteriores a estas preguntas). */
+  experiences: WaitlistExperience[];
+  schedule: WaitlistSchedule | null;
+  wineLevel: WineLevel | null;
+  /** Fecha o celebración especial próxima (cumpleaños, aniversario…). */
+  specialOccasion: string | null;
   message: string | null;
 }
 
@@ -129,6 +143,16 @@ function phone(v: unknown): string {
 function oneOf<T extends string>(v: unknown, options: readonly T[], label: string): T {
   if (typeof v === "string" && (options as readonly string[]).includes(v)) return v as T;
   throw new LeadInputError(`Selecciona ${label}.`);
+}
+
+function optionalOneOf<T extends string>(v: unknown, options: readonly T[], label: string): T | null {
+  return v === undefined || v === null || v === "" ? null : oneOf(v, options, label);
+}
+
+/** Opciones válidas de una selección múltiple (sin repetir); ignora las desconocidas. */
+function manyOf<T extends string>(v: unknown, options: readonly T[]): T[] {
+  const list = Array.isArray(v) ? v : [];
+  return options.filter((o) => list.includes(o));
 }
 
 function optionalUrl(v: unknown): string | null {
@@ -215,6 +239,10 @@ function normalizeWaitlist(i: WaitlistInput): WaitlistInput {
     tastingId,
     tastingTitle: tastingId ? line(i.tastingTitle, 160) || null : null,
     spots,
+    experiences: manyOf(i.experiences, WAITLIST_EXPERIENCES),
+    schedule: optionalOneOf(i.schedule, WAITLIST_SCHEDULES, "un día y horario válido"),
+    wineLevel: optionalOneOf(i.wineLevel, WINE_LEVELS, "un nivel válido"),
+    specialOccasion: line(i.specialOccasion, 300) || null,
     message: para(i.message, 1000) || null,
   };
 }
@@ -246,7 +274,9 @@ const COLUMNS: { [T in LeadType]: [keyof LeadByType[T], string][] } = {
   ],
   waitlist: [
     ["fullName", "full_name"], ["phone", "phone"], ["email", "email"], ["tastingId", "tasting_id"],
-    ["tastingTitle", "tasting_title"], ["spots", "spots"], ["message", "message"],
+    ["tastingTitle", "tasting_title"], ["spots", "spots"], ["experiences", "experiences"],
+    ["schedule", "preferred_schedule"], ["wineLevel", "wine_level"], ["specialOccasion", "special_occasion"],
+    ["message", "message"],
   ],
 };
 
@@ -264,7 +294,10 @@ function fromRow<T extends LeadType>(type: T, row: Row): LeadByType[T] {
     out.yearsExperience = Number(row.years_experience ?? 0);
   }
   if (type === "brand") out.wantsToSendSamples = Boolean(row.wants_samples);
-  if (type === "waitlist") out.spots = Number(row.spots ?? 1);
+  if (type === "waitlist") {
+    out.spots = Number(row.spots ?? 1);
+    out.experiences = Array.isArray(row.experiences) ? row.experiences : [];
+  }
   return out as unknown as LeadByType[T];
 }
 

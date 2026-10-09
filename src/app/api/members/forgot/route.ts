@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { CONTACT } from "@/lib/contact";
+import { SITE_URL } from "@/lib/site";
 import { isMailEnabled, sendMail } from "@/lib/mailer";
 import { createResetToken, getMemberByEmail, normalizeEmail, type Member } from "@/lib/members";
 import { LIMITS, clientIp, consume, readJson, str } from "../shared";
@@ -33,7 +34,7 @@ export async function POST(request: Request) {
       const result = await sendMail({
         to: member.email,
         subject: lang === "en" ? "Reset your El Origen password" : "Restablece tu contraseña de El Origen",
-        html: resetEmailHtml(member, `${appUrl()}/restablecer?token=${encodeURIComponent(token)}`, lang),
+        html: resetEmailHtml(member, `${SITE_URL}/restablecer?token=${encodeURIComponent(token)}`, lang),
       });
       if (result !== "sent") console.error(`[members/forgot] El correo de recuperación no se envió (${result}).`);
     }
@@ -43,9 +44,6 @@ export async function POST(request: Request) {
   return ok;
 }
 
-function appUrl(): string {
-  return (process.env.NEXT_PUBLIC_APP_URL || "https://el-origen-two.vercel.app").replace(/\/+$/, "");
-}
 
 function esc(v: unknown): string {
   return String(v ?? "")

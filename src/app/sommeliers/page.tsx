@@ -1,10 +1,12 @@
 "use client";
 
 import React, { useState } from "react";
+import Image from "next/image";
 import Link from "next/link";
 import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
 import { PageHeader, SectionHeading } from "@/components/Brand";
+import { PHOTOS } from "@/lib/photos";
 import { useLang } from "@/lib/useLang";
 import { useDocumentTitle } from "@/lib/useDocumentTitle";
 import type { SommelierSpecialty } from "@/lib/leads";
@@ -132,6 +134,15 @@ export default function SommeliersPage() {
                 {p}
               </p>
             ))}
+            <div className="!mt-10 relative aspect-[16/10] overflow-hidden rounded-2xl bg-surface-container">
+              <Image
+                src={PHOTOS.sommelierCopaItalia.src}
+                alt={PHOTOS.sommelierCopaItalia.alt[lang]}
+                fill
+                sizes="(min-width: 1320px) 680px, (min-width: 1024px) 55vw, 100vw"
+                className="object-cover object-[center_45%]"
+              />
+            </div>
           </div>
 
           <div className="lg:col-span-5 rounded-2xl bg-primary-container text-paper p-7 sm:p-10">

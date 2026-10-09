@@ -5,6 +5,7 @@ import type { BrandLead, LeadStatus, LeadType, PrivateInquiry, SommelierApplicat
 import { PRIVADAS_COPY } from "@/app/privadas/copy";
 import { ALIANZAS_COPY } from "@/app/alianzas/copy";
 import { SOMMELIERS_COPY } from "@/app/sommeliers/copy";
+import { WAITLIST_COPY } from "@/app/lista-de-espera/copy";
 import { instagramUrl } from "@/lib/team";
 
 /* Bandeja de solicitudes de los formularios públicos: Privadas, Marcas, Sommeliers y Lista de espera. */
@@ -32,6 +33,7 @@ const STATUS_ORDER: LeadStatus[] = ["new", "contacted", "closed", "archived"];
 const PRIVATE = PRIVADAS_COPY.es;
 const BRAND = ALIANZAS_COPY.es;
 const SOMMELIER = SOMMELIERS_COPY.es;
+const WAITLIST = WAITLIST_COPY.es;
 
 const when = (iso: string) =>
   iso
@@ -554,7 +556,13 @@ function LeadDetails({ type, lead }: { type: LeadType; lead: AnyLead }) {
             )}
           </Detail>
           <Detail label="Personas">{l.spots}</Detail>
+          <Detail label="Experiencias que le interesan">
+            {l.experiences.map((x) => WAITLIST.experienceOptions[x] ?? x).join(" · ") || "—"}
+          </Detail>
+          <Detail label="Días y horarios">{l.schedule ? WAITLIST.scheduleOptions[l.schedule] ?? l.schedule : "—"}</Detail>
+          <Detail label="Nivel en el mundo del vino">{l.wineLevel ? WAITLIST.wineLevelOptions[l.wineLevel] ?? l.wineLevel : "—"}</Detail>
         </dl>
+        <Message label="Fecha o celebración especial" text={l.specialOccasion} />
         <Message label="Comentario" text={l.message} />
       </>
     );

@@ -3,11 +3,10 @@
 import React, { useEffect, useState } from "react";
 import type { Language } from "@/lib/i18n";
 import type { PaymentConfig } from "@/lib/settings";
+import type { PaymentMethodId } from "@/types";
 import { whatsappLink } from "@/lib/contact";
 
 /* Datos de pago de la configuración editable (Admin → Configuración de pagos). */
-
-export type PaymentMethodId = "pago_movil" | "transferencia" | "binance_usdt" | "efectivo";
 
 /** "$55 USD" / "$55.50 USD" */
 export function formatUsd(n: number): string {
@@ -17,16 +16,6 @@ export function formatUsd(n: number): string {
 /** Bolívares con 2 decimales en el formato del idioma. */
 export function formatBs(n: number, lang: Language = "es"): string {
   return n.toLocaleString(lang === "es" ? "es-VE" : "en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-}
-
-/** Métodos que la configuración tiene activos, en el orden en que se ofrecen. */
-export function availableMethods(cfg: PaymentConfig): PaymentMethodId[] {
-  const methods: PaymentMethodId[] = [];
-  if (cfg.pagoMovil.length) methods.push("pago_movil");
-  if (cfg.transfers.length) methods.push("transferencia");
-  if (cfg.binance.enabled) methods.push("binance_usdt");
-  if (cfg.efectivo.enabled) methods.push("efectivo");
-  return methods;
 }
 
 /** Si la configuración trae datos de Binance para mostrar (enlace de cobro, Pay ID o correo). */
@@ -59,6 +48,7 @@ const COPY = {
     holder: "Titular",
     payId: "Binance Pay ID",
     email: "Correo de Binance",
+    zelle: "Correo o teléfono Zelle",
     copy: "Copiar",
     copied: "Copiado",
     copyAria: (field: string) => `Copiar ${field.toLowerCase()}`,
@@ -80,6 +70,7 @@ const COPY = {
     holder: "Account holder",
     payId: "Binance Pay ID",
     email: "Binance email",
+    zelle: "Zelle email or phone",
     copy: "Copy",
     copied: "Copied",
     copyAria: (field: string) => `Copy ${field.toLowerCase()}`,
@@ -111,7 +102,7 @@ interface PaymentDetailsProps {
   config: PaymentConfig;
   method: Exclude<PaymentMethodId, "efectivo">;
   lang: Language;
-  /** Cuenta seleccionada (Pago Móvil / transferencia). */
+  /** Cuenta seleccionada (Pago Móvil / transferencia). Zelle muestra las cuentas de `config.zelle` (la de la cata). */
   selectedId?: string;
   onSelect?: (id: string) => void;
   className?: string;
@@ -153,6 +144,15 @@ export function PaymentDetails({ config, method, lang, selectedId, onSelect, cla
         { name: t.account, value: a.number, copy: digits(a.number) },
         { name: t.docId, value: a.docId, copy: digits(a.docId) },
         ...holder,
+      ],
+    }));
+  } else if (method === "zelle") {
+    destinations = (config.zelle ?? []).map((a) => ({
+      id: a.id,
+      title: `Zelle${a.bank ? ` · ${a.bank}` : ""}`,
+      fields: [
+        { name: t.zelle, value: a.account },
+        { name: t.holder, value: a.holder },
       ],
     }));
   } else {

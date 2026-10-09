@@ -1,13 +1,16 @@
 import "server-only";
 import crypto from "crypto";
-import type {
-  RateCurrency,
-  Tasting,
-  TastingAddOn,
-  TastingCategory,
-  TastingInstagram,
-  TastingProduct,
-  TastingStatus,
+import {
+  PAYMENT_METHOD_IDS,
+  RATE_CURRENCIES,
+  type PaymentMethodId,
+  type RateCurrency,
+  type Tasting,
+  type TastingAddOn,
+  type TastingCategory,
+  type TastingInstagram,
+  type TastingProduct,
+  type TastingStatus,
 } from "@/types";
 import { getAdminClient } from "./orders";
 import { TEAM, getTeamMember } from "./team";
@@ -31,6 +34,10 @@ export interface CataInput {
   mapsUrl: string;
   priceUsd: number;
   rateCurrency: RateCurrency;
+  /** Métodos de pago de esta cata; vacío = todos los activos en Configuración. */
+  paymentMethods: PaymentMethodId[];
+  /** Cuenta Zelle (id de Configuración → Zelle); "" = la primera. */
+  zelleAccountId: string;
   totalSpots: number;
   imageUrl: string;
   imageAlt: string;
@@ -60,8 +67,8 @@ export const PUBLIC_CATA_STATUSES: readonly TastingStatus[] = ["active", "sold_o
 
 const EDITABLE_KEYS: (keyof CataInput)[] = [
   "title", "subtitle", "description", "date", "timeStart", "timeEnd", "location", "locationAddress", "mapsUrl",
-  "priceUsd", "rateCurrency", "totalSpots", "imageUrl", "imageAlt", "category", "wines", "pairings", "sommelierIds",
-  "instagram", "addOns", "status",
+  "priceUsd", "rateCurrency", "paymentMethods", "zelleAccountId", "totalSpots", "imageUrl", "imageAlt", "category", "wines",
+  "pairings", "sommelierIds", "instagram", "addOns", "status",
 ];
 
 /* ─── Fechas (zona horaria de Caracas) ─── */
@@ -226,9 +233,14 @@ function normalizeCataInput(input: unknown, requireAll: boolean): Partial<CataIn
     out.priceUsd = money(r.priceUsd, "Precio");
   }
   if (has("rateCurrency")) {
-    if (r.rateCurrency !== "USD" && r.rateCurrency !== "EUR") throw new CataInputError("La tasa debe ser USD o EUR.");
-    out.rateCurrency = r.rateCurrency;
+    if (!RATE_CURRENCIES.includes(r.rateCurrency as RateCurrency)) throw new CataInputError("La tasa debe ser BCV dólar, BCV euro o Binance.");
+    out.rateCurrency = r.rateCurrency as RateCurrency;
   }
+  if (has("paymentMethods")) {
+    const chosen = list(r.paymentMethods);
+    out.paymentMethods = PAYMENT_METHOD_IDS.filter((m) => chosen.includes(m));
+  }
+  if (has("zelleAccountId")) out.zelleAccountId = line(r.zelleAccountId, 40);
   if (has("totalSpots") || requireAll) {
     const n = Number(r.totalSpots);
     if (!Number.isInteger(n) || n < 1 || n > 1000) throw new CataInputError("Los cupos totales deben ser un número entre 1 y 1000.");
@@ -276,6 +288,8 @@ const DEFAULTS: Omit<CataInput, "title" | "date" | "timeStart" | "location" | "p
   locationAddress: "",
   mapsUrl: "",
   rateCurrency: "USD",
+  paymentMethods: [],
+  zelleAccountId: "",
   imageUrl: "",
   imageAlt: "",
   category: "degustacion",
@@ -309,6 +323,8 @@ function toTasting(c: CataRecord): Tasting {
     priceUsd: c.priceUsd,
     priceFormatted: formatUsd(c.priceUsd),
     rateCurrency: c.rateCurrency,
+    paymentMethods: c.paymentMethods,
+    zelleAccountId: c.zelleAccountId || null,
     totalSpots: c.totalSpots,
     // La disponibilidad real (descontando órdenes) la aplica `availability.ts`.
     availableSpots: c.totalSpots,
@@ -347,7 +363,9 @@ function fromRow(row: Row): CataRecord {
     locationAddress: String(row.location_address ?? ""),
     mapsUrl: String(row.maps_url ?? ""),
     priceUsd: Number(row.price_usd ?? 0),
-    rateCurrency: row.rate_currency === "EUR" ? "EUR" : "USD",
+    rateCurrency: RATE_CURRENCIES.includes(row.rate_currency as RateCurrency) ? (row.rate_currency as RateCurrency) : "USD",
+    paymentMethods: PAYMENT_METHOD_IDS.filter((m) => jsonArray<string>(row.payment_methods).includes(m)),
+    zelleAccountId: String(row.zelle_account_id ?? ""),
     totalSpots: Number(row.total_spots ?? 0),
     imageUrl: String(row.image_url ?? ""),
     imageAlt: String(row.image_alt ?? ""),
@@ -366,7 +384,8 @@ function fromRow(row: Row): CataRecord {
 const COLUMNS: Record<keyof CataInput, string> = {
   title: "title", subtitle: "subtitle", description: "description", date: "date", timeStart: "time_start",
   timeEnd: "time_end", location: "location_name", locationAddress: "location_address", mapsUrl: "maps_url",
-  priceUsd: "price_usd", rateCurrency: "rate_currency", totalSpots: "total_spots", imageUrl: "image_url",
+  priceUsd: "price_usd", rateCurrency: "rate_currency", paymentMethods: "payment_methods", zelleAccountId: "zelle_account_id",
+  totalSpots: "total_spots", imageUrl: "image_url",
   imageAlt: "image_alt", category: "category", wines: "products", pairings: "pairings", sommelierIds: "sommelier_ids",
   instagram: "instagram", addOns: "add_ons", status: "status",
 };
@@ -377,7 +396,7 @@ function toRow(patch: Partial<CataInput>): Row {
     if (k in patch) {
       const v = patch[k];
       // Columnas de texto opcionales: "" se guarda como null.
-      row[COLUMNS[k]] = (k === "locationAddress" || k === "mapsUrl") && !v ? null : v;
+      row[COLUMNS[k]] = (k === "locationAddress" || k === "mapsUrl" || k === "zelleAccountId") && !v ? null : v;
     }
   }
   return row;
@@ -544,7 +563,14 @@ export async function deleteCata(id: string): Promise<boolean> {
 function demoCatas(): CataRecord[] {
   const today = todayInCaracas();
   const now = new Date().toISOString();
-  const base = { createdAt: now, updatedAt: now, status: "active" as const, mapsUrl: "https://www.google.com/maps/search/?api=1&query=Caracas%2C%20Venezuela" };
+  const base = {
+    createdAt: now,
+    updatedAt: now,
+    status: "active" as const,
+    mapsUrl: "https://www.google.com/maps/search/?api=1&query=Caracas%2C%20Venezuela",
+    paymentMethods: [] as PaymentMethodId[],
+    zelleAccountId: "",
+  };
   return [
     {
       ...base,

@@ -11,6 +11,7 @@ const es = {
 
   historyEyebrow: "Cómo nació",
   historyTitle: "Caracas, 2026",
+  photosCaption: "Momentos de nuestras catas en Maratea y en «Contrastes de Italia».",
   history: [
     "El Origen nació en Caracas a inicios de 2026, impulsado por una visión clara: transformar la manera en que se vive la gastronomía y los licores de alta gama en Venezuela. Lo que comenzó como un concepto íntimo de catas guiadas evolucionó rápidamente en una firma de experiencias exclusivas, diseñadas para quienes buscan conectar a través del paladar, el aprendizaje y el networking de alto nivel.",
     "Desde nuestras primeras ediciones dedicadas al fascinante universo del vino y las grandes etiquetas, El Origen se ha consolidado como un punto de encuentro para apasionados, coleccionistas y marcas de prestigio.",
@@ -39,6 +40,7 @@ const en: typeof es = {
 
   historyEyebrow: "How it began",
   historyTitle: "Caracas, 2026",
+  photosCaption: "Moments from our tastings at Maratea and at “Contrasts of Italy”.",
   history: [
     "El Origen was born in Caracas in early 2026, driven by a clear vision: to transform the way fine food and premium spirits are experienced in Venezuela. What began as an intimate concept of guided tastings quickly grew into a firm of exclusive experiences, designed for those who seek to connect through the palate, learning and high-level networking.",
     "Since our first editions, devoted to the fascinating world of wine and great labels, El Origen has become a meeting point for enthusiasts, collectors and prestigious brands.",

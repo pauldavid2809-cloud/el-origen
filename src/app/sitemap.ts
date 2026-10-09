@@ -1,9 +1,9 @@
 import { MetadataRoute } from "next";
 import { listCatas } from "@/lib/catas";
+import { SITE_URL } from "@/lib/site";
 
 export const dynamic = "force-dynamic";
 
-const SITE_URL = (process.env.NEXT_PUBLIC_APP_URL || "https://el-origen-two.vercel.app").replace(/\/+$/, "");
 
 type ChangeFrequency = NonNullable<MetadataRoute.Sitemap[number]["changeFrequency"]>;
 

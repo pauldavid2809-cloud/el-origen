@@ -44,7 +44,7 @@ export function paymentDestinationLabel(config: PaymentConfig, paymentBank: stri
   if (paymentBank === "efectivo") return "Efectivo";
   const found = findPaymentAccount(config, paymentBank);
   if (!found) return paymentBank;
-  return found.kind === "pago_movil"
-    ? `Pago Móvil · ${found.account.bank}`
-    : `Transferencia · ${found.account.bank} ${found.account.number.replace(/\D/g, "").slice(-4)}`;
+  if (found.kind === "pago_movil") return `Pago Móvil · ${found.account.bank}`;
+  if (found.kind === "zelle") return `Zelle · ${found.account.account} (${found.account.holder})`;
+  return `Transferencia · ${found.account.bank} ${found.account.number.replace(/\D/g, "").slice(-4)}`;
 }

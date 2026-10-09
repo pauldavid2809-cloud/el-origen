@@ -1,7 +1,7 @@
 import "server-only";
 import crypto from "crypto";
 import { createClient, SupabaseClient } from "@supabase/supabase-js";
-import type { RateCurrency, Tasting } from "@/types";
+import { PAYMENT_METHOD_IDS, type PaymentMethodId, type RateCurrency, type Tasting } from "@/types";
 
 /* ─────────────────────────────────────────────────────────────
    Órdenes de reserva con pago verificado (tabla public.orders).
@@ -13,8 +13,8 @@ export type OrderStatus = "pending_payment" | "in_review" | "approved" | "reject
 /** queued: esperando que el bot de WhatsApp lo envíe. */
 export type DeliveryStatus = "not_sent" | "queued" | "sent" | "failed" | "disabled";
 /** Métodos de pago aceptados (sin tarjeta internacional). */
-export type PaymentMethod = "pago_movil" | "transferencia" | "binance_usdt" | "efectivo";
-export const PAYMENT_METHODS: readonly PaymentMethod[] = ["pago_movil", "transferencia", "binance_usdt", "efectivo"];
+export type PaymentMethod = PaymentMethodId;
+export const PAYMENT_METHODS: readonly PaymentMethod[] = PAYMENT_METHOD_IDS;
 /** Máximo de cupos que una persona puede reservar en una misma orden. */
 export const MAX_SPOTS_PER_ORDER = 10;
 
@@ -86,10 +86,11 @@ export function toPublicOrder(o: Order): PublicOrder {
 /** Minutos que una orden sin pago reportado retiene sus cupos. */
 export const HOLD_MINUTES = 60;
 /**
- * Horas que una orden en efectivo ("Ya coordiné la entrega", sin comprobante) retiene sus cupos
- * mientras el admin confirma el pago. Pasado ese tiempo los libera, igual que un apartado vencido.
+ * Horas que una orden en efectivo ("Ya coordiné la entrega", sin comprobante) retiene sus cupos.
+ * Es un año: en la práctica el cupo queda apartado hasta que el admin la marca como pagada
+ * o la anula (Reservas → filtro Efectivo → "Por cobrar").
  */
-export const CASH_HOLD_HOURS = 24;
+export const CASH_HOLD_HOURS = 24 * 365;
 
 const PROOF_BUCKET = "comprobantes";
 

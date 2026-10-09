@@ -3,13 +3,14 @@ import QRCode from "qrcode";
 import type { Order, DeliveryStatus, Ticket } from "./orders";
 import { CONTACT } from "./contact";
 import { sendMail, type MailAttachment } from "./mailer";
+import { SITE_URL } from "./site";
 import { policiesEmailHtml, policiesPlainText } from "./policies";
 
 /* Notificaciones al cliente: correo (Gmail SMTP o Resend, vía mailer.ts) y WhatsApp
    (API de Meta o cola del bot propio). Cada persona recibe su propia entrada con QR. */
 
 export function appUrl(): string {
-  return (process.env.NEXT_PUBLIC_APP_URL || "https://el-origen-two.vercel.app").replace(/\/+$/, "");
+  return SITE_URL;
 }
 
 export const orderUrl = (o: Pick<Order, "token">) => `${appUrl()}/orden/${o.token}`;
@@ -31,8 +32,17 @@ export const PAYMENT_METHOD_LABEL: Record<string, string> = {
   pago_movil: "Pago Móvil",
   transferencia: "Transferencia",
   binance_usdt: "Binance USDT",
+  zelle: "Zelle",
   efectivo: "Efectivo",
 };
+
+/** Monto que el cliente dice haber pagado, en la moneda de su método ("Bs 1.234,5", "55 USDT", "$55 USD"). */
+export function paidAmountLabel(o: Pick<Order, "paymentMethod" | "paymentAmountBs">): string {
+  if (o.paymentAmountBs === null) return "";
+  if (o.paymentMethod === "binance_usdt") return `${o.paymentAmountBs} USDT`;
+  if (o.paymentMethod === "zelle") return `$${o.paymentAmountBs} USD`;
+  return `Bs ${o.paymentAmountBs}`;
+}
 
 const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
 
@@ -153,8 +163,7 @@ function paymentSummary(o: Order): string {
   if (o.totalUsd <= 0) return "Sin monto que pagar (descuento del 100 %) · Total: $0 USD";
   const method = PAYMENT_METHOD_LABEL[o.paymentMethod ?? ""] ?? "Pago";
   if (o.paymentMethod === "efectivo") return `${method}: el cliente indica que coordinó la entrega · Total: $${o.totalUsd} USD`;
-  const amount =
-    o.paymentAmountBs === null ? "—" : o.paymentMethod === "binance_usdt" ? `${o.paymentAmountBs} USDT` : `Bs ${o.paymentAmountBs}`;
+  const amount = paidAmountLabel(o) || "—";
   return `${method} · Referencia: <strong>${esc(o.paymentReference)}</strong> · Monto: ${esc(amount)} · Total: $${o.totalUsd} USD`;
 }
 

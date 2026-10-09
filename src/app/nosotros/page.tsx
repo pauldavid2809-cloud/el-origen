@@ -10,6 +10,8 @@ import { useLang } from "@/lib/useLang";
 import { useDocumentTitle } from "@/lib/useDocumentTitle";
 import type { Language } from "@/lib/i18n";
 import { TEAM, instagramUrl, teamInitials, type TeamMember } from "@/lib/team";
+import { PhotoStrip } from "@/components/PhotoStrip";
+import { PHOTOS } from "@/lib/photos";
 import { NOSOTROS_COPY } from "./copy";
 
 export default function NosotrosPage() {
@@ -52,6 +54,12 @@ export default function NosotrosPage() {
               </p>
             ))}
           </div>
+          <PhotoStrip
+            photos={[PHOTOS.sommelierExplica, PHOTOS.invitadoMapas, PHOTOS.sommelierGuiaItalia]}
+            lang={lang}
+            caption={t.photosCaption}
+            className="lg:col-span-12 mt-4 sm:mt-8"
+          />
         </section>
 
         {/* Lema */}

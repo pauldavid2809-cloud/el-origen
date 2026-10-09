@@ -5,7 +5,9 @@ import type { CataInput } from "@/lib/catas";
 import { TEAM, teamInitials } from "@/lib/team";
 import { shrinkImage } from "@/lib/shrinkImage";
 import { VENUES, getVenue, venueForLocation } from "@/lib/venues";
-import type { RateCurrency, Tasting, TastingCategory, TastingStatus } from "@/types";
+import { availableMethods } from "@/lib/paymentMethods";
+import type { PaymentConfig } from "@/lib/settings";
+import { PAYMENT_METHOD_IDS, RATE_CURRENCIES, type PaymentMethodId, type RateCurrency, type Tasting, type TastingCategory, type TastingStatus } from "@/types";
 
 /* Formulario completo de una cata (crear, editar o duplicar). Envía un `CataInput` a /api/admin/catas. */
 
@@ -33,6 +35,29 @@ const STATUS_HINT: Partial<Record<TastingStatus, string>> = {
 };
 
 const MAX_IMAGE_BYTES = 6 * 1024 * 1024;
+
+export const RATE_LABEL: Record<RateCurrency, string> = {
+  USD: "BCV dólar",
+  EUR: "BCV euro",
+  BINANCE: "Binance (dólar paralelo)",
+};
+
+export const METHOD_LABEL: Record<PaymentMethodId, string> = {
+  pago_movil: "Pago Móvil",
+  transferencia: "Transferencia",
+  binance_usdt: "Binance USDT",
+  zelle: "Zelle",
+  efectivo: "Efectivo",
+};
+
+/** Qué falta en Configuración para poder ofrecer un método. */
+const METHOD_MISSING: Record<PaymentMethodId, string> = {
+  pago_movil: "Agregue una cuenta de Pago Móvil en Configuración.",
+  transferencia: "Agregue una cuenta bancaria en Configuración.",
+  binance_usdt: "Active Binance en Configuración.",
+  zelle: "Agregue una cuenta Zelle en Configuración.",
+  efectivo: "Active el efectivo en Configuración.",
+};
 
 type Keyed<T> = T & { _k: number };
 
@@ -66,6 +91,9 @@ interface FormState {
   mapsUrl: string;
   priceUsd: string;
   rateCurrency: RateCurrency;
+  /** Vacío = todos los métodos activos en Configuración (así quedan las catas creadas antes de esta opción). */
+  paymentMethods: PaymentMethodId[];
+  zelleAccountId: string;
   totalSpots: string;
   imageUrl: string;
   imageAlt: string;
@@ -98,6 +126,8 @@ function initialState(source: Tasting | null, duplicate: boolean): FormState {
       mapsUrl: "",
       priceUsd: "",
       rateCurrency: "USD",
+      paymentMethods: [],
+      zelleAccountId: "",
       totalSpots: "",
       imageUrl: "",
       imageAlt: "",
@@ -122,6 +152,8 @@ function initialState(source: Tasting | null, duplicate: boolean): FormState {
     mapsUrl: source.mapsUrl ?? "",
     priceUsd: String(source.priceUsd ?? source.price ?? ""),
     rateCurrency: source.rateCurrency ?? "USD",
+    paymentMethods: source.paymentMethods ?? [],
+    zelleAccountId: source.zelleAccountId ?? "",
     totalSpots: String(source.totalSpots),
     imageUrl: source.imageUrl ?? "",
     imageAlt: source.imageAlt === source.title ? "" : source.imageAlt ?? "",
@@ -161,6 +193,8 @@ function toPayload(s: FormState): CataInput {
     // El servidor acepta coma decimal ("45,50").
     priceUsd: s.priceUsd as unknown as number,
     rateCurrency: s.rateCurrency,
+    paymentMethods: s.paymentMethods,
+    zelleAccountId: s.zelleAccountId,
     totalSpots: Number(s.totalSpots),
     imageUrl: s.imageUrl,
     imageAlt: s.imageAlt,
@@ -206,12 +240,14 @@ interface Props {
   mode: "create" | "edit" | "duplicate";
   /** Cupos ya ocupados (para avisar si se reducen los cupos totales). */
   heldSpots?: number;
-  rates: { USD: number | null; EUR: number | null };
+  rates: Record<RateCurrency, number | null>;
+  /** Configuración de pagos (métodos activos y cuentas Zelle); null mientras carga. */
+  payment: PaymentConfig | null;
   onClose: () => void;
   onSaved: (t: Tasting, message: string) => void;
 }
 
-export function CataForm({ source, mode, heldSpots = 0, rates, onClose, onSaved }: Props) {
+export function CataForm({ source, mode, heldSpots = 0, rates, payment, onClose, onSaved }: Props) {
   const [s, setS] = useState<FormState>(() => initialState(source, mode === "duplicate"));
   const [dirty, setDirty] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -330,9 +366,22 @@ export function CataForm({ source, mode, heldSpots = 0, rates, onClose, onSaved 
     }
   };
 
+  // Métodos de la cata: los marcados o, si no se marcó ninguno, todos los activos en Configuración.
+  const enabledMethods = payment ? availableMethods(payment) : PAYMENT_METHOD_IDS;
+  const chosenMethods = s.paymentMethods.length ? s.paymentMethods : enabledMethods;
+  const offeredMethods = chosenMethods.filter((m) => enabledMethods.includes(m));
+  const zelleAccounts = payment?.zelle ?? [];
+  const toggleMethod = (m: PaymentMethodId, on: boolean) =>
+    set("paymentMethods", PAYMENT_METHOD_IDS.filter((x) => (x === m ? on : chosenMethods.includes(x))));
+
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
+    if (payment && offeredMethods.length === 0) {
+      setError("Marque al menos un método de pago activo para esta cata.");
+      errorRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+      return;
+    }
     const total = Number(s.totalSpots);
     if (mode === "edit" && heldSpots > 0 && total < heldSpots) {
       setError(`Esta cata ya tiene ${heldSpots} cupos ocupados: los cupos totales no pueden ser menos.`);
@@ -478,24 +527,6 @@ export function CataForm({ source, mode, heldSpots = 0, rates, onClose, onSaved 
               </div>
             </div>
             <fieldset>
-              <legend className={labelCls}>Tasa BCV para el monto en bolívares</legend>
-              <div className="flex gap-2">
-                {(["USD", "EUR"] as RateCurrency[]).map((c) => (
-                  <label key={c} className={`flex-1 sm:flex-none flex items-center gap-2 min-h-11 px-4 rounded border cursor-pointer text-[14px] ${s.rateCurrency === c ? "border-primary-container bg-primary-fixed/50" : "border-outline-variant"}`}>
-                    <input type="radio" name={id("rate")} checked={s.rateCurrency === c} onChange={() => set("rateCurrency", c)} className="accent-[#7D2A46]" />
-                    {c === "USD" ? "Dólar (USD)" : "Euro (EUR)"}
-                  </label>
-                ))}
-              </div>
-              <p className={hintCls}>
-                {rate
-                  ? `Tasa BCV ${s.rateCurrency} de hoy: Bs ${rate.toLocaleString("es-VE", { maximumFractionDigits: 4 })}${
-                      price > 0 ? ` → ${s.priceUsd} = Bs ${(price * rate).toLocaleString("es-VE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : ""
-                    }`
-                  : "La tasa del día se calcula automáticamente al reservar."}
-              </p>
-            </fieldset>
-            <fieldset>
               <legend className={labelCls}>Estado</legend>
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                 {(["draft", "active", "archived", ...(source?.status === "sold_out" && mode === "edit" ? (["sold_out"] as const) : [])] as TastingStatus[]).map((st) => (
@@ -508,6 +539,79 @@ export function CataForm({ source, mode, heldSpots = 0, rates, onClose, onSaved 
                   </label>
                 ))}
               </div>
+            </fieldset>
+          </Section>
+
+          {/* Pagos */}
+          <Section title="Pagos de esta cata">
+            <fieldset>
+              <legend className={labelCls}>Métodos de pago</legend>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                {PAYMENT_METHOD_IDS.map((m) => {
+                  const enabled = enabledMethods.includes(m);
+                  const checked = enabled && chosenMethods.includes(m);
+                  return (
+                    <label
+                      key={m}
+                      className={`flex items-start gap-2 min-h-11 p-3 rounded border ${enabled ? "cursor-pointer" : "opacity-60"} ${
+                        checked ? "border-primary-container bg-primary-fixed/50" : "border-outline-variant"
+                      }`}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={checked}
+                        disabled={!enabled}
+                        onChange={(e) => toggleMethod(m, e.target.checked)}
+                        className="accent-[#7D2A46] mt-0.5"
+                      />
+                      <span>
+                        <span className="block text-[14px] font-semibold">{METHOD_LABEL[m]}</span>
+                        {!enabled && <span className="block text-[12px] text-on-surface-variant">{METHOD_MISSING[m]}</span>}
+                      </span>
+                    </label>
+                  );
+                })}
+              </div>
+              <p className={hintCls}>El cliente solo verá los métodos marcados al pagar esta cata.</p>
+            </fieldset>
+
+            {offeredMethods.includes("zelle") && zelleAccounts.length > 0 && (
+              <div>
+                <label htmlFor={id("zelle")} className={labelCls}>Cuenta Zelle para esta cata</label>
+                <select
+                  id={id("zelle")}
+                  value={zelleAccounts.some((a) => a.id === s.zelleAccountId) ? s.zelleAccountId : zelleAccounts[0].id}
+                  onChange={(e) => set("zelleAccountId", e.target.value)}
+                  className={inputCls}
+                >
+                  {zelleAccounts.map((a) => (
+                    <option key={a.id} value={a.id}>
+                      {a.account} · {a.holder}
+                    </option>
+                  ))}
+                </select>
+                <p className={hintCls}>Los datos de esta cuenta son los que verá el cliente al elegir Zelle.</p>
+              </div>
+            )}
+
+            <fieldset>
+              <legend className={labelCls}>Tasa para el monto en bolívares (Pago Móvil y transferencia)</legend>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                {RATE_CURRENCIES.map((c) => (
+                  <label key={c} className={`flex items-center gap-2 min-h-11 px-4 rounded border cursor-pointer text-[14px] ${s.rateCurrency === c ? "border-primary-container bg-primary-fixed/50" : "border-outline-variant"}`}>
+                    <input type="radio" name={id("rate")} checked={s.rateCurrency === c} onChange={() => set("rateCurrency", c)} className="accent-[#7D2A46]" />
+                    {RATE_LABEL[c]}
+                  </label>
+                ))}
+              </div>
+              <p className={hintCls}>
+                {rate
+                  ? `Tasa ${RATE_LABEL[s.rateCurrency]} de hoy: Bs ${rate.toLocaleString("es-VE", { maximumFractionDigits: 4 })}${
+                      price > 0 ? ` → ${s.priceUsd} = Bs ${(price * rate).toLocaleString("es-VE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : ""
+                    }`
+                  : "La tasa del día se calcula automáticamente al reservar."}
+                {s.rateCurrency === "BINANCE" && " La tasa Binance es el promedio del dólar paralelo y se actualiza sola cada 10 minutos."}
+              </p>
             </fieldset>
           </Section>
 

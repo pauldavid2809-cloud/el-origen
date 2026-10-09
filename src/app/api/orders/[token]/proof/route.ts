@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { clientIp, hit, isLimited, tooManyAttempts, type RateLimit } from "@/lib/rateLimit";
 import { tastingWithAvailability } from "@/lib/availability";
+import { getCata } from "@/lib/catas";
+import { isBsMethod, methodsForTasting, zelleForTasting } from "@/lib/paymentMethods";
 import { sendProofAlert } from "@/lib/notify";
 import {
   getOrderByToken,
@@ -75,9 +77,11 @@ function parseAmount(raw: string): number {
  * El cliente reporta su pago.
  *  - pago_movil / transferencia: cuenta destino de la configuración, referencia, monto en Bs, datos del pagador y comprobante.
  *  - binance_usdt: referencia (Order ID / TxID), monto en USDT y comprobante.
+ *  - zelle: cuenta Zelle de la cata, número de confirmación, monto en USD y comprobante.
  *  - efectivo: sin comprobante ni referencia (la entrega se coordina por WhatsApp); nota opcional.
  *  - total $0 (cupón del 100 %): no hay nada que pagar; se pasa a revisión sin monto, referencia ni comprobante.
- * El monto se guarda en `paymentAmountBs`; su moneda depende del método (USDT en Binance).
+ * Solo se aceptan los métodos de la cata (Catas → Pagos) que estén activos en Configuración.
+ * El monto se guarda en `paymentAmountBs`; su moneda depende del método (USDT en Binance, USD en Zelle).
  */
 export async function POST(request: Request, { params }: { params: { token: string } }) {
   // Se rechaza antes de leer el cuerpo: formData() lo carga entero en memoria.
@@ -107,7 +111,8 @@ export async function POST(request: Request, { params }: { params: { token: stri
     const method = String(form.get("paymentMethod") ?? "") as PaymentMethod;
     if (!free && !PAYMENT_METHODS.includes(method)) return bad("Seleccione la forma de pago.");
 
-    const config = await getPaymentConfig();
+    const [config, cata] = await Promise.all([getPaymentConfig(), getCata(order.tastingId).catch(() => null)]);
+    if (!free && !methodsForTasting(cata, config).includes(method)) return bad("Esa forma de pago no está disponible para esta cata.");
     const note = field(form, "note", NOTE_MAX) || null;
     const payerBank = field(form, "payerBank") || null;
     const payerDocId = String(form.get("payerDocId") ?? "").replace(/[^0-9VEJvej-]/g, "").toUpperCase().slice(0, 20) || null;
@@ -137,6 +142,13 @@ export async function POST(request: Request, { params }: { params: { token: stri
         reference = String(form.get("paymentReference") ?? "").replace(/[^A-Za-z0-9]/g, "").slice(0, 100);
         if (reference.length < 4) return bad("Indique el Order ID o TxID del pago en Binance.");
         if (!(amount > 0)) return bad("Indique el monto pagado en USDT.");
+      } else if (method === "zelle") {
+        const account = zelleForTasting(cata, config);
+        if (!account) return bad("El pago por Zelle no está disponible.");
+        destination = account.id;
+        reference = String(form.get("paymentReference") ?? "").replace(/[^A-Za-z0-9]/g, "").slice(0, 60);
+        if (reference.length < 4) return bad("Indique el número de confirmación del pago por Zelle.");
+        if (!(amount > 0)) return bad("Indique el monto pagado en dólares.");
       } else {
         destination = String(form.get("paymentBank") ?? "");
         const account = findPaymentAccount(config, destination);
@@ -159,7 +171,7 @@ export async function POST(request: Request, { params }: { params: { token: stri
       }
       if (await referenceInUse(reference, order.id)) return bad(DUPLICATE_REFERENCE, 409);
 
-      const isBs = method !== "binance_usdt";
+      const isBs = isBsMethod(method);
       const [proofPath, rate] = await Promise.all([
         uploadProof(order.id, data, actual, TYPES[actual]),
         isBs ? getBcvRate(order.rateCurrency ?? "USD") : null,

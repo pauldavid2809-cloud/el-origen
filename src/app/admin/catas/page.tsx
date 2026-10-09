@@ -1,9 +1,10 @@
 "use client";
 
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import type { Tasting } from "@/types";
+import type { RateCurrency, Tasting } from "@/types";
 import { getTeamMember } from "@/lib/team";
-import { CATEGORY_LABEL, CataForm, STATUS_LABEL } from "./CataForm";
+import { CATEGORY_LABEL, CataForm, RATE_LABEL, STATUS_LABEL } from "./CataForm";
+import type { PaymentConfig } from "@/lib/settings";
 
 interface TastingOrderStats {
   orders: number;
@@ -46,7 +47,8 @@ export default function AdminCatasPage() {
   const [editor, setEditor] = useState<Editor | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [toast, setToast] = useState<{ text: string; ok: boolean } | null>(null);
-  const [rates, setRates] = useState<{ USD: number | null; EUR: number | null }>({ USD: null, EUR: null });
+  const [rates, setRates] = useState<Record<RateCurrency, number | null>>({ USD: null, EUR: null, BINANCE: null });
+  const [payment, setPayment] = useState<PaymentConfig | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -67,7 +69,11 @@ export default function AdminCatasPage() {
     load();
     fetch("/api/rates")
       .then((r) => r.json())
-      .then((d) => d.success && setRates({ USD: d.USD?.rate ?? null, EUR: d.EUR?.rate ?? null }))
+      .then((d) => d.success && setRates({ USD: d.USD?.rate ?? null, EUR: d.EUR?.rate ?? null, BINANCE: d.BINANCE?.rate ?? null }))
+      .catch(() => undefined);
+    fetch("/api/payment-config", { cache: "no-store" })
+      .then((r) => r.json())
+      .then((d) => d.success && setPayment(d.config))
       .catch(() => undefined);
     // /admin/catas?nueva=1 abre directamente el formulario (enlace del dashboard).
     if (new URLSearchParams(window.location.search).get("nueva") === "1") {
@@ -215,6 +221,7 @@ export default function AdminCatasPage() {
           source={editor.source}
           heldSpots={editor.mode === "edit" ? editor.source?.heldSpots ?? 0 : 0}
           rates={rates}
+          payment={payment}
           onClose={() => setEditor(null)}
           onSaved={async (saved, message) => {
             setEditor(null);
@@ -283,7 +290,7 @@ function CataRow({ t, past, busy, onEdit, onDuplicate, onPublish, onArchive, onR
               <span className="text-[11px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-full bg-surface-container-high text-on-surface-variant">Realizada</span>
             )}
             <span className="text-[12px] text-on-surface-variant">{CATEGORY_LABEL[t.category]}</span>
-            {t.rateCurrency === "EUR" && <span className="text-[12px] text-on-surface-variant">· tasa EUR</span>}
+            {t.rateCurrency !== "USD" && <span className="text-[12px] text-on-surface-variant">· tasa {RATE_LABEL[t.rateCurrency]}</span>}
           </div>
           <div>
             <h2 className="font-serif text-xl break-words">{t.title}</h2>

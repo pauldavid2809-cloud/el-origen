@@ -8,14 +8,14 @@ import { whatsappLink } from "@/lib/contact";
 import { formatBs } from "@/components/PaymentDetails";
 import { AvilaRidge, SunBurst } from "@/components/Brand";
 
-/** Tasas BCV del día por moneda (Bs por unidad). `null` si la fuente no respondió. */
+/** Tasas del día (Bs por unidad): BCV dólar, BCV euro y Binance (paralelo). `null` si la fuente no respondió. */
 export type BcvRates = Record<RateCurrency, number | null>;
 
-const NO_RATES: BcvRates = { USD: null, EUR: null };
+const NO_RATES: BcvRates = { USD: null, EUR: null, BINANCE: null };
 
 /**
- * Tasas BCV de `/api/rates`, pedidas UNA vez por página y repartidas a todas las tarjetas.
- * Devuelve `null` mientras carga; si falla, ambas tasas quedan en `null` y la tarjeta muestra solo el precio en divisa.
+ * Tasas de `/api/rates`, pedidas UNA vez por página y repartidas a todas las tarjetas.
+ * Devuelve `null` mientras carga; si falla, las tasas quedan en `null` y la tarjeta muestra solo el precio en divisa.
  */
 export function useBcvRates(): BcvRates | null {
   const [rates, setRates] = useState<BcvRates | null>(null);
@@ -28,7 +28,7 @@ export function useBcvRates(): BcvRates | null {
     };
     fetch("/api/rates")
       .then((r) => r.json())
-      .then((d) => alive && setRates(d?.success ? { USD: rateOf(d.USD), EUR: rateOf(d.EUR) } : NO_RATES))
+      .then((d) => alive && setRates(d?.success ? { USD: rateOf(d.USD), EUR: rateOf(d.EUR), BINANCE: rateOf(d.BINANCE) } : NO_RATES))
       .catch(() => alive && setRates(NO_RATES));
     return () => {
       alive = false;
@@ -41,7 +41,7 @@ export function useBcvRates(): BcvRates | null {
 interface TastingCardProps {
   tasting: Tasting;
   currentLang?: Language;
-  /** Tasas BCV del día (de `useBcvRates`). Sin tasa para la moneda de la cata no se muestra el monto en Bs. */
+  /** Tasas del día (de `useBcvRates`). Sin la tasa de la cata no se muestra el monto en Bs. */
   rates?: BcvRates | null;
 }
 
@@ -54,7 +54,7 @@ export function TastingCard({ tasting, currentLang = "es", rates }: TastingCardP
   const fewSpots = !isSoldOut && tasting.availableSpots <= 5;
   const href = `/catas/${tasting.slug || tasting.id}`;
 
-  const currency: RateCurrency = tasting.rateCurrency === "EUR" ? "EUR" : "USD";
+  const currency: RateCurrency = tasting.rateCurrency ?? "USD";
   const rate = rates?.[currency] ?? null;
   const priceUsd = tasting.priceUsd ?? tasting.price;
   const priceBs = rate && priceUsd > 0 ? Math.round(priceUsd * rate * 100) / 100 : null;

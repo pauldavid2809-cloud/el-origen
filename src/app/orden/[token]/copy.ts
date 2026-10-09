@@ -1,6 +1,6 @@
-import type { Language } from "@/lib/i18n";
+import { RATE_NAME, type Language } from "@/lib/i18n";
 import type { OrderStatus } from "@/lib/orders";
-import type { PaymentMethodId } from "@/components/PaymentDetails";
+import type { PaymentMethodId, RateCurrency } from "@/types";
 
 /* Textos de la página de la orden (ES/EN). */
 
@@ -47,15 +47,18 @@ const es = {
   step2Text: "Te enviaremos una entrada con código QR por persona, por correo y WhatsApp, apenas verifiquemos el pago.",
   methodsLegend: "Método de pago",
   methods: {
-    pago_movil: { title: "Pago Móvil", hint: "En bolívares, tasa BCV del día" },
-    transferencia: { title: "Transferencia bancaria", hint: "En bolívares, tasa BCV del día" },
+    pago_movil: { title: "Pago Móvil", hint: "En bolívares, a la tasa del día" },
+    transferencia: { title: "Transferencia bancaria", hint: "En bolívares, a la tasa del día" },
     binance_usdt: { title: "Binance USDT", hint: "Monto en USDT = total en USD" },
+    zelle: { title: "Zelle", hint: "Monto en USD = total" },
     efectivo: { title: "Efectivo", hint: "Entrega previa acordada" },
   } satisfies Record<PaymentMethodId, { title: string; hint: string }>,
   amountToPay: "Monto a pagar",
-  rateLine: (usd: string, currency: string, rate: string) => `${usd} × tasa BCV ${currency} ${rate}`,
+  rateLine: (usd: string, currency: RateCurrency, rate: string) => `${usd} × ${RATE_NAME.es[currency]} ${rate}`,
   eurNote: "Precio en divisa convertido con la tasa oficial del euro (BCV).",
-  noRate: "En bolívares a la tasa BCV del día.",
+  binanceNote: "Precio en divisa convertido con la tasa del dólar paralelo (referencia Binance), que se actualiza cada 10 minutos.",
+  noRate: "En bolívares a la tasa del día.",
+  zelleLine: "Envía exactamente este monto por Zelle a la cuenta indicada abajo.",
   usdtLine: "Paga exactamente este monto en USDT a la cuenta de Binance indicada abajo.",
   usdtLineNoDetails: "Paga exactamente este monto en USDT. Pídenos los datos de Binance por WhatsApp antes de pagar.",
   cashLine: "Coordina con nosotros por WhatsApp el lugar y la hora de entrega.",
@@ -66,8 +69,10 @@ const es = {
   reference: "Número de referencia *",
   referencePlaceholder: "Últimos dígitos o completo",
   binanceReference: "ID de la orden o transacción de Binance *",
+  zelleReference: "Número de confirmación de Zelle *",
   amountBs: "Monto pagado (Bs) *",
   amountUsdt: "Monto pagado (USDT) *",
+  amountUsd: "Monto pagado (USD) *",
   payerBank: "Banco desde el que pagaste *",
   select: "Selecciona…",
   payerDocId: "Cédula del titular *",
@@ -168,15 +173,18 @@ const en: OrderCopy = {
   step2Text: "As soon as we verify the payment we'll send one QR ticket per person by email and WhatsApp.",
   methodsLegend: "Payment method",
   methods: {
-    pago_movil: { title: "Pago Móvil", hint: "In bolívares, BCV rate of the day" },
-    transferencia: { title: "Bank transfer", hint: "In bolívares, BCV rate of the day" },
+    pago_movil: { title: "Pago Móvil", hint: "In bolívares, at the rate of the day" },
+    transferencia: { title: "Bank transfer", hint: "In bolívares, at the rate of the day" },
     binance_usdt: { title: "Binance USDT", hint: "USDT amount = total in USD" },
+    zelle: { title: "Zelle", hint: "USD amount = total" },
     efectivo: { title: "Cash", hint: "Delivery arranged in advance" },
   },
   amountToPay: "Amount to pay",
-  rateLine: (usd, currency, rate) => `${usd} × BCV ${currency} rate ${rate}`,
+  rateLine: (usd, currency, rate) => `${usd} × ${RATE_NAME.en[currency]} ${rate}`,
   eurNote: "Price converted with the official euro rate (BCV).",
-  noRate: "In bolívares at the BCV rate of the day.",
+  binanceNote: "Price converted with the parallel dollar rate (Binance reference), updated every 10 minutes.",
+  noRate: "In bolívares at the rate of the day.",
+  zelleLine: "Send exactly this amount via Zelle to the account shown below.",
   usdtLine: "Pay exactly this amount in USDT to the Binance account shown below.",
   usdtLineNoDetails: "Pay exactly this amount in USDT. Ask us for the Binance details on WhatsApp before paying.",
   cashInstructionsDefault: "Delivery arranged in advance on WhatsApp",
@@ -185,8 +193,10 @@ const en: OrderCopy = {
   reference: "Reference number *",
   referencePlaceholder: "Last digits or full number",
   binanceReference: "Binance order or transaction ID *",
+  zelleReference: "Zelle confirmation number *",
   amountBs: "Amount paid (Bs) *",
   amountUsdt: "Amount paid (USDT) *",
+  amountUsd: "Amount paid (USD) *",
   payerBank: "Bank you paid from *",
   select: "Select…",
   payerDocId: "Account holder ID *",

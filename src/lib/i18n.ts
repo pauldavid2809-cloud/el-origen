@@ -1,6 +1,16 @@
 import { PURCHASE_POLICIES } from "./policies";
+import type { RateCurrency } from "@/types";
 
 export type Language = "es" | "en";
+
+/** Nombre de la tasa con la que se pasa el precio a bolívares, para usar dentro de una frase. */
+export const RATE_NAME: Record<Language, Record<RateCurrency, string>> = {
+  es: { USD: "tasa BCV del dólar", EUR: "tasa BCV del euro", BINANCE: "tasa Binance (dólar paralelo)" },
+  en: { USD: "BCV dollar rate", EUR: "BCV euro rate", BINANCE: "Binance rate (parallel dollar)" },
+};
+
+/** "tasa BCV del dólar" → "Tasa BCV del dólar". */
+export const capitalize = (text: string) => text.charAt(0).toUpperCase() + text.slice(1);
 
 /* Textos compartidos de la estructura del sitio (barra, pie, portada y catálogo).
    La copia propia de cada página interior vive en un `copy.ts` junto a esa página. */
@@ -51,7 +61,6 @@ export const translations = {
         "Experiencias exclusivas de cata guiada para quienes buscan conectar a través del paladar, el aprendizaje y el networking de alto nivel.",
       ctaPrimary: "Ver próximas catas",
       ctaSecondary: "Crear mi Cuenta Origen",
-      imageAlt: "Copa de vino tinto servida en una cata",
       nextTasting: "Próxima cata",
       stats: [
         { value: "1 a 2 horas", label: "Duración de cada cata" },
@@ -63,7 +72,7 @@ export const translations = {
       badge: "Agenda",
       title: "Próximas catas",
       subtitle:
-        "Cada fecha indica los productos a degustar, el menú, el lugar, el horario y el sommelier que la guía. Precio en divisas y en bolívares a tasa BCV del día.",
+        "Cada fecha indica los productos a degustar, el menú, el lugar, el horario y el sommelier que la guía. Precio en divisas y en bolívares a la tasa del día.",
       viewAll: "Ver todas las catas",
       loading: "Cargando catas…",
       soldOut: "Agotado",
@@ -71,7 +80,7 @@ export const translations = {
       spot: "cupo",
       perPerson: "por persona",
       bsApprox: (bs: string) => `≈ Bs ${bs}`,
-      bsTitle: (currency: string) => `Tasa BCV ${currency === "EUR" ? "del euro" : "del dólar"} del día`,
+      bsTitle: (currency: RateCurrency) => `${capitalize(RATE_NAME.es[currency])} del día`,
       noImage: "Cata de El Origen",
       emptyBadge: "Muy pronto",
       emptyTitle: "Estamos preparando las próximas fechas",
@@ -110,13 +119,24 @@ export const translations = {
       privateSubtitle: "Diseñamos veladas de cata a medida para marcas, empresas y celebraciones exclusivas.",
       privateCta: "Solicitar Propuesta Privada",
     },
+    gallery: {
+      badge: "En imágenes",
+      title: "Así se viven nuestras catas",
+      subtitle:
+        "Mesas llenas, sommeliers que guían cada copa y brindis entre nuevos amigos. Fotos reales de nuestras ediciones en Caracas.",
+      cta: "Reservar mi cupo",
+      open: (alt: string) => `Ver en grande: ${alt}`,
+      viewer: "Visor de fotos",
+      close: "Cerrar",
+      previous: "Foto anterior",
+      next: "Foto siguiente",
+      position: (i: number, total: number) => `${i} de ${total}`,
+    },
     story: {
       badge: "Nosotros",
       title: "Una firma de experiencias exclusivas",
       p1: "El Origen nació en Caracas a inicios de 2026, impulsado por una visión clara: transformar la manera en que se vive la gastronomía y los licores de alta gama en Venezuela. Lo que comenzó como un concepto íntimo de catas guiadas evolucionó rápidamente en una firma de experiencias exclusivas, diseñadas para quienes buscan conectar a través del paladar, el aprendizaje y el networking de alto nivel.",
       p2: "Desde nuestras primeras ediciones dedicadas al fascinante universo del vino y las grandes etiquetas El Origen se ha consolidado como un punto de encuentro para apasionados, coleccionistas y marcas de prestigio.",
-      imageMainAlt: "Copa de vino tinto frente a un viñedo",
-      imageSideAlt: "Tanques de acero en una bodega",
       ritual: [
         { n: "01", title: "Curaduría", text: "Vinos, destilados y grandes etiquetas elegidos con un hilo conductor en cada edición." },
         { n: "02", title: "Maridaje", text: "Armonías y menú de autor junto a restaurantes aliados de Caracas." },
@@ -188,7 +208,7 @@ export const translations = {
         },
         {
           q: "¿Qué métodos de pago aceptan?",
-          a: "Pago Móvil y transferencia en bolívares (Banco de Venezuela y Mercantil) a la tasa BCV del día, Binance USDT y efectivo con entrega previa acordada. Por ahora no aceptamos tarjetas internacionales.",
+          a: "Según la cata: Pago Móvil y transferencia en bolívares (a la tasa que indica cada cata: BCV o Binance), Binance USDT, Zelle y efectivo con entrega previa acordada. Por ahora no aceptamos tarjetas internacionales.",
         },
         {
           q: "¿Cuándo queda confirmado mi cupo?",
@@ -275,7 +295,6 @@ export const translations = {
         "Exclusive guided tasting experiences for those who seek to connect through the palate, learning and high-level networking.",
       ctaPrimary: "See upcoming tastings",
       ctaSecondary: "Create my Origen Account",
-      imageAlt: "Glass of red wine served at a tasting",
       nextTasting: "Next tasting",
       stats: [
         { value: "1 to 2 hours", label: "Length of each tasting" },
@@ -287,7 +306,7 @@ export const translations = {
       badge: "Calendar",
       title: "Upcoming tastings",
       subtitle:
-        "Each date lists the products to taste, the menu, the venue, the schedule and the sommelier leading it. Prices in US dollars and in bolívars at the BCV rate of the day.",
+        "Each date lists the products to taste, the menu, the venue, the schedule and the sommelier leading it. Prices in US dollars and in bolívars at the rate of the day.",
       viewAll: "View all tastings",
       loading: "Loading tastings…",
       soldOut: "Sold out",
@@ -295,7 +314,7 @@ export const translations = {
       spot: "spot",
       perPerson: "per person",
       bsApprox: (bs: string) => `≈ Bs ${bs}`,
-      bsTitle: (currency: string) => `BCV ${currency === "EUR" ? "euro" : "dollar"} rate of the day`,
+      bsTitle: (currency: RateCurrency) => `${RATE_NAME.en[currency]} of the day`,
       noImage: "El Origen tasting",
       emptyBadge: "Coming soon",
       emptyTitle: "We are preparing the next dates",
@@ -333,13 +352,23 @@ export const translations = {
       privateSubtitle: "We design bespoke tasting evenings for brands, companies and exclusive celebrations.",
       privateCta: "Request a Private Proposal",
     },
+    gallery: {
+      badge: "In pictures",
+      title: "What our tastings feel like",
+      subtitle: "Full tables, sommeliers guiding every glass and toasts among new friends. Real photos from our editions in Caracas.",
+      cta: "Book my spot",
+      open: (alt: string) => `View larger: ${alt}`,
+      viewer: "Photo viewer",
+      close: "Close",
+      previous: "Previous photo",
+      next: "Next photo",
+      position: (i: number, total: number) => `${i} of ${total}`,
+    },
     story: {
       badge: "About us",
       title: "A firm of exclusive experiences",
       p1: "El Origen was born in Caracas in early 2026, driven by a clear vision: to transform the way high-end gastronomy and spirits are experienced in Venezuela. What began as an intimate guided-tasting concept quickly grew into a firm of exclusive experiences, designed for those who seek to connect through the palate, learning and high-level networking.",
       p2: "Since our first editions devoted to the fascinating world of wine and great labels, El Origen has become a meeting point for enthusiasts, collectors and prestigious brands.",
-      imageMainAlt: "Glass of red wine overlooking a vineyard",
-      imageSideAlt: "Steel tanks in a winery cellar",
       ritual: [
         { n: "01", title: "Curation", text: "Wines, spirits and great labels chosen with a common thread for every edition." },
         { n: "02", title: "Pairing", text: "Signature menus and pairings with partner restaurants in Caracas." },
@@ -411,7 +440,7 @@ export const translations = {
         },
         {
           q: "Which payment methods do you accept?",
-          a: "Pago Móvil and bank transfer in bolívars (Banco de Venezuela and Mercantil) at the BCV rate of the day, Binance USDT, and cash with delivery arranged in advance. We do not accept international cards for now.",
+          a: "Depending on the tasting: Pago Móvil and bank transfer in bolívars (at the rate each tasting shows: BCV or Binance), Binance USDT, Zelle, and cash with delivery arranged in advance. We do not accept international cards for now.",
         },
         {
           q: "When is my spot confirmed?",

@@ -8,7 +8,7 @@ import { AvilaRidge } from "@/components/Brand";
 
 interface CommercialShowcaseProps {
   currentLang: Language;
-  /** Número de sección en la portada ("06"). */
+  /** Número de sección en la portada ("07"). */
   index?: string;
 }
 

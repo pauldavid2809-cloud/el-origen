@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getCata } from "@/lib/catas";
 import { ensureTickets, getOrderByToken, HOLD_MINUTES, toPublicOrder } from "@/lib/orders";
+import { methodsForTasting, zelleForTasting } from "@/lib/paymentMethods";
 import { getBcvRate, usdToBs } from "@/lib/rates";
 import { getPaymentConfig } from "@/lib/settings";
 import { toPublicTicket } from "../shared";
@@ -26,13 +27,17 @@ export async function GET(_req: Request, { params }: { params: { token: string }
       getCata(order.tastingId).catch(() => null),
     ]);
     const expiresAt = new Date(Date.parse(order.createdAt) + HOLD_MINUTES * 60_000).toISOString();
+    // Solo la cuenta Zelle de esta cata (las demás no se muestran al cliente).
+    const zelle = zelleForTasting(tasting, payment);
 
     return NextResponse.json({
       success: true,
       order: { ...toPublicOrder(order), tastingDateIso: tasting?.date ?? null, tickets: tickets.map(toPublicTicket) },
       holdExpiresAt: order.status === "pending_payment" ? expiresAt : null,
       rate: rate ? { currency, rate: rate.rate, updatedAt: rate.updatedAt, amountBs: usdToBs(order.totalUsd, rate.rate) } : null,
-      payment,
+      payment: { ...payment, zelle: zelle ? [zelle] : [] },
+      /** Métodos que acepta la cata de esta orden (y que están activos en Configuración). */
+      methods: methodsForTasting(tasting, payment),
     });
   } catch (error) {
     console.error("[orders]", error);

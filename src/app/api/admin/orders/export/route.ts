@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import * as XLSX from "xlsx";
 import { requireAdmin } from "@/lib/auth";
 import { listOrders, type Order } from "@/lib/orders";
-import { PAYMENT_METHOD_LABEL } from "@/lib/notify";
+import { PAYMENT_METHOD_LABEL, paidAmountLabel } from "@/lib/notify";
 import { getPaymentConfig } from "@/lib/settings";
 import { approvedTicketsByOrder, couponReferrers, paymentDestinationLabel } from "../shared";
 
@@ -17,11 +17,6 @@ const STATUS_LABEL: Record<Order["status"], string> = {
 };
 
 const fmt = (iso: string | null) => (iso ? new Date(iso).toLocaleString("es-VE", { timeZone: "America/Caracas" }) : "");
-
-const amountLabel = (o: Order) => {
-  if (o.paymentAmountBs === null) return "";
-  return o.paymentMethod === "binance_usdt" ? `${o.paymentAmountBs} USDT` : `Bs ${o.paymentAmountBs}`;
-};
 
 /**
  * Excel con tres hojas:
@@ -99,7 +94,7 @@ export async function GET(request: Request) {
     "Forma de pago": PAYMENT_METHOD_LABEL[o.paymentMethod ?? ""] ?? "",
     "Cuenta destino": paymentDestinationLabel(config, o.paymentBank) ?? "",
     Referencia: o.paymentReference ?? "",
-    "Monto pagado": amountLabel(o),
+    "Monto pagado": paidAmountLabel(o),
     "Tasa BCV": o.bcvRate ?? "",
     "Moneda de la tasa": o.rateCurrency ?? "",
     "Banco pagador": o.payerBank ?? "",

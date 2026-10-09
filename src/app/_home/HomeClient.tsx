@@ -8,6 +8,7 @@ import { Footer } from "@/components/Footer";
 import { TastingCard, TastingsEmptyState, TastingsLoadError, useBcvRates } from "@/components/TastingCard";
 import { CommercialShowcase } from "@/components/CommercialShowcase";
 import { PartnersSection } from "@/components/PartnersSection";
+import { EventGallery } from "@/components/EventGallery";
 import { AvilaRidge, SectionHeading, SunBurst } from "@/components/Brand";
 import { BandAds, TopAd, WideAd } from "@/components/Ads";
 import type { PublicAds } from "@/lib/ads";
@@ -16,6 +17,7 @@ import { translations } from "@/lib/i18n";
 import { useLang } from "@/lib/useLang";
 import { BUSINESS_HOURS, whatsappLink } from "@/lib/contact";
 import { TEAM, instagramUrl, teamInitials } from "@/lib/team";
+import { PHOTOS } from "@/lib/photos";
 
 /** Ficha de cata en vivo de demostración. */
 const LIVE_DEMO_PATH = "/cata-en-vivo/tok-demo-1234";
@@ -97,8 +99,8 @@ export default function HomeClient({ ads }: { ads: PublicAds }) {
               <SunBurst className="absolute -top-10 -right-2 sm:-right-6 w-24 sm:w-28 text-sun z-10" />
               <div className="relative arch overflow-hidden aspect-[4/5] bg-surface-container border border-outline-variant">
                 <Image
-                  src="https://images.unsplash.com/photo-1510812431401-41d2bd2722f3?q=80&w=1200&auto=format&fit=crop"
-                  alt={t.hero.imageAlt}
+                  src={PHOTOS.mesaSommelier.src}
+                  alt={PHOTOS.mesaSommelier.alt[lang]}
                   fill
                   priority
                   sizes="(min-width: 1024px) 40vw, 90vw"
@@ -182,14 +184,17 @@ export default function HomeClient({ ads }: { ads: PublicAds }) {
           )}
         </section>
 
+        {/* ─── GALERÍA: fotos reales de las catas ─── */}
+        <EventGallery currentLang={lang} index="02" />
+
         {/* ─── NOSOTROS ─── */}
         <section id="nosotros" className="scroll-mt-24 bg-surface-container-low border-y border-outline-variant">
           <div className="max-w-[1320px] mx-auto px-5 sm:px-8 lg:px-12 py-24 sm:py-32 grid grid-cols-1 lg:grid-cols-12 gap-14 lg:gap-16 items-center">
             <div className="lg:col-span-5 grid grid-cols-5 gap-4 items-end">
               <div className="col-span-3 relative arch overflow-hidden aspect-[3/4] bg-surface-container">
                 <Image
-                  src="https://images.unsplash.com/photo-1506377247377-2a5b3b417ebb?q=80&w=900&auto=format&fit=crop"
-                  alt={t.story.imageMainAlt}
+                  src={PHOTOS.sommelierTerraza.src}
+                  alt={PHOTOS.sommelierTerraza.alt[lang]}
                   fill
                   sizes="(min-width: 1024px) 25vw, 60vw"
                   className="object-cover"
@@ -197,8 +202,8 @@ export default function HomeClient({ ads }: { ads: PublicAds }) {
               </div>
               <div className="col-span-2 relative rounded-lg overflow-hidden aspect-[3/4] bg-surface-container mb-10">
                 <Image
-                  src="https://images.unsplash.com/photo-1528823872057-9c018a7a7553?q=80&w=600&auto=format&fit=crop"
-                  alt={t.story.imageSideAlt}
+                  src={PHOTOS.botellasItalia.src}
+                  alt={PHOTOS.botellasItalia.alt[lang]}
                   fill
                   sizes="(min-width: 1024px) 16vw, 40vw"
                   className="object-cover"
@@ -207,7 +212,7 @@ export default function HomeClient({ ads }: { ads: PublicAds }) {
             </div>
 
             <div className="lg:col-span-7 lg:pl-8">
-              <SectionHeading index="02" eyebrow={t.story.badge} title={t.story.title} />
+              <SectionHeading index="03" eyebrow={t.story.badge} title={t.story.title} />
               <div className="mt-6 space-y-4 text-[16px] leading-relaxed text-on-surface-variant max-w-xl">
                 <p>{t.story.p1}</p>
                 <p>{t.story.p2}</p>
@@ -239,7 +244,7 @@ export default function HomeClient({ ads }: { ads: PublicAds }) {
         {/* ─── SOMMELIERS ─── */}
         <section id="sommeliers" className="scroll-mt-24 py-24 sm:py-32 px-5 sm:px-8 lg:px-12 max-w-[1320px] mx-auto w-full">
           <div className="flex flex-col md:flex-row justify-between md:items-end gap-8 mb-12 sm:mb-14">
-            <SectionHeading index="03" eyebrow={t.team.badge} title={t.team.title} subtitle={t.team.subtitle} />
+            <SectionHeading index="04" eyebrow={t.team.badge} title={t.team.title} subtitle={t.team.subtitle} />
             <Link
               href="/nosotros#sommeliers"
               className="group inline-flex items-center gap-2 min-h-[44px] text-[14px] font-semibold text-primary-container whitespace-nowrap"
@@ -305,7 +310,7 @@ export default function HomeClient({ ads }: { ads: PublicAds }) {
           <div className="relative overflow-hidden rounded-2xl bg-ink text-paper">
             <div className="grid grid-cols-1 lg:grid-cols-12 items-center">
               <div className="lg:col-span-7 p-8 sm:p-14 lg:p-16 relative z-10">
-                <SectionHeading index="04" eyebrow={t.liveDemo.badge} title={t.liveDemo.title} subtitle={t.liveDemo.description} tone="dark" />
+                <SectionHeading index="05" eyebrow={t.liveDemo.badge} title={t.liveDemo.title} subtitle={t.liveDemo.description} tone="dark" />
                 <p className="mt-4 text-[13px] text-paper/60 leading-relaxed max-w-xl">{t.liveDemo.note}</p>
                 <Link
                   href={LIVE_DEMO_PATH}
@@ -355,15 +360,15 @@ export default function HomeClient({ ads }: { ads: PublicAds }) {
         </section>
 
         {/* ─── ALIADOS ─── */}
-        <PartnersSection currentLang={lang} index="05" />
+        <PartnersSection currentLang={lang} index="06" />
 
         {/* ─── ALIANZAS, SOMMELIERS Y PRIVADAS ─── */}
-        <CommercialShowcase currentLang={lang} index="06" />
+        <CommercialShowcase currentLang={lang} index="07" />
 
         {/* ─── FAQ ─── */}
         <section className="py-24 sm:py-32 px-5 sm:px-8 lg:px-12 max-w-[1320px] mx-auto w-full grid grid-cols-1 lg:grid-cols-12 gap-12">
           <div className="lg:col-span-4">
-            <SectionHeading index="07" eyebrow={t.faq.badge} title={t.faq.title} />
+            <SectionHeading index="08" eyebrow={t.faq.badge} title={t.faq.title} />
           </div>
           <div className="lg:col-span-8 border-t border-outline-variant">
             {t.faq.items.map((faq, idx) => {

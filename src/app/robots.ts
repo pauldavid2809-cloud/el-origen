@@ -1,6 +1,6 @@
 import { MetadataRoute } from "next";
+import { SITE_URL } from "@/lib/site";
 
-const SITE_URL = (process.env.NEXT_PUBLIC_APP_URL || "https://el-origen-two.vercel.app").replace(/\/+$/, "");
 
 /** Rutas privadas o de un solo cliente (órdenes, entradas, cuentas, puerta): fuera del índice. */
 const PRIVATE_PATHS = [
