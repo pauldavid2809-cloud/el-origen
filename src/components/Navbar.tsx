@@ -57,15 +57,18 @@ export function Navbar({ currentLang, onLanguageChange }: NavbarProps) {
 
   const closeMenu = () => setMobileMenuOpen(false);
 
+  /* Menú completo (en el orden que pidió el cliente). `desktop`: también en la barra de pantallas anchas;
+     el resto queda en el menú desplegable y en el pie de página. */
   const navLinks = [
-    { href: "/catas", label: t.catas },
-    { href: "/privadas", label: t.privadas },
-    { href: "/alianzas", label: t.alianzas },
-    { href: "/nosotros", label: t.nosotros },
-  ];
-  const secondaryLinks = [
-    { href: "/sommeliers", label: t.sommeliers },
-    { href: "/#contacto", label: t.contacto },
+    { href: "/catas", label: t.catas, desktop: true },
+    { href: "/privadas", label: t.privadas, desktop: true },
+    { href: "/alianzas", label: t.alianzas, desktop: true },
+    { href: "/nosotros", label: t.nosotros, desktop: true },
+    { href: "/horarios", label: t.horarios, desktop: false },
+    { href: "/eventos", label: t.eventos, desktop: true },
+    { href: "/#contacto", label: t.contacto, desktop: true },
+    { href: "/sommeliers", label: t.sommeliers, desktop: false },
+    { href: "/vinos", label: t.vinos, desktop: true },
   ];
 
   const isActive = (href: string) => pathname === href || (href !== "/" && pathname?.startsWith(`${href}/`));
@@ -103,8 +106,8 @@ export function Navbar({ currentLang, onLanguageChange }: NavbarProps) {
           </Link>
 
           {/* Navegación desktop */}
-          <nav className="hidden lg:flex items-center gap-8" aria-label={t.mainLabel}>
-            {navLinks.map((link) => {
+          <nav className="hidden xl:flex items-center gap-7" aria-label={t.mainLabel}>
+            {navLinks.filter((link) => link.desktop).map((link) => {
               const active = isActive(link.href);
               return (
                 <Link
@@ -142,7 +145,7 @@ export function Navbar({ currentLang, onLanguageChange }: NavbarProps) {
             <button
               type="button"
               onClick={() => setMobileMenuOpen((open) => !open)}
-              className="lg:hidden w-11 h-11 flex items-center justify-center text-primary-container rounded hover:bg-primary-container/5"
+              className="xl:hidden w-11 h-11 flex items-center justify-center text-primary-container rounded hover:bg-primary-container/5"
               aria-label={mobileMenuOpen ? t.closeMenu : t.openMenu}
               aria-expanded={mobileMenuOpen}
               aria-controls="menu-movil"
@@ -159,7 +162,7 @@ export function Navbar({ currentLang, onLanguageChange }: NavbarProps) {
       {mobileMenuOpen && (
         <div
           id="menu-movil"
-          className="fixed inset-0 z-40 bg-primary text-paper flex flex-col pt-20 sm:pt-24 animate-fade-in lg:hidden overflow-y-auto"
+          className="fixed inset-0 z-40 bg-primary text-paper flex flex-col pt-20 sm:pt-24 animate-fade-in xl:hidden overflow-y-auto"
         >
           <nav className="flex flex-col px-6 sm:px-10" aria-label={t.mobileLabel}>
             {navLinks.map((link, i) => (
@@ -168,7 +171,7 @@ export function Navbar({ currentLang, onLanguageChange }: NavbarProps) {
                 href={link.href}
                 onClick={closeMenu}
                 aria-current={isActive(link.href) ? "page" : undefined}
-                className="flex items-baseline gap-4 py-4 border-b border-paper/15 font-serif text-[28px] sm:text-4xl hover:text-sun transition-colors"
+                className="flex items-baseline gap-4 py-3 border-b border-paper/15 font-serif text-[26px] sm:text-4xl hover:text-sun transition-colors"
               >
                 <span className="font-sans text-[11px] tracking-[0.2em] text-sun tabular-nums" aria-hidden="true">
                   0{i + 1}
@@ -176,18 +179,6 @@ export function Navbar({ currentLang, onLanguageChange }: NavbarProps) {
                 {link.label}
               </Link>
             ))}
-            <div className="flex flex-wrap gap-x-6 pt-3">
-              {secondaryLinks.map((link) => (
-                <Link
-                  key={link.href}
-                  href={link.href}
-                  onClick={closeMenu}
-                  className="inline-flex items-center min-h-[44px] text-[15px] text-paper/80 hover:text-sun transition-colors"
-                >
-                  {link.label}
-                </Link>
-              ))}
-            </div>
           </nav>
 
           <div className="px-6 sm:px-10 pt-6 space-y-3">

@@ -163,3 +163,39 @@ export interface NotificationLog {
   sentAt: string;
   previewText: string;
 }
+
+/* ─── Vinos (catálogo de productos degustados en las catas) ─── */
+
+export type WineType = "tinto" | "blanco" | "rosado" | "espumoso" | "dulce" | "destilado" | "otro";
+export const WINE_TYPES: readonly WineType[] = ["tinto", "blanco", "rosado", "espumoso", "dulce", "destilado", "otro"];
+export type WineStatus = "draft" | "published";
+
+/** Fila de la ficha técnica ("Crianza" → "5 meses en barrica de roble francés"). */
+export interface WineSpec {
+  label: string;
+  value: string;
+}
+
+export interface Wine {
+  id: string;
+  slug: string;
+  name: string;
+  /** Bodega o productor. */
+  winery: string;
+  /** País, región o denominación de origen. */
+  region: string;
+  type: WineType;
+  /** Uva o variedad (o materia prima en destilados). */
+  grapes: string;
+  /** Añada ("2021"); vacío si no aplica. */
+  vintage: string;
+  description: string;
+  /** Foto de la botella (idealmente vertical y sobre fondo oscuro o liso). */
+  imageUrl: string;
+  specs: WineSpec[];
+  /** Catas en las que se degustó. */
+  tastingIds: string[];
+  status: WineStatus;
+  createdAt: string;
+  updatedAt: string;
+}

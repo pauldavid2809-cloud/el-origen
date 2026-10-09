@@ -9,6 +9,8 @@ import { TastingCard, TastingsEmptyState, TastingsLoadError, useBcvRates } from 
 import { CommercialShowcase } from "@/components/CommercialShowcase";
 import { PartnersSection } from "@/components/PartnersSection";
 import { EventGallery } from "@/components/EventGallery";
+import { WinesShowcase } from "@/components/WinesShowcase";
+import type { PublicWine } from "@/components/WineCard";
 import { AvilaRidge, SectionHeading, SunBurst } from "@/components/Brand";
 import { BandAds, TopAd, WideAd } from "@/components/Ads";
 import type { PublicAds } from "@/lib/ads";
@@ -24,7 +26,10 @@ const LIVE_DEMO_PATH = "/cata-en-vivo/tok-demo-1234";
 
 type LoadState = "loading" | "ready" | "error";
 
-export default function HomeClient({ ads }: { ads: PublicAds }) {
+/** Secciones numeradas de la portada, en orden ("Nuestros vinos" solo si hay vinos publicados). */
+type SectionKey = "tastings" | "gallery" | "story" | "team" | "wines" | "liveDemo" | "partners" | "showcase" | "faq";
+
+export default function HomeClient({ ads, wines }: { ads: PublicAds; wines: PublicWine[] }) {
   const [lang, setLang] = useLang();
   const t = translations[lang];
 
@@ -53,6 +58,8 @@ export default function HomeClient({ ads }: { ads: PublicAds }) {
   const next = tastings.find((x) => x.availableSpots > 0 && x.status !== "sold_out") ?? tastings[0];
   const featured = tastings.slice(0, 3);
   const hasBandAds = Boolean(ads.band1 || ads.band2 || ads.band3);
+  const sections: SectionKey[] = ["tastings", "gallery", "story", "team", ...(wines.length ? (["wines"] as const) : []), "liveDemo", "partners", "showcase", "faq"];
+  const num = (key: SectionKey) => String(sections.indexOf(key) + 1).padStart(2, "0");
 
   return (
     <div className="bg-background text-on-background min-h-screen flex flex-col">
@@ -128,7 +135,7 @@ export default function HomeClient({ ads }: { ads: PublicAds }) {
 
           {/* Línea del Ávila → banda vino con datos de la experiencia */}
           <div className="mt-20 sm:mt-24 text-primary-container relative">
-            <AvilaRidge fill="var(--wine)" stroke="var(--wine)" showBirds showValley={false} className="h-20 sm:h-32 -mb-px" />
+            <AvilaRidge fill="var(--wine)" stroke="var(--wine)" showBirds showValley={false} showHumboldt className="h-20 sm:h-32 -mb-px" />
           </div>
           <div className="bg-primary-container text-paper">
             <dl
@@ -151,7 +158,7 @@ export default function HomeClient({ ads }: { ads: PublicAds }) {
         {/* ─── PRÓXIMAS CATAS ─── */}
         <section id="proximas-catas" className="scroll-mt-24 py-24 sm:py-32 px-5 sm:px-8 lg:px-12 max-w-[1320px] mx-auto w-full">
           <div className="flex flex-col md:flex-row justify-between md:items-end gap-8 mb-12 sm:mb-16">
-            <SectionHeading index="01" eyebrow={t.tastings.badge} title={t.tastings.title} subtitle={t.tastings.subtitle} />
+            <SectionHeading index={num("tastings")} eyebrow={t.tastings.badge} title={t.tastings.title} subtitle={t.tastings.subtitle} />
             {tastings.length > 0 && (
               <Link
                 href="/catas"
@@ -185,7 +192,7 @@ export default function HomeClient({ ads }: { ads: PublicAds }) {
         </section>
 
         {/* ─── GALERÍA: fotos reales de las catas ─── */}
-        <EventGallery currentLang={lang} index="02" />
+        <EventGallery currentLang={lang} index={num("gallery")} />
 
         {/* ─── NOSOTROS ─── */}
         <section id="nosotros" className="scroll-mt-24 bg-surface-container-low border-y border-outline-variant">
@@ -212,7 +219,7 @@ export default function HomeClient({ ads }: { ads: PublicAds }) {
             </div>
 
             <div className="lg:col-span-7 lg:pl-8">
-              <SectionHeading index="03" eyebrow={t.story.badge} title={t.story.title} />
+              <SectionHeading index={num("story")} eyebrow={t.story.badge} title={t.story.title} />
               <div className="mt-6 space-y-4 text-[16px] leading-relaxed text-on-surface-variant max-w-xl">
                 <p>{t.story.p1}</p>
                 <p>{t.story.p2}</p>
@@ -244,7 +251,7 @@ export default function HomeClient({ ads }: { ads: PublicAds }) {
         {/* ─── SOMMELIERS ─── */}
         <section id="sommeliers" className="scroll-mt-24 py-24 sm:py-32 px-5 sm:px-8 lg:px-12 max-w-[1320px] mx-auto w-full">
           <div className="flex flex-col md:flex-row justify-between md:items-end gap-8 mb-12 sm:mb-14">
-            <SectionHeading index="04" eyebrow={t.team.badge} title={t.team.title} subtitle={t.team.subtitle} />
+            <SectionHeading index={num("team")} eyebrow={t.team.badge} title={t.team.title} subtitle={t.team.subtitle} />
             <Link
               href="/nosotros#sommeliers"
               className="group inline-flex items-center gap-2 min-h-[44px] text-[14px] font-semibold text-primary-container whitespace-nowrap"
@@ -305,12 +312,15 @@ export default function HomeClient({ ads }: { ads: PublicAds }) {
           </Link>
         </section>
 
+        {/* ─── NUESTROS VINOS ─── */}
+        {wines.length > 0 && <WinesShowcase wines={wines} lang={lang} index={num("wines")} />}
+
         {/* ─── FICHA DE CATA INTERACTIVA ─── */}
         <section className="px-5 sm:px-8 lg:px-12 max-w-[1320px] mx-auto w-full pb-24 sm:pb-32">
           <div className="relative overflow-hidden rounded-2xl bg-ink text-paper">
             <div className="grid grid-cols-1 lg:grid-cols-12 items-center">
               <div className="lg:col-span-7 p-8 sm:p-14 lg:p-16 relative z-10">
-                <SectionHeading index="05" eyebrow={t.liveDemo.badge} title={t.liveDemo.title} subtitle={t.liveDemo.description} tone="dark" />
+                <SectionHeading index={num("liveDemo")} eyebrow={t.liveDemo.badge} title={t.liveDemo.title} subtitle={t.liveDemo.description} tone="dark" />
                 <p className="mt-4 text-[13px] text-paper/60 leading-relaxed max-w-xl">{t.liveDemo.note}</p>
                 <Link
                   href={LIVE_DEMO_PATH}
@@ -360,15 +370,15 @@ export default function HomeClient({ ads }: { ads: PublicAds }) {
         </section>
 
         {/* ─── ALIADOS ─── */}
-        <PartnersSection currentLang={lang} index="06" />
+        <PartnersSection currentLang={lang} index={num("partners")} />
 
         {/* ─── ALIANZAS, SOMMELIERS Y PRIVADAS ─── */}
-        <CommercialShowcase currentLang={lang} index="07" />
+        <CommercialShowcase currentLang={lang} index={num("showcase")} />
 
         {/* ─── FAQ ─── */}
         <section className="py-24 sm:py-32 px-5 sm:px-8 lg:px-12 max-w-[1320px] mx-auto w-full grid grid-cols-1 lg:grid-cols-12 gap-12">
           <div className="lg:col-span-4">
-            <SectionHeading index="08" eyebrow={t.faq.badge} title={t.faq.title} />
+            <SectionHeading index={num("faq")} eyebrow={t.faq.badge} title={t.faq.title} />
           </div>
           <div className="lg:col-span-8 border-t border-outline-variant">
             {t.faq.items.map((faq, idx) => {

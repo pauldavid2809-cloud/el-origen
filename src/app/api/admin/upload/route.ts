@@ -10,7 +10,7 @@ function typeFromName(name: string): string {
   return ext === "png" ? "image/png" : ext === "webp" ? "image/webp" : ext === "jpg" || ext === "jpeg" ? "image/jpeg" : "";
 }
 
-/** Sube una imagen pública (multipart: `file`, `folder` = catas | recuerdos | anuncios) → `{ success, url }`. */
+/** Sube una imagen pública (multipart: `file`, `folder` = catas | recuerdos | anuncios | vinos) → `{ success, url }`. */
 export async function POST(request: Request) {
   const denied = requireAdmin();
   if (denied) return denied;

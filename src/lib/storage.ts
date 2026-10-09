@@ -2,11 +2,11 @@ import "server-only";
 import crypto from "crypto";
 import { getAdminClient } from "./orders";
 
-/* Imágenes públicas (fotos de catas, recuerdos y publicidad) en Supabase Storage.
+/* Imágenes públicas (fotos de catas, recuerdos, publicidad y vinos) en Supabase Storage.
    Sin Supabase se devuelven como data URL (solo pruebas locales). */
 
-export type PublicImageFolder = "catas" | "recuerdos" | "anuncios";
-export const PUBLIC_IMAGE_FOLDERS: readonly PublicImageFolder[] = ["catas", "recuerdos", "anuncios"];
+export type PublicImageFolder = "catas" | "recuerdos" | "anuncios" | "vinos";
+export const PUBLIC_IMAGE_FOLDERS: readonly PublicImageFolder[] = ["catas", "recuerdos", "anuncios", "vinos"];
 
 export const MAX_IMAGE_BYTES = 6 * 1024 * 1024;
 

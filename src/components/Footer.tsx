@@ -21,8 +21,11 @@ export function Footer({ currentLang }: FooterProps) {
     { href: "/catas", label: t.nav.catas },
     { href: "/privadas", label: t.nav.privadas },
     { href: "/alianzas", label: t.nav.alianzas },
-    { href: "/sommeliers", label: t.nav.sommeliers },
     { href: "/nosotros", label: t.nav.nosotros },
+    { href: "/horarios", label: t.nav.horarios },
+    { href: "/eventos", label: t.nav.eventos },
+    { href: "/sommeliers", label: t.nav.sommeliers },
+    { href: "/vinos", label: t.nav.vinos },
   ];
 
   const contact = [

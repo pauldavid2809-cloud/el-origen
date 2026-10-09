@@ -42,7 +42,10 @@ export const translations = {
       privadas: "Privadas",
       alianzas: "Alianzas",
       nosotros: "Nosotros",
+      horarios: "Horarios",
+      eventos: "Eventos",
       sommeliers: "Sommeliers",
+      vinos: "Vinos",
       contacto: "Contacto",
       admin: "Admin",
       reservar: "Reservar",
@@ -211,6 +214,10 @@ export const translations = {
           a: "Según la cata: Pago Móvil y transferencia en bolívares (a la tasa que indica cada cata: BCV o Binance), Binance USDT, Zelle y efectivo con entrega previa acordada. Por ahora no aceptamos tarjetas internacionales.",
         },
         {
+          q: "¿Necesito una cuenta para comprar?",
+          a: "Sí. Para reservar cupos inicia sesión con tu Cuenta Origen, que es gratis: tus reservas y entradas quedan guardadas en tu cuenta y las recibes en su correo.",
+        },
+        {
           q: "¿Cuándo queda confirmado mi cupo?",
           a: `${POLICY.es.guarantee} Al reservar, tus cupos quedan apartados por 60 minutos mientras envías el comprobante.`,
         },
@@ -276,7 +283,10 @@ export const translations = {
       privadas: "Private",
       alianzas: "Partnerships",
       nosotros: "About",
+      horarios: "Hours",
+      eventos: "Events",
       sommeliers: "Sommeliers",
+      vinos: "Wines",
       contacto: "Contact",
       admin: "Admin",
       reservar: "Book",
@@ -441,6 +451,10 @@ export const translations = {
         {
           q: "Which payment methods do you accept?",
           a: "Depending on the tasting: Pago Móvil and bank transfer in bolívars (at the rate each tasting shows: BCV or Binance), Binance USDT, Zelle, and cash with delivery arranged in advance. We do not accept international cards for now.",
+        },
+        {
+          q: "Do I need an account to buy?",
+          a: "Yes. To book spots, sign in with your free Origen account: your bookings and tickets are saved in your account and sent to its email.",
         },
         {
           q: "When is my spot confirmed?",

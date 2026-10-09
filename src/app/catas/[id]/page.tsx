@@ -473,7 +473,8 @@ function Checkout({ tasting, rate, lang }: { tasting: Tasting; rate: number | nu
   const [addOnQty, setAddOnQty] = useState<Record<string, number>>({});
   const [form, setForm] = useState({ name: "", docId: "", email: "", phone: "", dietary: "" });
   const [showErrors, setShowErrors] = useState(false);
-  const [memberPrefilled, setMemberPrefilled] = useState(false);
+  /** Solo compran los miembros con sesión: sin sesión se muestra la invitación a ingresar o registrarse. */
+  const [account, setAccount] = useState<"loading" | "member" | "guest">("loading");
   const [couponInput, setCouponInput] = useState("");
   const [coupon, setCoupon] = useState<AppliedCoupon | null>(null);
   const [couponMsg, setCouponMsg] = useState<{ text: string; ok: boolean; membersOnly?: boolean } | null>(null);
@@ -483,23 +484,27 @@ function Checkout({ tasting, rate, lang }: { tasting: Tasting; rate: number | nu
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState("");
 
-  // Prellenado con la Cuenta Origen si hay sesión de miembro.
+  // Sesión de miembro: sin ella no se puede comprar; con ella se prellenan los datos (el correo es el de la cuenta).
   useEffect(() => {
     let alive = true;
     fetch("/api/members/me?orders=0", { cache: "no-store" })
       .then((r) => (r.ok ? r.json() : null))
       .then((data) => {
+        if (!alive) return;
         const m = data?.member;
-        if (!alive || !m) return;
+        if (!m) {
+          setAccount("guest");
+          return;
+        }
         setForm((f) => ({
           ...f,
           name: f.name || m.fullName || "",
-          email: f.email || m.email || "",
+          email: m.email || "",
           phone: f.phone || m.phone || "",
         }));
-        setMemberPrefilled(true);
+        setAccount("member");
       })
-      .catch(() => {});
+      .catch(() => alive && setAccount("guest"));
     return () => {
       alive = false;
     };
@@ -647,6 +652,11 @@ function Checkout({ tasting, rate, lang }: { tasting: Tasting; rate: number | nu
         router.push(data.redirectUrl);
         return;
       }
+      // La sesión venció mientras completaba la compra.
+      if (res.status === 401 && data.code === "login_required") {
+        setAccount("guest");
+        return;
+      }
       setSubmitError(data.message || t.submitError);
     } catch {
       setSubmitError(t.connectionError);
@@ -695,6 +705,32 @@ function Checkout({ tasting, rate, lang }: { tasting: Tasting; rate: number | nu
             <span className="material-symbols-outlined text-[18px]" aria-hidden="true">chat</span>
             {t.soldOutWhatsapp}
           </a>
+        </div>
+      ) : account === "loading" ? (
+        <p className="p-5 sm:p-7 min-h-[180px] flex items-center justify-center gap-2 text-[14px] text-on-surface-variant" role="status">
+          <span className="material-symbols-outlined animate-spin text-[20px]" aria-hidden="true">progress_activity</span>
+          {t.checkingAccount}
+        </p>
+      ) : account === "guest" ? (
+        <div className="p-5 sm:p-7">
+          <span className="w-12 h-12 rounded-full bg-primary-fixed text-primary-container inline-flex items-center justify-center" aria-hidden="true">
+            <span className="material-symbols-outlined text-[24px]">person</span>
+          </span>
+          <p className="mt-4 font-serif text-xl text-on-surface">{t.loginTitle}</p>
+          <p className="mt-2 text-[14px] text-on-surface-variant leading-relaxed">{t.loginText}</p>
+          <Link
+            href={`/ingresar?next=${encodeURIComponent(`/catas/${tasting.slug || tasting.id}`)}`}
+            className="mt-5 w-full h-12 inline-flex items-center justify-center gap-2 rounded bg-primary-container hover:bg-primary text-white text-[15px] font-semibold"
+          >
+            <span className="material-symbols-outlined text-[18px]" aria-hidden="true">login</span>
+            {t.loginCta}
+          </Link>
+          <Link
+            href={`/registro?next=${encodeURIComponent(`/catas/${tasting.slug || tasting.id}`)}`}
+            className="mt-2 w-full h-12 inline-flex items-center justify-center gap-2 rounded border border-outline-variant hover:border-primary-container text-on-surface text-[15px] font-semibold"
+          >
+            {t.registerCta}
+          </Link>
         </div>
       ) : (
         <form ref={formRef} onSubmit={submit} noValidate className="p-5 sm:p-7 scroll-mt-24">
@@ -799,12 +835,10 @@ function Checkout({ tasting, rate, lang }: { tasting: Tasting; rate: number | nu
 
           {step === 2 && (
             <div className="space-y-4 animate-fade-in">
-              {memberPrefilled && (
-                <p className="flex items-center gap-2 rounded-lg bg-emerald-50 border border-emerald-200 px-3 py-2 text-[13px] text-emerald-900">
-                  <span className="material-symbols-outlined text-[18px]" aria-hidden="true">person_check</span>
-                  {t.memberPrefilled}
-                </p>
-              )}
+              <p className="flex items-center gap-2 rounded-lg bg-emerald-50 border border-emerald-200 px-3 py-2 text-[13px] text-emerald-900">
+                <span className="material-symbols-outlined text-[18px]" aria-hidden="true">person_check</span>
+                {t.memberPrefilled}
+              </p>
               <TextField
                 id="name"
                 label={t.name}
@@ -827,11 +861,11 @@ function Checkout({ tasting, rate, lang }: { tasting: Tasting; rate: number | nu
                 id="email"
                 type="email"
                 label={t.email}
-                hint={t.emailHint}
+                hint={t.emailAccountHint}
                 value={form.email}
                 onChange={(v) => update("email", v)}
-                placeholder="nombre@ejemplo.com"
                 autoComplete="email"
+                readOnly
                 error={showErrors ? errors.email : undefined}
               />
               <TextField
@@ -1072,6 +1106,7 @@ function TextField({
   type = "text",
   autoComplete,
   maxLength = 160,
+  readOnly = false,
 }: {
   id: string;
   label: string;
@@ -1083,6 +1118,8 @@ function TextField({
   type?: string;
   autoComplete?: string;
   maxLength?: number;
+  /** Solo lectura (p. ej. el correo de la cuenta). */
+  readOnly?: boolean;
 }) {
   const describedBy = [hint && `${id}-hint`, error && `${id}-error`].filter(Boolean).join(" ") || undefined;
   return (
@@ -1096,9 +1133,10 @@ function TextField({
         placeholder={placeholder}
         autoComplete={autoComplete}
         maxLength={maxLength}
+        readOnly={readOnly}
         aria-invalid={Boolean(error)}
         aria-describedby={describedBy}
-        className={`${inputClass} ${error ? "border-error" : "border-outline-variant"}`}
+        className={`${inputClass} ${error ? "border-error" : "border-outline-variant"} ${readOnly ? "bg-surface-container text-on-surface-variant cursor-not-allowed" : ""}`}
       />
       {hint && !error && <p id={`${id}-hint`} className="mt-1 text-[12px] text-on-surface-variant">{hint}</p>}
       {error && <p id={`${id}-error`} className="mt-1 text-[12px] text-error">{error}</p>}

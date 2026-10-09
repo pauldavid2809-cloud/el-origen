@@ -45,7 +45,10 @@ function alreadyStarted(tasting: { date: string; timeStart: string }): boolean {
   return tasting.date < today || (tasting.date === today && Boolean(tasting.timeStart) && nowInCaracas() >= tasting.timeStart);
 }
 
-/** Crea la orden (pendiente de pago) y devuelve el enlace privado para pagar y ver las entradas. */
+/**
+ * Crea la orden (pendiente de pago) y devuelve el enlace privado para pagar y ver las entradas.
+ * Solo para miembros con sesión (Cuenta Origen): la orden queda en su cuenta y usa el correo de la cuenta.
+ */
 export async function POST(request: Request) {
   try {
     const ipKey = `checkout:ip:${clientIp(request)}`;
@@ -54,8 +57,12 @@ export async function POST(request: Request) {
     const body = await request.json().catch(() => null);
     if (!body || typeof body !== "object") return bad("Solicitud inválida.");
 
+    const member = await currentMember();
+    if (!member) return bad("Inicia sesión con tu Cuenta Origen para comprar.", 401, { code: "login_required" });
+
     const name = String(body.customerName ?? "").replace(/\s+/g, " ").trim();
-    const email = String(body.customerEmail ?? "").trim().toLowerCase();
+    // El correo es siempre el de la cuenta: ahí llegan las entradas y con él se validan los cupones de miembros.
+    const email = member.email.trim().toLowerCase();
     const phone = String(body.customerPhone ?? "").trim();
     const docId = String(body.customerDocId ?? "").replace(/[^0-9VEJvej-]/g, "").toUpperCase();
     const spots = Math.floor(Number(body.spotsCount));
@@ -119,7 +126,6 @@ export async function POST(request: Request) {
       discount = Math.min(subtotal, couponDiscountUsd(result.coupon, subtotal));
     }
 
-    const member = await currentMember();
     // Cupos y usos del cupón se comprueban de nuevo en la misma operación que crea la orden:
     // dos compras simultáneas no pueden llevarse los mismos últimos cupos ni superar el límite del cupón.
     const created = await createOrderChecked(
@@ -137,7 +143,7 @@ export async function POST(request: Request) {
         discountUsd: discount,
         couponCode,
         totalUsd: Math.max(0, round2(subtotal - discount)),
-        memberId: member?.id ?? null,
+        memberId: member.id,
         acceptedTermsAt: new Date().toISOString(),
         rateCurrency: tasting.rateCurrency,
       },
