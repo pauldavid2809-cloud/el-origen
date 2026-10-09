@@ -59,11 +59,11 @@ interface AvilaRidgeProps {
 const SUMMIT_LEFT = `${(702 / 1440) * 100}%`;
 const SUMMIT_BOTTOM = `${((170 - 21) / 170) * 100}%`;
 
-/** Silueta del Hotel Humboldt: torre cilíndrica con corona, sobre su base en la cumbre. */
+/** Silueta del Hotel Humboldt: solo la torre cilíndrica con su corona, apoyada en la cumbre. */
 function HumboldtSilhouette({ fill, className = "", style }: { fill: string; className?: string; style?: React.CSSProperties }) {
   const floors = [14, 19, 24, 29, 34, 39, 44];
   return (
-    <svg viewBox="0 0 48 64" className={className} style={style} aria-hidden="true">
+    <svg viewBox="0 0 48 54" className={className} style={style} aria-hidden="true">
       {/* antena */}
       <rect x="23.4" y="0" width="1.2" height="7" fill={fill} />
       {/* corona */}
@@ -74,8 +74,6 @@ function HumboldtSilhouette({ fill, className = "", style }: { fill: string; cla
       {floors.map((y) => (
         <rect key={y} x="18.4" y={y} width="11.2" height="1.3" fill="#ffffff" opacity="0.16" />
       ))}
-      {/* edificio bajo y estación */}
-      <path d="M4 64 V56 H14 V52 H34 V56 H44 V64 Z" fill={fill} />
     </svg>
   );
 }
@@ -106,7 +104,7 @@ export function AvilaRidge({
         />
         <HumboldtSilhouette
           fill={fill}
-          className="absolute h-8 sm:h-12 w-auto -translate-x-1/2"
+          className="absolute h-[27px] sm:h-10 w-auto -translate-x-1/2"
           style={{ left: SUMMIT_LEFT, bottom: SUMMIT_BOTTOM }}
         />
       </div>

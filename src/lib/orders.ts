@@ -333,6 +333,30 @@ export async function createOrderChecked(
     : { ok: false, reason: "coupon_exhausted" };
 }
 
+/**
+ * Borra las órdenes de una cata con sus entradas (en Supabase, `tickets` se borra en cascada) y sus comprobantes.
+ * Solo se usa al eliminar una cata desde el panel. Devuelve cuántas órdenes se borraron.
+ */
+export async function deleteOrdersByTasting(tastingId: string): Promise<number> {
+  const sb = getAdminClient();
+  if (!sb) {
+    const ids = new Set(Array.from(memOrders.values()).filter((o) => o.tastingId === tastingId).map((o) => o.id));
+    memTickets.forEach((t, key) => {
+      if (ids.has(t.orderId)) memTickets.delete(key);
+    });
+    ids.forEach((id) => memOrders.delete(id));
+    return ids.size;
+  }
+  const { data, error } = await sb.from("orders").delete().eq("tasting_id", tastingId).select("id, proof_path");
+  if (error) throw new Error(`No se pudieron eliminar las reservas de la cata: ${error.message}`);
+  const proofs = (data ?? []).map((r) => r.proof_path).filter((path): path is string => typeof path === "string" && path.length > 0);
+  if (proofs.length) {
+    const { error: storageError } = await sb.storage.from(PROOF_BUCKET).remove(proofs);
+    if (storageError) console.error("[orders] No se pudieron borrar los comprobantes:", storageError.message);
+  }
+  return data?.length ?? 0;
+}
+
 export async function getOrderByToken(token: string): Promise<Order | null> {
   if (!token) return null;
   const sb = getAdminClient();

@@ -115,13 +115,29 @@ export default function AdminCatasPage() {
   };
 
   const remove = async (t: AdminTasting) => {
-    if (!confirm(`¿Eliminar "${t.title}"? Esta acción no se puede deshacer.`)) return;
+    const { orders, approvedSpots, approvedUsd } = t.stats;
+    if (orders > 0) {
+      const answer = prompt(
+        `"${t.title}" tiene ${orders} ${orders === 1 ? "reserva" : "reservas"} (${approvedSpots} ${approvedSpots === 1 ? "cupo pagado" : "cupos pagados"}, $${approvedUsd}).\n\n` +
+          "Al eliminarla se borran también esas reservas, sus entradas QR y sus comprobantes, y no se puede deshacer. " +
+          "Si solo quiere ocultarla del sitio, use Archivar. Si necesita el registro, exporte antes el Excel en Reservas.\n\n" +
+          "Para confirmar, escriba ELIMINAR:"
+      );
+      if (answer === null) return;
+      if (answer.trim().toUpperCase() !== "ELIMINAR") {
+        notify("No se eliminó: escriba ELIMINAR para confirmar.", false);
+        return;
+      }
+    } else if (!confirm(`¿Eliminar "${t.title}"? Esta acción no se puede deshacer.`)) {
+      return;
+    }
     setBusy(t.id);
     try {
-      const res = await fetch(`/api/admin/catas/${t.id}`, { method: "DELETE" });
+      const res = await fetch(`/api/admin/catas/${t.id}${orders > 0 ? "?reservas=1" : ""}`, { method: "DELETE" });
       const data = await res.json();
       if (!data.success) throw new Error(data.message);
-      notify("Cata eliminada.");
+      const n = Number(data.ordersDeleted) || 0;
+      notify(n > 0 ? `Cata eliminada junto con ${n} ${n === 1 ? "reserva" : "reservas"}.` : "Cata eliminada.");
       await load();
     } catch (err) {
       notify((err as Error).message || "No se pudo eliminar la cata.", false);
@@ -361,16 +377,21 @@ function CataRow({ t, past, busy, onEdit, onDuplicate, onPublish, onArchive, onR
             Archivar
           </button>
         )}
-        {stats.orders === 0 ? (
-          <button type="button" disabled={busy} onClick={onDelete} className="h-10 px-3 rounded text-[13px] font-semibold text-on-surface-variant hover:text-error ml-auto inline-flex items-center gap-1.5">
-            <span className="material-symbols-outlined text-[18px]" aria-hidden="true">delete</span>
-            Eliminar
-          </button>
-        ) : (
-          <span className="ml-auto self-center text-[12px] text-on-surface-variant">
-            {stats.orders} {stats.orders === 1 ? "orden" : "órdenes"} · no se puede eliminar
-          </span>
-        )}
+        <button
+          type="button"
+          disabled={busy}
+          onClick={onDelete}
+          title={stats.orders > 0 ? `Elimina también sus ${stats.orders} ${stats.orders === 1 ? "reserva" : "reservas"}` : undefined}
+          className="h-10 px-3 rounded text-[13px] font-semibold text-on-surface-variant hover:text-error ml-auto inline-flex items-center gap-1.5"
+        >
+          <span className="material-symbols-outlined text-[18px]" aria-hidden="true">delete</span>
+          Eliminar
+          {stats.orders > 0 && (
+            <span className="font-normal">
+              · {stats.orders} {stats.orders === 1 ? "orden" : "órdenes"}
+            </span>
+          )}
+        </button>
       </div>
     </li>
   );

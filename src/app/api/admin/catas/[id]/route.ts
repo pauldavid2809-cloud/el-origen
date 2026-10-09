@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/auth";
 import { CataInputError, deleteCata, getCata, updateCata, type CataInput } from "@/lib/catas";
-import { heldSpotsByTasting, syncOrdersWithTasting, tastingSnapshot } from "@/lib/orders";
+import { deleteOrdersByTasting, heldSpotsByTasting, syncOrdersWithTasting, tastingSnapshot } from "@/lib/orders";
 import { countTastingOrders } from "../shared";
 
 export const dynamic = "force-dynamic";
@@ -64,24 +64,30 @@ export async function PATCH(request: Request, { params }: Params) {
 }
 
 /** Solo se eliminan catas sin órdenes; las demás se archivan para conservar el historial. */
-export async function DELETE(_request: Request, { params }: Params) {
+/**
+ * Elimina una cata. Si tiene órdenes hay que confirmarlo con `?reservas=1`: se borran también sus órdenes,
+ * sus entradas y sus comprobantes (no se puede deshacer; para solo ocultarla está "Archivar").
+ */
+export async function DELETE(request: Request, { params }: Params) {
   const denied = requireAdmin();
   if (denied) return denied;
   try {
     const current = await getCata(params.id);
     if (!current) return notFound();
     const orders = await countTastingOrders(current.id);
-    if (orders > 0) {
+    if (orders > 0 && new URL(request.url).searchParams.get("reservas") !== "1") {
       return NextResponse.json(
         {
           success: false,
-          message: `Esta cata tiene ${orders} ${orders === 1 ? "orden" : "órdenes"} y no se puede eliminar. Archívela para ocultarla del sitio.`,
+          message: `Esta cata tiene ${orders} ${orders === 1 ? "orden" : "órdenes"}: confirme que desea eliminarlas junto con la cata.`,
         },
         { status: 409 }
       );
     }
+    // Primero las reservas: si algo falla después, la cata sigue en el panel y se puede reintentar.
+    const ordersDeleted = orders > 0 ? await deleteOrdersByTasting(current.id) : 0;
     const deleted = await deleteCata(current.id);
-    return deleted ? NextResponse.json({ success: true }) : notFound();
+    return deleted ? NextResponse.json({ success: true, ordersDeleted }) : notFound();
   } catch (error) {
     console.error("[admin/catas] No se pudo eliminar la cata:", error);
     return NextResponse.json({ success: false, message: (error as Error).message }, { status: 500 });
