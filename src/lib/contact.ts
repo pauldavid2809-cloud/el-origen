@@ -6,8 +6,8 @@ export const CONTACT = {
   phoneDisplay: "0414-107-4007",
   phoneIntl: "+58-414-1074007",
   email: "experiencethewine22@gmail.com",
-  instagramHandle: "@elorigen.vzla",
-  instagramUrl: "https://www.instagram.com/elorigen.vzla",
+  instagramHandle: "@elorigencatas",
+  instagramUrl: "https://www.instagram.com/elorigencatas",
   /** Sin oficina física: solo se muestra la ciudad. */
   city: "Caracas",
 };
