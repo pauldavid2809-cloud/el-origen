@@ -70,7 +70,7 @@ apenas se encienda. El correo con el QR sale igual desde el sitio.
    `PAIRING_PHONE` (el número de El Origen con código de país, ej. `584141074007`).
 4. Como en Railway nadie ve el panel, el bot imprime en los **logs** un `CÓDIGO DE VINCULACIÓN` de 8
    caracteres. En el teléfono: **WhatsApp → Ajustes → Dispositivos vinculados → Vincular un dispositivo →
-   Vincular con el número de teléfono** y escríbalo (vale ~3 minutos; si vence, el bot genera otro).
+   Vincular con el número de teléfono** y escríbalo (vale ~3 minutos; si vence, el bot genera otro, hasta 4 veces por arranque).
 5. Listo: el log dice `WhatsApp conectado` y el panel de administración (Correo y WhatsApp) muestra el bot
    conectado. La sesión sobrevive a reinicios y despliegues gracias al volumen.
 

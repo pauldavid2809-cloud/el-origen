@@ -33,6 +33,9 @@ const AUTH_DIR = process.env.AUTH_DIR || path.join(__dirname, "auth_info");
 const PAIRING_PHONE = (process.env.PAIRING_PHONE || "").replace(/\D/g, "");
 // Un código nuevo vale ~3 min; no se pide otro antes para no invalidar el que se está escribiendo.
 const PAIRING_COOLDOWN_MS = 150_000;
+// Cada código le avisa al teléfono con una notificación: tras unos intentos sin usarlo, se detiene
+// (para pedir otro: reiniciar el servicio o «Generar un QR nuevo desde cero» en el panel).
+const PAIRING_MAX_TRIES = 4;
 
 /* libsignal imprime en consola las claves de cada sesión ("Closing session: SessionEntry {…privKey…}").
    En un servidor eso quedaría guardado en los logs: se descartan solo esos mensajes. */
@@ -56,6 +59,7 @@ let sock = null;
 let qrDataUrl = null;
 let pairingCode = null;
 let pairingAskedAt = 0;
+let pairingTries = 0;
 let connected = false;
 let myPhone = null;
 let draining = false;
@@ -277,19 +281,27 @@ async function connect() {
         stats.message = "Escanee el código QR desde WhatsApp → Dispositivos vinculados";
         console.log(`\n📱 Código QR listo: abra http://localhost:${PORT} y escanéelo.\n`);
         if (PAIRING_PHONE && !sock.authState.creds.registered && Date.now() - pairingAskedAt > PAIRING_COOLDOWN_MS) {
-          pairingAskedAt = Date.now();
-          try {
-            const raw = await sock.requestPairingCode(PAIRING_PHONE);
-            pairingCode = (raw.match(/.{1,4}/g) ?? [raw]).join("-");
-            stats.message = `Escriba el código ${pairingCode} en WhatsApp → Dispositivos vinculados`;
-            console.log("\n===================================================================");
-            console.log(`🔑 CÓDIGO DE VINCULACIÓN: ${pairingCode}`);
-            console.log(`   En el teléfono de +${PAIRING_PHONE}: WhatsApp → Ajustes → Dispositivos vinculados`);
-            console.log("   → Vincular un dispositivo → «Vincular con el número de teléfono» y escríbalo.");
-            console.log("   Vale unos 3 minutos; si vence, el bot genera otro solo.");
-            console.log("===================================================================\n");
-          } catch (err) {
-            remember(`⚠️ No se pudo pedir el código de vinculación: ${err?.message ?? err}`);
+          if (pairingTries >= PAIRING_MAX_TRIES) {
+            if (pairingTries === PAIRING_MAX_TRIES) {
+              pairingTries += 1;
+              remember("⏸️ Código de vinculación sin usar tras varios intentos: reinicie el servicio para pedir otro.");
+            }
+          } else {
+            pairingTries += 1;
+            pairingAskedAt = Date.now();
+            try {
+              const raw = await sock.requestPairingCode(PAIRING_PHONE);
+              pairingCode = (raw.match(/.{1,4}/g) ?? [raw]).join("-");
+              stats.message = `Escriba el código ${pairingCode} en WhatsApp → Dispositivos vinculados`;
+              console.log("\n===================================================================");
+              console.log(`🔑 CÓDIGO DE VINCULACIÓN: ${pairingCode}`);
+              console.log(`   En el teléfono de +${PAIRING_PHONE}: WhatsApp → Ajustes → Dispositivos vinculados`);
+              console.log("   → Vincular un dispositivo → «Vincular con el número de teléfono» y escríbalo.");
+              console.log("   Vale unos 3 minutos; si vence, el bot genera otro solo (hasta " + PAIRING_MAX_TRIES + " veces).");
+              console.log("===================================================================\n");
+            } catch (err) {
+              remember(`⚠️ No se pudo pedir el código de vinculación: ${err?.message ?? err}`);
+            }
           }
         }
       }
@@ -416,6 +428,7 @@ app.post("/reset-session", async (_req, res) => {
   qrDataUrl = null;
   pairingCode = null;
   pairingAskedAt = 0;
+  pairingTries = 0;
   remember("🔄 Sesión reiniciada: escanee el nuevo QR.");
   setTimeout(() => {
     resetting = false;
