@@ -60,6 +60,7 @@ let qrDataUrl = null;
 let pairingCode = null;
 let pairingAskedAt = 0;
 let pairingTries = 0;
+let siteOk = null; // null = aún no se sabe; true/false = último resultado al consultar la cola
 let connected = false;
 let myPhone = null;
 let draining = false;
@@ -174,6 +175,9 @@ async function drainQueue() {
   draining = true;
   try {
     const data = await api("GET");
+    // Un solo aviso por cambio de estado (el panel local no se ve en un servidor: esto queda en los logs).
+    if (siteOk !== true) remember("🟢 El sitio aceptó la clave del bot: cola conectada.");
+    siteOk = true;
     stats.lastPoll = new Date();
     stats.lastError = null;
     const queue = connected ? data.queue ?? [] : [];
@@ -210,6 +214,8 @@ async function drainQueue() {
     }
     if (queue.length) stats.message = "Cola al día";
   } catch (err) {
+    if (siteOk !== false || stats.lastError !== err.message) remember(`🔴 Sin conexión con el sitio: ${err.message}`);
+    siteOk = false;
     stats.lastError = err.message;
     stats.message = `Sin conexión con el sitio: ${err.message}`;
   } finally {
