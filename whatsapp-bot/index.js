@@ -34,10 +34,11 @@ const AUTH_DIR = process.env.AUTH_DIR || path.join(__dirname, "auth_info");
 // Panel con dirección pública (Railway): sin PANEL_TOKEN el panel solo abre en esta máquina (127.0.0.1).
 // Con PANEL_TOKEN se publica y TODO exige la clave: se entra con  https://…/?key=<PANEL_TOKEN>  (queda en
 // una cookie y se quita de la URL). Quien tenga el enlace puede ver el QR y vincular el WhatsApp: no lo comparta.
-const PANEL_TOKEN = process.env.PANEL_TOKEN || "";
+const PANEL_TOKEN = (process.env.PANEL_TOKEN || "").trim();
 const PANEL_HOST = PANEL_TOKEN ? "0.0.0.0" : "127.0.0.1";
-if (PANEL_TOKEN && PANEL_TOKEN.length < 24) {
-  console.error("\n❌ PANEL_TOKEN es muy corto: use al menos 24 caracteres aleatorios.\n");
+// Solo caracteres seguros en una URL (un "+" o "&" de una clave en base64 rompería el enlace).
+if (PANEL_TOKEN && !/^[A-Za-z0-9_-]{24,}$/.test(PANEL_TOKEN)) {
+  console.error("\n❌ PANEL_TOKEN: use solo letras, números, - y _ (mínimo 24). Ejemplo: openssl rand -hex 32\n");
   process.exit(1);
 }
 const PAIRING_PHONE = (process.env.PAIRING_PHONE || "").replace(/\D/g, "");
@@ -357,7 +358,6 @@ async function connect() {
 const app = express();
 app.disable("x-powered-by");
 app.set("trust proxy", 1); // detrás del proxy de Railway: req.secure según x-forwarded-proto
-app.use(express.urlencoded({ extended: false }));
 
 const sameSecret = (a, b) =>
   crypto.timingSafeEqual(crypto.createHash("sha256").update(String(a)).digest(), crypto.createHash("sha256").update(String(b)).digest());
@@ -381,11 +381,14 @@ app.use((req, res, next) => {
   if (cookieValue && sameSecret(cookieValue, PANEL_TOKEN)) return next();
   const key = req.method === "GET" ? req.query.key : undefined;
   if (typeof key === "string" && sameSecret(key, PANEL_TOKEN)) {
-    res.cookie("eo_panel", PANEL_TOKEN, { httpOnly: true, sameSite: "strict", secure: req.secure, maxAge: 12 * 3600_000, path: "/" });
+    res.cookie("eo_panel", PANEL_TOKEN, { httpOnly: true, sameSite: "lax", secure: req.secure, maxAge: 12 * 3600_000, path: "/" });
     return res.redirect("/"); // la clave no queda en la barra de direcciones ni en el historial
   }
   res.status(404).type("text/plain").send("Not found");
 });
+
+// Los formularios del panel (POST) se leen solo con la clave ya validada y con tamaño mínimo.
+app.use(express.urlencoded({ extended: false, limit: "2kb" }));
 
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
 
@@ -485,6 +488,11 @@ app.post("/reset-session", async (_req, res) => {
     connect();
   }, 1000);
   res.redirect("/");
+});
+
+// Último recurso: ningún error revela trazas ni que hay Express detrás (todo es un 404 simple).
+app.use((_err, _req, res, _next) => {
+  res.status(404).type("text/plain").send("Not found");
 });
 
 // Sin PANEL_TOKEN solo escucha en esta computadora: el panel no queda expuesto a internet.

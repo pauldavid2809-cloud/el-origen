@@ -69,7 +69,7 @@ apenas se encienda. El correo con el QR sale igual desde el sitio.
 3. Variables: `APP_URL`, `WHATSAPP_QUEUE_SECRET` (igual a la de Vercel), `AUTH_DIR=/data/auth_info` y
    `PAIRING_PHONE` (el número de El Origen con código de país, ej. `584141074007`).
 4. Para vincular el WhatsApp hay dos formas (elija una):
-   - **Por QR (recomendado):** defina `PANEL_TOKEN` (clave larga y aleatoria, mínimo 24 caracteres) y genere un
+   - **Por QR (recomendado):** defina `PANEL_TOKEN` (clave larga y aleatoria: solo letras, números, `-` y `_`, mínimo 24; por ejemplo `openssl rand -hex 32`) y genere un
      dominio público al servicio. Abra `https://<dominio>/?key=<PANEL_TOKEN>` en una computadora, y en el
      teléfono: **WhatsApp → Ajustes → Dispositivos vinculados → Vincular un dispositivo** y escanee el QR.
      Todo el panel exige esa clave (sin ella responde 404); el enlace queda en una cookie y se quita de la
@@ -103,4 +103,4 @@ Use solo **una** instancia a la vez con el mismo número (Railway o una computad
 | `POLL_SECONDS` | Cada cuántos segundos revisa la cola (4) |
 | `AUTH_DIR` | Carpeta de la sesión de WhatsApp (por defecto `auth_info/`; en Railway `/data/auth_info`) |
 | `PAIRING_PHONE` | Vincula con código de 8 caracteres en vez de QR (servidores sin pantalla) |
-| `PANEL_TOKEN` | Publica el panel (QR) en la dirección del servicio, protegido con esta clave (mín. 24 caracteres) |
+| `PANEL_TOKEN` | Publica el panel (QR) en la dirección del servicio, protegido con esta clave (letras, números, `-` y `_`; mín. 24) |
