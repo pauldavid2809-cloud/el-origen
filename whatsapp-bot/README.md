@@ -68,9 +68,17 @@ apenas se encienda. El correo con el QR sale igual desde el sitio.
    despliegue pediría vincular otra vez.
 3. Variables: `APP_URL`, `WHATSAPP_QUEUE_SECRET` (igual a la de Vercel), `AUTH_DIR=/data/auth_info` y
    `PAIRING_PHONE` (el número de El Origen con código de país, ej. `584141074007`).
-4. Como en Railway nadie ve el panel, el bot imprime en los **logs** un `CÓDIGO DE VINCULACIÓN` de 8
-   caracteres. En el teléfono: **WhatsApp → Ajustes → Dispositivos vinculados → Vincular un dispositivo →
-   Vincular con el número de teléfono** y escríbalo (vale ~3 minutos; si vence, el bot genera otro, hasta 4 veces por arranque).
+4. Para vincular el WhatsApp hay dos formas (elija una):
+   - **Por QR (recomendado):** defina `PANEL_TOKEN` (clave larga y aleatoria, mínimo 24 caracteres) y genere un
+     dominio público al servicio. Abra `https://<dominio>/?key=<PANEL_TOKEN>` en una computadora, y en el
+     teléfono: **WhatsApp → Ajustes → Dispositivos vinculados → Vincular un dispositivo** y escanee el QR.
+     Todo el panel exige esa clave (sin ella responde 404); el enlace queda en una cookie y se quita de la
+     barra de direcciones. **Quien tenga el enlace puede vincular el WhatsApp: no lo comparta.** Al terminar,
+     quite el dominio público (o cambie `PANEL_TOKEN`).
+   - **Por código:** sin dominio público, defina `PAIRING_PHONE` y el bot imprime en los
+     **logs** un `CÓDIGO DE VINCULACIÓN` de 8 caracteres para escribirlo en **WhatsApp → Dispositivos
+     vinculados → Vincular un dispositivo → Vincular con el número de teléfono** (vale ~3 minutos; si vence,
+     genera otro, hasta 4 veces por arranque).
 5. Listo: el log dice `WhatsApp conectado` y el panel de administración (Correo y WhatsApp) muestra el bot
    conectado. La sesión sobrevive a reinicios y despliegues gracias al volumen.
 
@@ -95,3 +103,4 @@ Use solo **una** instancia a la vez con el mismo número (Railway o una computad
 | `POLL_SECONDS` | Cada cuántos segundos revisa la cola (4) |
 | `AUTH_DIR` | Carpeta de la sesión de WhatsApp (por defecto `auth_info/`; en Railway `/data/auth_info`) |
 | `PAIRING_PHONE` | Vincula con código de 8 caracteres en vez de QR (servidores sin pantalla) |
+| `PANEL_TOKEN` | Publica el panel (QR) en la dirección del servicio, protegido con esta clave (mín. 24 caracteres) |

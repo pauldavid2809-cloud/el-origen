@@ -7,6 +7,7 @@
    ───────────────────────────────────────────────────────────── */
 
 import "dotenv/config";
+import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -30,6 +31,15 @@ const AUTH_DIR = process.env.AUTH_DIR || path.join(__dirname, "auth_info");
 // Vinculación sin pantalla (servidores como Railway, donde nadie ve el panel local): con PAIRING_PHONE
 // (el número de El Origen con código de país, ej. 584141074007) el bot pide un código de 8 caracteres
 // y se escribe en WhatsApp → Dispositivos vinculados → «Vincular con el número de teléfono».
+// Panel con dirección pública (Railway): sin PANEL_TOKEN el panel solo abre en esta máquina (127.0.0.1).
+// Con PANEL_TOKEN se publica y TODO exige la clave: se entra con  https://…/?key=<PANEL_TOKEN>  (queda en
+// una cookie y se quita de la URL). Quien tenga el enlace puede ver el QR y vincular el WhatsApp: no lo comparta.
+const PANEL_TOKEN = process.env.PANEL_TOKEN || "";
+const PANEL_HOST = PANEL_TOKEN ? "0.0.0.0" : "127.0.0.1";
+if (PANEL_TOKEN && PANEL_TOKEN.length < 24) {
+  console.error("\n❌ PANEL_TOKEN es muy corto: use al menos 24 caracteres aleatorios.\n");
+  process.exit(1);
+}
 const PAIRING_PHONE = (process.env.PAIRING_PHONE || "").replace(/\D/g, "");
 // Un código nuevo vale ~3 min; no se pide otro antes para no invalidar el que se está escribiendo.
 const PAIRING_COOLDOWN_MS = 150_000;
@@ -285,7 +295,11 @@ async function connect() {
         qrDataUrl = await QRCode.toDataURL(qr, { width: 320, margin: 1 });
         connected = false;
         stats.message = "Escanee el código QR desde WhatsApp → Dispositivos vinculados";
-        console.log(`\n📱 Código QR listo: abra http://localhost:${PORT} y escanéelo.\n`);
+        console.log(
+          PANEL_TOKEN
+            ? "\n📱 Código QR listo: ábralo en el panel (enlace con su clave) y escanéelo.\n"
+            : `\n📱 Código QR listo: abra http://localhost:${PORT} y escanéelo.\n`
+        );
         if (PAIRING_PHONE && !sock.authState.creds.registered && Date.now() - pairingAskedAt > PAIRING_COOLDOWN_MS) {
           if (pairingTries >= PAIRING_MAX_TRIES) {
             if (pairingTries === PAIRING_MAX_TRIES) {
@@ -341,7 +355,37 @@ async function connect() {
 /* ─── Panel local (solo en esta computadora) ─── */
 
 const app = express();
+app.disable("x-powered-by");
+app.set("trust proxy", 1); // detrás del proxy de Railway: req.secure según x-forwarded-proto
 app.use(express.urlencoded({ extended: false }));
+
+const sameSecret = (a, b) =>
+  crypto.timingSafeEqual(crypto.createHash("sha256").update(String(a)).digest(), crypto.createHash("sha256").update(String(b)).digest());
+const readCookie = (req, name) =>
+  (req.headers.cookie ?? "")
+    .split(";")
+    .map((c) => c.trim().split("="))
+    .find(([k]) => k === name)?.slice(1).join("=");
+
+// Nada del panel se guarda en caché ni se indexa; con PANEL_TOKEN, nada responde sin la clave.
+app.use((req, res, next) => {
+  res.set({ "Cache-Control": "no-store", "X-Robots-Tag": "noindex, nofollow", "Referrer-Policy": "no-referrer" });
+  if (!PANEL_TOKEN) return next();
+  const cookie = readCookie(req, "eo_panel");
+  let cookieValue = "";
+  try {
+    cookieValue = cookie ? decodeURIComponent(cookie) : "";
+  } catch {
+    /* cookie mal formada: se trata como ausente */
+  }
+  if (cookieValue && sameSecret(cookieValue, PANEL_TOKEN)) return next();
+  const key = req.method === "GET" ? req.query.key : undefined;
+  if (typeof key === "string" && sameSecret(key, PANEL_TOKEN)) {
+    res.cookie("eo_panel", PANEL_TOKEN, { httpOnly: true, sameSite: "strict", secure: req.secure, maxAge: 12 * 3600_000, path: "/" });
+    return res.redirect("/"); // la clave no queda en la barra de direcciones ni en el historial
+  }
+  res.status(404).type("text/plain").send("Not found");
+});
 
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
 
@@ -443,11 +487,11 @@ app.post("/reset-session", async (_req, res) => {
   res.redirect("/");
 });
 
-// Solo escucha en esta computadora: el panel no queda expuesto a internet.
-app.listen(PORT, "127.0.0.1", () => {
+// Sin PANEL_TOKEN solo escucha en esta computadora: el panel no queda expuesto a internet.
+app.listen(PORT, PANEL_HOST, () => {
   console.log("===================================================================");
   console.log("   BOT DE WHATSAPP · EL ORIGEN");
-  console.log(`   Panel: http://localhost:${PORT}`);
+  console.log(PANEL_TOKEN ? `   Panel: público en el puerto ${PORT}, protegido con PANEL_TOKEN` : `   Panel: http://localhost:${PORT}`);
   console.log(`   Sitio: ${APP_URL} (revisa la cola cada ${POLL_MS / 1000} s)`);
   console.log("===================================================================");
   connect();
