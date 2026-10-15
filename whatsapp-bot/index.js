@@ -69,6 +69,7 @@ if (!QUEUE_SECRET) {
 let sock = null;
 let qrSvg = null; // QR vectorial (nítido a cualquier tamaño); se renueva cada ~20 s
 let qrAt = 0;
+let qrCount = 0; // QR emitidos por esta conexión: el 1.º vale ~60 s, los siguientes ~20 s
 let pairingCode = null;
 let pairingAt = 0;
 let lastPairRequest = 0;
@@ -297,6 +298,7 @@ async function connect() {
       /* usa la versión por defecto de la librería */
     }
 
+    qrCount = 0;
     sock = makeWASocket({
       ...(version ? { version } : {}),
       auth: state,
@@ -314,6 +316,7 @@ async function connect() {
       if (qr) {
         qrSvg = await QRCode.toString(qr, { type: "svg", margin: 4, errorCorrectionLevel: "L" });
         qrAt = Date.now();
+        qrCount += 1;
         connected = false;
         stats.message = "Escanee el código QR desde WhatsApp → Dispositivos vinculados";
         console.log(
@@ -411,7 +414,7 @@ app.get("/", (req, res) => {
     `<ol><li>Abra <strong>WhatsApp</strong> en el teléfono de El Origen.</li><li>Toque <strong>⋮ / Ajustes → Dispositivos vinculados</strong>.</li><li>Toque <strong>Vincular un dispositivo</strong> y ${last}</li></ol>`;
   const qrBlock = qrSvg
     ? `${steps("escanee este código con el lector que se abre dentro de WhatsApp (no con la cámara normal del teléfono):")}
-       <div id="qrbox" class="qrbox" data-age="${Math.max(0, Math.round((Date.now() - qrAt) / 1000))}">${qrSvg}</div>
+       <div id="qrbox" class="qrbox" data-age="${Math.max(0, Math.round((Date.now() - qrAt) / 1000))}" data-ttl="${qrCount <= 1 ? 60 : 20}">${qrSvg}</div>
        <p id="qrage" class="muted"></p>`
     : `<p class="muted">Conectando con WhatsApp…</p>`;
   const codeBlock = pairingCode
@@ -464,12 +467,12 @@ ${log.length ? `<details><summary class="muted">Actividad reciente</summary><pre
 </main><script>
 (function () {
   var box = document.getElementById("qrbox"), msg = document.getElementById("qrage");
-  var age0 = box ? Number(box.getAttribute("data-age")) : 0, t0 = Date.now();
+  var age0 = box ? Number(box.getAttribute("data-age")) : 0, ttl = box ? Number(box.getAttribute("data-ttl")) : 20, t0 = Date.now();
   function tick() {
     if (!box) return;
-    var s = age0 + Math.floor((Date.now() - t0) / 1000), old = s > 20;
+    var s = age0 + Math.floor((Date.now() - t0) / 1000), old = s > ttl;
     box.style.opacity = old ? "0.2" : "1";
-    msg.textContent = old ? "Este código ya venció: espere, se está actualizando…" : "Código generado hace " + s + " s · vale unos 20 s";
+    msg.textContent = old ? "Este código ya venció: espere, se está actualizando…" : "Código generado hace " + s + " s · vale unos " + ttl + " s";
   }
   tick(); setInterval(tick, 1000);
   // Recarga sola (QR nuevo / estado), salvo que se esté escribiendo o el formulario de respaldo esté abierto.
