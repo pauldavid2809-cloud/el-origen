@@ -27,6 +27,23 @@ const QUEUE_SECRET = process.env.WHATSAPP_QUEUE_SECRET || "";
 // Cada 4 s por defecto (como el bot del congreso): la entrada sale casi al instante de aprobarla.
 const POLL_MS = Math.max(3, Number(process.env.POLL_SECONDS || 4)) * 1000;
 const AUTH_DIR = process.env.AUTH_DIR || path.join(__dirname, "auth_info");
+// Vinculación sin pantalla (servidores como Railway, donde nadie ve el panel local): con PAIRING_PHONE
+// (el número de El Origen con código de país, ej. 584141074007) el bot pide un código de 8 caracteres
+// y se escribe en WhatsApp → Dispositivos vinculados → «Vincular con el número de teléfono».
+const PAIRING_PHONE = (process.env.PAIRING_PHONE || "").replace(/\D/g, "");
+// Un código nuevo vale ~3 min; no se pide otro antes para no invalidar el que se está escribiendo.
+const PAIRING_COOLDOWN_MS = 150_000;
+
+/* libsignal imprime en consola las claves de cada sesión ("Closing session: SessionEntry {…privKey…}").
+   En un servidor eso quedaría guardado en los logs: se descartan solo esos mensajes. */
+const SIGNAL_NOISE = /^(Closing session|Opening session|Removing old closed session|Session already (closed|open))/;
+for (const level of ["info", "warn"]) {
+  const original = console[level].bind(console);
+  console[level] = (...args) => {
+    if (typeof args[0] === "string" && SIGNAL_NOISE.test(args[0])) return;
+    original(...args);
+  };
+}
 
 if (!QUEUE_SECRET) {
   console.error("\n❌ Falta WHATSAPP_QUEUE_SECRET en el archivo .env (debe ser igual al de Vercel).\n");
@@ -37,6 +54,8 @@ if (!QUEUE_SECRET) {
 
 let sock = null;
 let qrDataUrl = null;
+let pairingCode = null;
+let pairingAskedAt = 0;
 let connected = false;
 let myPhone = null;
 let draining = false;
@@ -257,10 +276,27 @@ async function connect() {
         connected = false;
         stats.message = "Escanee el código QR desde WhatsApp → Dispositivos vinculados";
         console.log(`\n📱 Código QR listo: abra http://localhost:${PORT} y escanéelo.\n`);
+        if (PAIRING_PHONE && !sock.authState.creds.registered && Date.now() - pairingAskedAt > PAIRING_COOLDOWN_MS) {
+          pairingAskedAt = Date.now();
+          try {
+            const raw = await sock.requestPairingCode(PAIRING_PHONE);
+            pairingCode = (raw.match(/.{1,4}/g) ?? [raw]).join("-");
+            stats.message = `Escriba el código ${pairingCode} en WhatsApp → Dispositivos vinculados`;
+            console.log("\n===================================================================");
+            console.log(`🔑 CÓDIGO DE VINCULACIÓN: ${pairingCode}`);
+            console.log(`   En el teléfono de +${PAIRING_PHONE}: WhatsApp → Ajustes → Dispositivos vinculados`);
+            console.log("   → Vincular un dispositivo → «Vincular con el número de teléfono» y escríbalo.");
+            console.log("   Vale unos 3 minutos; si vence, el bot genera otro solo.");
+            console.log("===================================================================\n");
+          } catch (err) {
+            remember(`⚠️ No se pudo pedir el código de vinculación: ${err?.message ?? err}`);
+          }
+        }
       }
       if (connection === "open") {
         connected = true;
         qrDataUrl = null;
+        pairingCode = null;
         myPhone = sock.user?.id?.split(":")[0]?.split("@")[0] ?? null;
         remember(`🟢 WhatsApp conectado (+${myPhone})`);
         setTimeout(drainQueue, 3000);
@@ -293,6 +329,10 @@ const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "
 
 app.get("/", (req, res) => {
   const notice = req.query.ok ? `<p class="ok">${esc(req.query.ok)}</p>` : req.query.error ? `<p class="err">${esc(req.query.error)}</p>` : "";
+  const pairingBlock = pairingCode
+    ? `<ol><li>Abra <strong>WhatsApp</strong> en el teléfono de El Origen.</li><li>Toque <strong>⋮ / Ajustes → Dispositivos vinculados → Vincular un dispositivo</strong>.</li><li>Elija <strong>Vincular con el número de teléfono</strong> y escriba:</li></ol>
+       <p class="code">${esc(pairingCode)}</p>`
+    : "";
   const body = connected
     ? `<div class="state on"><span class="dot"></span><div><strong>WhatsApp conectado</strong><br>Número: +${esc(myPhone)}</div></div>
        <dl class="stats">
@@ -304,7 +344,9 @@ app.get("/", (req, res) => {
        <form method="post" action="/drain-now"><button>Revisar la cola ahora</button></form>
        <form method="post" action="/test-send" class="row"><input name="phone" placeholder="Su número, ej. 0414-123-4567" required><button>Enviar prueba</button></form>
        <form method="post" action="/reset-session" onsubmit="return confirm('¿Desvincular este WhatsApp del bot?')"><button class="ghost">Desvincular / usar otro número</button></form>`
-    : qrDataUrl
+    : pairingCode
+      ? `${pairingBlock}<p class="muted">Si vence, el bot genera otro código solo.</p>`
+      : qrDataUrl
       ? `<ol><li>Abra <strong>WhatsApp</strong> en el teléfono de El Origen.</li><li>Toque <strong>⋮ / Ajustes → Dispositivos vinculados</strong>.</li><li>Toque <strong>Vincular un dispositivo</strong> y escanee:</li></ol>
          <img class="qr" src="${qrDataUrl}" alt="Código QR de WhatsApp">
          <p class="muted">El código cambia cada pocos segundos; la página se actualiza sola.</p>
@@ -325,6 +367,7 @@ app.get("/", (req, res) => {
   .muted{color:var(--muted);font-size:13px;margin:0}
   button{width:100%;height:44px;border:0;border-radius:6px;background:var(--wine);color:#fff;font-weight:600;font-size:14px;cursor:pointer}button.ghost{background:transparent;color:var(--muted);border:1px solid var(--line)}
   .row{display:flex;gap:8px}.row input{flex:1;height:44px;border:1px solid var(--line);border-radius:6px;padding:0 12px;font-size:14px}.row button{width:auto;padding:0 16px}
+  .code{margin:0;text-align:center;font:700 34px ui-monospace,Menlo,Consolas,monospace;letter-spacing:4px;color:var(--wine)}
   ol{margin:0;padding-left:20px}.qr{width:260px;height:260px;margin:0 auto;display:block;border:1px solid var(--line);border-radius:10px;padding:8px;background:#fff}
   .ok,.err{margin:0;padding:10px 12px;border-radius:6px;font-size:14px}.ok{background:#E7F5EC;color:#14532D}.err{background:#F9DEDC;color:#8C1D18}
   pre{margin:0;max-height:180px;overflow:auto;background:#F2EADF;border-radius:8px;padding:10px;font-size:12px;white-space:pre-wrap}
@@ -371,6 +414,8 @@ app.post("/reset-session", async (_req, res) => {
   connected = false;
   myPhone = null;
   qrDataUrl = null;
+  pairingCode = null;
+  pairingAskedAt = 0;
   remember("🔄 Sesión reiniciada: escanee el nuevo QR.");
   setTimeout(() => {
     resetting = false;

@@ -60,6 +60,22 @@ Para cambiar de número use "Desvincular / usar otro número".
 **Mientras el bot esté apagado, las entradas aprobadas esperan en la cola** y se envían
 apenas se encienda. El correo con el QR sale igual desde el sitio.
 
+## En Railway (siempre encendido, sin computadora)
+
+1. Servicio nuevo desde este repositorio con **Root Directory** `/whatsapp-bot` (Railpack detecta Node y
+   corre `npm start`). No le genere dominio público: el panel solo escucha en `127.0.0.1`.
+2. Agréguele un **volumen** montado en `/data`: ahí queda la sesión de WhatsApp. Sin volumen, cada
+   despliegue pediría vincular otra vez.
+3. Variables: `APP_URL`, `WHATSAPP_QUEUE_SECRET` (igual a la de Vercel), `AUTH_DIR=/data/auth_info` y
+   `PAIRING_PHONE` (el número de El Origen con código de país, ej. `584141074007`).
+4. Como en Railway nadie ve el panel, el bot imprime en los **logs** un `CÓDIGO DE VINCULACIÓN` de 8
+   caracteres. En el teléfono: **WhatsApp → Ajustes → Dispositivos vinculados → Vincular un dispositivo →
+   Vincular con el número de teléfono** y escríbalo (vale ~3 minutos; si vence, el bot genera otro).
+5. Listo: el log dice `WhatsApp conectado` y el panel de administración (Correo y WhatsApp) muestra el bot
+   conectado. La sesión sobrevive a reinicios y despliegues gracias al volumen.
+
+Use solo **una** instancia a la vez con el mismo número (Railway o una computadora, no ambas).
+
 ## Recomendaciones
 
 - Use un número dedicado a El Origen con algo de antigüedad y uso normal.
@@ -77,3 +93,5 @@ apenas se encienda. El correo con el QR sale igual desde el sitio.
 | `WHATSAPP_QUEUE_SECRET` | Igual a la de Vercel |
 | `PORT` | Puerto del panel local (3001) |
 | `POLL_SECONDS` | Cada cuántos segundos revisa la cola (4) |
+| `AUTH_DIR` | Carpeta de la sesión de WhatsApp (por defecto `auth_info/`; en Railway `/data/auth_info`) |
+| `PAIRING_PHONE` | Vincula con código de 8 caracteres en vez de QR (servidores sin pantalla) |
