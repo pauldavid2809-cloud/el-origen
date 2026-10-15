@@ -67,8 +67,11 @@ if (!QUEUE_SECRET) {
 /* ─── Estado ─── */
 
 let sock = null;
-let qrDataUrl = null;
+let qrSvg = null; // QR vectorial (nítido a cualquier tamaño); se renueva cada ~20 s
+let qrAt = 0;
 let pairingCode = null;
+let pairingAt = 0;
+let lastPairRequest = 0;
 let pairingAskedAt = 0;
 let pairingTries = 0;
 let siteOk = null; // null = aún no se sabe; true/false = último resultado al consultar la cola
@@ -267,6 +270,22 @@ async function onIncoming({ messages }) {
 
 /* ─── Conexión ─── */
 
+/** Pide a WhatsApp un código de 8 caracteres para vincular con el número (alternativa al QR). */
+async function requestPairing(digits) {
+  if (!sock || sock.authState.creds.registered) throw new Error("WhatsApp no está listo para vincular");
+  const raw = await sock.requestPairingCode(digits);
+  pairingCode = (raw.match(/.{1,4}/g) ?? [raw]).join("-");
+  pairingAt = Date.now();
+  stats.message = `Escriba el código ${pairingCode} en WhatsApp → Dispositivos vinculados`;
+  console.log("\n===================================================================");
+  console.log(`🔑 CÓDIGO DE VINCULACIÓN: ${pairingCode}`);
+  console.log(`   En el teléfono de +${digits}: WhatsApp → Ajustes → Dispositivos vinculados`);
+  console.log("   → Vincular un dispositivo → «Vincular con el número de teléfono» y escríbalo.");
+  console.log("   Vale unos 3 minutos.");
+  console.log("===================================================================\n");
+  return pairingCode;
+}
+
 async function connect() {
   try {
     fs.mkdirSync(AUTH_DIR, { recursive: true });
@@ -293,7 +312,8 @@ async function connect() {
     sock.ev.on("messages.upsert", onIncoming);
     sock.ev.on("connection.update", async ({ connection, lastDisconnect, qr }) => {
       if (qr) {
-        qrDataUrl = await QRCode.toDataURL(qr, { width: 320, margin: 1 });
+        qrSvg = await QRCode.toString(qr, { type: "svg", margin: 4, errorCorrectionLevel: "L" });
+        qrAt = Date.now();
         connected = false;
         stats.message = "Escanee el código QR desde WhatsApp → Dispositivos vinculados";
         console.log(
@@ -311,15 +331,7 @@ async function connect() {
             pairingTries += 1;
             pairingAskedAt = Date.now();
             try {
-              const raw = await sock.requestPairingCode(PAIRING_PHONE);
-              pairingCode = (raw.match(/.{1,4}/g) ?? [raw]).join("-");
-              stats.message = `Escriba el código ${pairingCode} en WhatsApp → Dispositivos vinculados`;
-              console.log("\n===================================================================");
-              console.log(`🔑 CÓDIGO DE VINCULACIÓN: ${pairingCode}`);
-              console.log(`   En el teléfono de +${PAIRING_PHONE}: WhatsApp → Ajustes → Dispositivos vinculados`);
-              console.log("   → Vincular un dispositivo → «Vincular con el número de teléfono» y escríbalo.");
-              console.log("   Vale unos 3 minutos; si vence, el bot genera otro solo (hasta " + PAIRING_MAX_TRIES + " veces).");
-              console.log("===================================================================\n");
+              await requestPairing(PAIRING_PHONE);
             } catch (err) {
               remember(`⚠️ No se pudo pedir el código de vinculación: ${err?.message ?? err}`);
             }
@@ -328,7 +340,7 @@ async function connect() {
       }
       if (connection === "open") {
         connected = true;
-        qrDataUrl = null;
+        qrSvg = null;
         pairingCode = null;
         myPhone = sock.user?.id?.split(":")[0]?.split("@")[0] ?? null;
         remember(`🟢 WhatsApp conectado (+${myPhone})`);
@@ -336,6 +348,7 @@ async function connect() {
       }
       if (connection === "close") {
         connected = false;
+        pairingCode = null; // el código pertenecía a esta conexión
         if (resetting) return;
         const code = lastDisconnect?.error?.output?.statusCode;
         if (code === DisconnectReason.loggedOut) {
@@ -394,10 +407,21 @@ const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "
 
 app.get("/", (req, res) => {
   const notice = req.query.ok ? `<p class="ok">${esc(req.query.ok)}</p>` : req.query.error ? `<p class="err">${esc(req.query.error)}</p>` : "";
-  const pairingBlock = pairingCode
-    ? `<ol><li>Abra <strong>WhatsApp</strong> en el teléfono de El Origen.</li><li>Toque <strong>⋮ / Ajustes → Dispositivos vinculados → Vincular un dispositivo</strong>.</li><li>Elija <strong>Vincular con el número de teléfono</strong> y escriba:</li></ol>
-       <p class="code">${esc(pairingCode)}</p>`
+  const steps = (last) =>
+    `<ol><li>Abra <strong>WhatsApp</strong> en el teléfono de El Origen.</li><li>Toque <strong>⋮ / Ajustes → Dispositivos vinculados</strong>.</li><li>Toque <strong>Vincular un dispositivo</strong> y ${last}</li></ol>`;
+  const qrBlock = qrSvg
+    ? `${steps("escanee este código con el lector que se abre dentro de WhatsApp (no con la cámara normal del teléfono):")}
+       <div id="qrbox" class="qrbox" data-age="${Math.max(0, Math.round((Date.now() - qrAt) / 1000))}">${qrSvg}</div>
+       <p id="qrage" class="muted"></p>`
+    : `<p class="muted">Conectando con WhatsApp…</p>`;
+  const codeBlock = pairingCode
+    ? `<div class="paircode"><strong>Código de vinculación</strong>
+       <p class="code">${esc(pairingCode)}</p>
+       <p class="muted">En el teléfono: <strong>Dispositivos vinculados → Vincular un dispositivo → «Vincular con el número de teléfono»</strong> y escriba este código. Vale unos 3 minutos${pairingAt ? ` (pedido hace ${Math.round((Date.now() - pairingAt) / 1000)} s)` : ""}.</p></div>`
     : "";
+  const pairForm = `<details${pairingCode ? " open" : ""}><summary class="muted">¿No le funciona el QR? Vincular con el número de teléfono</summary>
+       <form method="post" action="/pair" class="row" style="margin-top:10px"><input name="phone" inputmode="tel" placeholder="Número de El Origen, ej. 0414-107-4007" value="${esc(PAIRING_PHONE)}" required><button>Pedir código</button></form>
+       <p class="muted" style="margin-top:8px">WhatsApp le mostrará una notificación en ese teléfono; entre al aviso o escriba el código que sale aquí.</p></details>`;
   const body = connected
     ? `<div class="state on"><span class="dot"></span><div><strong>WhatsApp conectado</strong><br>Número: +${esc(myPhone)}</div></div>
        <dl class="stats">
@@ -409,14 +433,8 @@ app.get("/", (req, res) => {
        <form method="post" action="/drain-now"><button>Revisar la cola ahora</button></form>
        <form method="post" action="/test-send" class="row"><input name="phone" placeholder="Su número, ej. 0414-123-4567" required><button>Enviar prueba</button></form>
        <form method="post" action="/reset-session" onsubmit="return confirm('¿Desvincular este WhatsApp del bot?')"><button class="ghost">Desvincular / usar otro número</button></form>`
-    : pairingCode
-      ? `${pairingBlock}<p class="muted">Si vence, el bot genera otro código solo.</p>`
-      : qrDataUrl
-      ? `<ol><li>Abra <strong>WhatsApp</strong> en el teléfono de El Origen.</li><li>Toque <strong>⋮ / Ajustes → Dispositivos vinculados</strong>.</li><li>Toque <strong>Vincular un dispositivo</strong> y escanee:</li></ol>
-         <img class="qr" src="${qrDataUrl}" alt="Código QR de WhatsApp">
-         <p class="muted">El código cambia cada pocos segundos; la página se actualiza sola.</p>
-         <form method="post" action="/reset-session"><button class="ghost">Generar un QR nuevo desde cero</button></form>`
-      : `<p class="muted">Conectando con WhatsApp…</p>`;
+    : `${codeBlock}${qrBlock}${pairForm}
+       <form method="post" action="/reset-session"><button class="ghost">Generar un QR nuevo desde cero</button></form>`;
 
   res.send(`<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Bot de WhatsApp · El Origen</title>
@@ -433,14 +451,36 @@ app.get("/", (req, res) => {
   button{width:100%;height:44px;border:0;border-radius:6px;background:var(--wine);color:#fff;font-weight:600;font-size:14px;cursor:pointer}button.ghost{background:transparent;color:var(--muted);border:1px solid var(--line)}
   .row{display:flex;gap:8px}.row input{flex:1;height:44px;border:1px solid var(--line);border-radius:6px;padding:0 12px;font-size:14px}.row button{width:auto;padding:0 16px}
   .code{margin:0;text-align:center;font:700 34px ui-monospace,Menlo,Consolas,monospace;letter-spacing:4px;color:var(--wine)}
-  ol{margin:0;padding-left:20px}.qr{width:260px;height:260px;margin:0 auto;display:block;border:1px solid var(--line);border-radius:10px;padding:8px;background:#fff}
+  ol{margin:0;padding-left:20px}
+  .qrbox{width:min(100%,360px);margin:0 auto;background:#fff;border:1px solid var(--line);border-radius:10px;padding:4px;transition:opacity .3s}.qrbox svg{display:block;width:100%;height:auto;shape-rendering:crispEdges}
+  .paircode{background:#FBF3E4;border:1px solid var(--sun);border-radius:10px;padding:14px;display:grid;gap:6px;text-align:center}
+  details summary{cursor:pointer}
   .ok,.err{margin:0;padding:10px 12px;border-radius:6px;font-size:14px}.ok{background:#E7F5EC;color:#14532D}.err{background:#F9DEDC;color:#8C1D18}
   pre{margin:0;max-height:180px;overflow:auto;background:#F2EADF;border-radius:8px;padding:10px;font-size:12px;white-space:pre-wrap}
 </style></head><body><main>
 <header><h1>EL ORIGEN</h1><p>Bot de WhatsApp</p></header>
 <section>${notice}${body}${stats.lastError ? `<p class="err">${esc(stats.lastError)}</p>` : ""}
 ${log.length ? `<details><summary class="muted">Actividad reciente</summary><pre>${esc(log.join("\n"))}</pre></details>` : ""}</section>
-</main><script>${connected ? "setTimeout(()=>location.replace('/'),15000)" : "setTimeout(()=>location.replace('/'),5000)"}</script></body></html>`);
+</main><script>
+(function () {
+  var box = document.getElementById("qrbox"), msg = document.getElementById("qrage");
+  var age0 = box ? Number(box.getAttribute("data-age")) : 0, t0 = Date.now();
+  function tick() {
+    if (!box) return;
+    var s = age0 + Math.floor((Date.now() - t0) / 1000), old = s > 20;
+    box.style.opacity = old ? "0.2" : "1";
+    msg.textContent = old ? "Este código ya venció: espere, se está actualizando…" : "Código generado hace " + s + " s · vale unos 20 s";
+  }
+  tick(); setInterval(tick, 1000);
+  // Recarga sola (QR nuevo / estado), salvo que se esté escribiendo o el formulario de respaldo esté abierto.
+  function reload() {
+    var typing = document.activeElement && document.activeElement.tagName === "INPUT";
+    if (typing || document.querySelector("details[open]")) return setTimeout(reload, 4000);
+    location.replace("/");
+  }
+  setTimeout(reload, ${connected ? 15000 : 3000});
+})();
+</script></body></html>`);
 });
 
 app.get("/status", (_req, res) => {
@@ -468,6 +508,29 @@ app.post("/test-send", async (req, res) => {
   }
 });
 
+app.post("/pair", async (req, res) => {
+  const fail = (m) => res.redirect("/?error=" + encodeURIComponent(m));
+  if (connected) return fail("WhatsApp ya está conectado");
+  let digits = "";
+  try {
+    digits = toJid(String(req.body?.phone ?? "")).split("@")[0];
+  } catch {
+    /* se valida abajo */
+  }
+  if (!/^\d{10,15}$/.test(digits)) return fail("Escriba el número con código de país, ej. 0414-107-4007");
+  // Cada código le manda una notificación al teléfono: un solo pedido por minuto.
+  if (Date.now() - lastPairRequest < 60_000) return fail("Espere un minuto antes de pedir otro código");
+  lastPairRequest = Date.now();
+  try {
+    await requestPairing(digits);
+    remember(`🔑 Código de vinculación pedido para +${digits}`);
+    res.redirect("/?ok=" + encodeURIComponent("Código listo: escríbalo en el teléfono"));
+  } catch (err) {
+    remember(`⚠️ No se pudo pedir el código de vinculación: ${err?.message ?? err}`);
+    fail("No se pudo pedir el código: " + (err?.message ?? "intente de nuevo"));
+  }
+});
+
 app.post("/reset-session", async (_req, res) => {
   resetting = true;
   try {
@@ -478,7 +541,7 @@ app.post("/reset-session", async (_req, res) => {
   fs.rmSync(AUTH_DIR, { recursive: true, force: true });
   connected = false;
   myPhone = null;
-  qrDataUrl = null;
+  qrSvg = null;
   pairingCode = null;
   pairingAskedAt = 0;
   pairingTries = 0;
