@@ -41,6 +41,10 @@ if (PANEL_TOKEN && !/^[A-Za-z0-9_-]{24,}$/.test(PANEL_TOKEN)) {
   console.error("\n❌ PANEL_TOKEN: use solo letras, números, - y _ (mínimo 24). Ejemplo: openssl rand -hex 32\n");
   process.exit(1);
 }
+// En un servidor, mientras el WhatsApp no está vinculado y nadie mira el panel, el bot descansa en vez de pedirle
+// un QR nuevo a WhatsApp cada ~3 minutos (muchos intentos seguidos desde una IP de servidor pueden hacer que
+// WhatsApp restrinja la vinculación). Se reanuda solo al abrir el panel.
+const IDLE_AFTER_MS = Math.max(30, Number(process.env.PANEL_IDLE_SECONDS || 300)) * 1000;
 const PAIRING_PHONE = (process.env.PAIRING_PHONE || "").replace(/\D/g, "");
 // Un código nuevo vale ~3 min; no se pide otro antes para no invalidar el que se está escribiendo.
 const PAIRING_COOLDOWN_MS = 150_000;
@@ -68,6 +72,8 @@ if (!QUEUE_SECRET) {
 
 let sock = null;
 let qrSvg = null; // QR vectorial (nítido a cualquier tamaño); se renueva cada ~20 s
+let lastPanelHit = Date.now();
+let idle = false; // sin vincular y sin nadie mirando el panel: no se piden más QR
 let qrAt = 0;
 let qrCount = 0; // QR emitidos por esta conexión: el 1.º vale ~60 s, los siguientes ~20 s
 let pairingCode = null;
@@ -354,6 +360,14 @@ async function connect() {
         pairingCode = null; // el código pertenecía a esta conexión
         if (resetting) return;
         const code = lastDisconnect?.error?.output?.statusCode;
+        const registered = Boolean(sock?.authState?.creds?.registered);
+        if (PANEL_TOKEN && !registered && code === DisconnectReason.timedOut && Date.now() - lastPanelHit > IDLE_AFTER_MS) {
+          idle = true;
+          qrSvg = null;
+          stats.message = "En pausa: se reanuda al abrir el panel";
+          remember("⏸️ Nadie está mirando el panel: se pausa la generación de QR hasta que se abra.");
+          return;
+        }
         if (code === DisconnectReason.loggedOut) {
           remember("🔴 Sesión cerrada desde el teléfono. Generando un QR nuevo…");
           fs.rmSync(AUTH_DIR, { recursive: true, force: true });
@@ -383,6 +397,16 @@ const readCookie = (req, name) =>
     .map((c) => c.trim().split("="))
     .find(([k]) => k === name)?.slice(1).join("=");
 
+/** Alguien autorizado abrió el panel: si el bot estaba en pausa, vuelve a conectar para mostrar el QR. */
+function touchPanel() {
+  lastPanelHit = Date.now();
+  if (idle && !resetting) {
+    idle = false;
+    remember("▶️ Panel abierto: se reanuda la conexión con WhatsApp.");
+    connect();
+  }
+}
+
 // Nada del panel se guarda en caché ni se indexa; con PANEL_TOKEN, nada responde sin la clave.
 app.use((req, res, next) => {
   res.set({ "Cache-Control": "no-store", "X-Robots-Tag": "noindex, nofollow", "Referrer-Policy": "no-referrer" });
@@ -394,11 +418,12 @@ app.use((req, res, next) => {
   } catch {
     /* cookie mal formada: se trata como ausente */
   }
-  if (cookieValue && sameSecret(cookieValue, PANEL_TOKEN)) return next();
+  if (cookieValue && sameSecret(cookieValue, PANEL_TOKEN)) return touchPanel(), next();
   const rawKey = req.method === "GET" ? req.query.key : undefined;
   // Al copiar el enlace de un chat suelen quedar pegados un punto, una coma, un paréntesis o un espacio al final.
   const key = typeof rawKey === "string" ? rawKey.trim().replace(/[^A-Za-z0-9_-]+$/, "") : undefined;
   if (typeof key === "string" && sameSecret(key, PANEL_TOKEN)) {
+    touchPanel();
     res.cookie("eo_panel", PANEL_TOKEN, { httpOnly: true, sameSite: "lax", secure: req.secure, maxAge: 12 * 3600_000, path: "/" });
     return res.redirect("/"); // la clave no queda en la barra de direcciones ni en el historial
   }
@@ -425,7 +450,7 @@ app.get("/", (req, res) => {
     ? `${steps("escanee este código con el lector que se abre dentro de WhatsApp (no con la cámara normal del teléfono):")}
        <div id="qrbox" class="qrbox" data-age="${Math.max(0, Math.round((Date.now() - qrAt) / 1000))}" data-ttl="${qrCount <= 1 ? 60 : 20}">${qrSvg}</div>
        <p id="qrage" class="muted"></p>`
-    : `<p class="muted">Conectando con WhatsApp…</p>`;
+    : `<p class="muted">${idle ? "Reanudando la conexión con WhatsApp…" : "Conectando con WhatsApp…"}</p>`;
   const codeBlock = pairingCode
     ? `<div class="paircode"><strong>Código de vinculación</strong>
        <p class="code">${esc(pairingCode)}</p>
