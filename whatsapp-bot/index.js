@@ -395,10 +395,19 @@ app.use((req, res, next) => {
     /* cookie mal formada: se trata como ausente */
   }
   if (cookieValue && sameSecret(cookieValue, PANEL_TOKEN)) return next();
-  const key = req.method === "GET" ? req.query.key : undefined;
+  const rawKey = req.method === "GET" ? req.query.key : undefined;
+  // Al copiar el enlace de un chat suelen quedar pegados un punto, una coma, un paréntesis o un espacio al final.
+  const key = typeof rawKey === "string" ? rawKey.trim().replace(/[^A-Za-z0-9_-]+$/, "") : undefined;
   if (typeof key === "string" && sameSecret(key, PANEL_TOKEN)) {
     res.cookie("eo_panel", PANEL_TOKEN, { httpOnly: true, sameSite: "lax", secure: req.secure, maxAge: 12 * 3600_000, path: "/" });
     return res.redirect("/"); // la clave no queda en la barra de direcciones ni en el historial
+  }
+  // Quien trae una clave (pero equivocada o cortada) merece saber qué pasó; quien no trae ninguna recibe un 404 liso.
+  if (typeof rawKey === "string") {
+    return res
+      .status(404)
+      .type("text/plain; charset=utf-8")
+      .send("Enlace incompleto o con la clave equivocada.\nPida el enlace de nuevo y ábralo tal cual, completo, en una sola línea (sin espacios ni signos al final).");
   }
   res.status(404).type("text/plain").send("Not found");
 });
