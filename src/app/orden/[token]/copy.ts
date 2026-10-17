@@ -1,14 +1,16 @@
-import { RATE_NAME, type Language } from "@/lib/i18n";
+import type { Language } from "@/lib/i18n";
 import type { OrderStatus } from "@/lib/orders";
-import type { PaymentMethodId, RateCurrency } from "@/types";
+import { PAY_COPY } from "@/components/payCopy";
 
-/* Textos de la página de la orden (ES/EN). */
+/* Textos de la página de la orden (ES/EN). Los del pago y el reporte de comprobante, iguales para reservas y pedidos
+   de vino, viven en `@/components/payCopy` (PAY_COPY) y se incluyen aquí; abajo van los propios de las catas. */
 
 const es = {
+  ...PAY_COPY.es,
+
   loading: "Cargando tu orden…",
   notFoundTitle: "No encontramos esta orden",
   notFoundText: "Revisa el enlace que recibiste o escríbenos por WhatsApp.",
-  support: "Atención al cliente",
   orderLabel: (code: string) => `Orden ${code}`,
   titleApproved: (n: number): string => (n === 1 ? "Tu entrada" : "Tus entradas"),
   titlePending: "Tu reserva",
@@ -37,67 +39,15 @@ const es = {
   // Pago
   cancelledTitle: "Esta reserva fue anulada",
   cancelledText: (code: string) => `Si crees que es un error, escríbenos a atención al cliente indicando el código ${code}.`,
-  rejectedTitle: "No pudimos verificar tu pago",
-  rejectedReason: "Motivo:",
-  rejectedText: "Revisa los datos y vuelve a reportarlo abajo, o escríbenos a atención al cliente.",
   holdExpired: "El tiempo de apartado de tus cupos terminó. Aún puedes pagar y reportar: confirmaremos según disponibilidad.",
   heldUntil: "Cupos apartados hasta las",
-  step1: "Paso 1 · Elige cómo pagar",
-  step2: "Paso 2 · Reporta tu pago",
   step2Text: "Te enviaremos una entrada con código QR por persona, por correo y WhatsApp, apenas verifiquemos el pago.",
-  methodsLegend: "Método de pago",
-  methods: {
-    pago_movil: { title: "Pago Móvil", hint: "En bolívares, a la tasa del día" },
-    transferencia: { title: "Transferencia bancaria", hint: "En bolívares, a la tasa del día" },
-    binance_usdt: { title: "Binance USDT", hint: "Monto en USDT = total en USD" },
-    zelle: { title: "Zelle", hint: "Monto en USD = total" },
-    efectivo: { title: "Efectivo", hint: "Entrega previa acordada" },
-  } satisfies Record<PaymentMethodId, { title: string; hint: string }>,
-  amountToPay: "Monto a pagar",
-  rateLine: (usd: string, currency: RateCurrency, rate: string) => `${usd} × ${RATE_NAME.es[currency]} ${rate}`,
-  eurNote: "Precio en divisa convertido con la tasa oficial del euro (BCV).",
-  binanceNote: "Precio en divisa convertido con la tasa del dólar paralelo (referencia Binance), que se actualiza cada 10 minutos.",
-  noRate: "En bolívares a la tasa del día.",
-  zelleLine: "Envía exactamente este monto por Zelle a la cuenta indicada abajo.",
-  usdtLine: "Paga exactamente este monto en USDT a la cuenta de Binance indicada abajo.",
-  usdtLineNoDetails: "Paga exactamente este monto en USDT. Pídenos los datos de Binance por WhatsApp antes de pagar.",
-  cashLine: "Coordina con nosotros por WhatsApp el lugar y la hora de entrega.",
-  /** Igual a `DEFAULT_PAYMENT_CONFIG.efectivo.instructions` (settings.ts): permite mostrar su traducción en EN. */
-  cashInstructionsDefault: "Entrega previa acordada por WhatsApp",
-
-  // Formulario de comprobante
-  reference: "Número de referencia *",
-  referencePlaceholder: "Últimos dígitos o completo",
-  binanceReference: "ID de la orden o transacción de Binance *",
-  zelleReference: "Número de confirmación de Zelle *",
-  amountBs: "Monto pagado (Bs) *",
-  amountUsdt: "Monto pagado (USDT) *",
-  amountUsd: "Monto pagado (USD) *",
-  payerBank: "Banco desde el que pagaste *",
-  select: "Selecciona…",
-  payerDocId: "Cédula del titular *",
-  payerPhone: "Teléfono desde el que pagaste",
-  note: "Nota (opcional)",
-  notePlaceholder: "Algo que debamos saber sobre tu pago",
-  proof: "Comprobante *",
-  proofCta: "Toca para subir la captura o PDF",
-  proofHint: "JPG, PNG, WEBP, HEIC o PDF · máximo 8 MB",
-  proofMissing: "Adjunta la captura o PDF del comprobante.",
-  send: "Enviar comprobante",
-  sending: "Enviando…",
-  sendError: "No se pudo enviar el comprobante.",
   noMethods: "Los métodos de pago no están disponibles en este momento. Escríbenos por WhatsApp para completar tu reserva.",
 
   // Efectivo
-  cashTitle: "Pago en efectivo",
-  cashStep1: "1. Escríbenos por WhatsApp para acordar la entrega.",
   cashStep2: "2. Cuando la hayamos coordinado, avísanos aquí. Confirmaremos tu reserva al recibir el pago.",
-  cashWhatsapp: "Coordinar entrega por WhatsApp",
   cashMessage: (code: string, name: string, total: string) =>
     `Hola, soy ${name}. Quiero pagar en efectivo mi reserva ${code} de El Origen (${total}). ¿Cómo coordinamos la entrega?`,
-  cashNote: "Detalles acordados (opcional)",
-  cashNotePlaceholder: "Ej: entrega el jueves en la tarde",
-  cashDone: "Ya coordiné la entrega",
 
   // En revisión
   reviewTitle: "Recibimos tu reporte de pago",
@@ -134,10 +84,11 @@ const es = {
 type OrderCopy = typeof es;
 
 const en: OrderCopy = {
+  ...PAY_COPY.en,
+
   loading: "Loading your order…",
   notFoundTitle: "We couldn't find this order",
   notFoundText: "Check the link you received or message us on WhatsApp.",
-  support: "Customer service",
   orderLabel: (code) => `Order ${code}`,
   titleApproved: (n) => (n === 1 ? "Your ticket" : "Your tickets"),
   titlePending: "Your reservation",
@@ -163,64 +114,14 @@ const en: OrderCopy = {
 
   cancelledTitle: "This reservation was cancelled",
   cancelledText: (code) => `If you think this is a mistake, contact customer service and mention code ${code}.`,
-  rejectedTitle: "We couldn't verify your payment",
-  rejectedReason: "Reason:",
-  rejectedText: "Check the details and report it again below, or contact customer service.",
   holdExpired: "The hold on your spots has expired. You can still pay and report it: we'll confirm subject to availability.",
   heldUntil: "Spots held until",
-  step1: "Step 1 · Choose how to pay",
-  step2: "Step 2 · Report your payment",
   step2Text: "As soon as we verify the payment we'll send one QR ticket per person by email and WhatsApp.",
-  methodsLegend: "Payment method",
-  methods: {
-    pago_movil: { title: "Pago Móvil", hint: "In bolívares, at the rate of the day" },
-    transferencia: { title: "Bank transfer", hint: "In bolívares, at the rate of the day" },
-    binance_usdt: { title: "Binance USDT", hint: "USDT amount = total in USD" },
-    zelle: { title: "Zelle", hint: "USD amount = total" },
-    efectivo: { title: "Cash", hint: "Delivery arranged in advance" },
-  },
-  amountToPay: "Amount to pay",
-  rateLine: (usd, currency, rate) => `${usd} × ${RATE_NAME.en[currency]} ${rate}`,
-  eurNote: "Price converted with the official euro rate (BCV).",
-  binanceNote: "Price converted with the parallel dollar rate (Binance reference), updated every 10 minutes.",
-  noRate: "In bolívares at the rate of the day.",
-  zelleLine: "Send exactly this amount via Zelle to the account shown below.",
-  usdtLine: "Pay exactly this amount in USDT to the Binance account shown below.",
-  usdtLineNoDetails: "Pay exactly this amount in USDT. Ask us for the Binance details on WhatsApp before paying.",
-  cashInstructionsDefault: "Delivery arranged in advance on WhatsApp",
-  cashLine: "Arrange the delivery place and time with us on WhatsApp.",
-
-  reference: "Reference number *",
-  referencePlaceholder: "Last digits or full number",
-  binanceReference: "Binance order or transaction ID *",
-  zelleReference: "Zelle confirmation number *",
-  amountBs: "Amount paid (Bs) *",
-  amountUsdt: "Amount paid (USDT) *",
-  amountUsd: "Amount paid (USD) *",
-  payerBank: "Bank you paid from *",
-  select: "Select…",
-  payerDocId: "Account holder ID *",
-  payerPhone: "Phone you paid from",
-  note: "Note (optional)",
-  notePlaceholder: "Anything we should know about your payment",
-  proof: "Proof of payment *",
-  proofCta: "Tap to upload the screenshot or PDF",
-  proofHint: "JPG, PNG, WEBP, HEIC or PDF · up to 8 MB",
-  proofMissing: "Attach the screenshot or PDF of your payment.",
-  send: "Send proof of payment",
-  sending: "Sending…",
-  sendError: "The proof of payment could not be sent.",
   noMethods: "Payment methods are not available right now. Message us on WhatsApp to complete your reservation.",
 
-  cashTitle: "Cash payment",
-  cashStep1: "1. Message us on WhatsApp to arrange the delivery.",
   cashStep2: "2. Once arranged, let us know here. We'll confirm your reservation when we receive the payment.",
-  cashWhatsapp: "Arrange delivery on WhatsApp",
   cashMessage: (code, name, total) =>
     `Hi, I'm ${name}. I'd like to pay my El Origen reservation ${code} (${total}) in cash. How can we arrange the delivery?`,
-  cashNote: "Agreed details (optional)",
-  cashNotePlaceholder: "E.g. delivery Thursday afternoon",
-  cashDone: "I've arranged the delivery",
 
   reviewTitle: "We received your payment report",
   reviewText: (email) =>
@@ -252,11 +153,3 @@ const en: OrderCopy = {
 };
 
 export const ORDER_COPY: Record<Language, OrderCopy> = { es, en };
-
-/** Bancos venezolanos para "¿desde qué banco pagaste?" (nombres propios: iguales en ambos idiomas, salvo "Otro"). */
-export const VE_BANKS = [
-  "Banco de Venezuela", "Banesco", "Mercantil", "BBVA Provincial", "BNC", "Bancamiga", "Banco del Tesoro",
-  "Bicentenario", "Bancaribe", "Banco Exterior", "Banco Plaza", "Banplus", "BFC Fondo Común", "Banco Activo",
-  "Venezolano de Crédito", "Sofitasa", "100% Banco", "Banco Caroní", "Bancrecer", "Mi Banco", "R4", "Del Sur",
-];
-export const OTHER_BANK: Record<Language, string> = { es: "Otro", en: "Other" };

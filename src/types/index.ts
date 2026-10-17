@@ -195,7 +195,23 @@ export interface Wine {
   specs: WineSpec[];
   /** Catas en las que se degustó. */
   tastingIds: string[];
+  /** Publicado/Borrador: decide si el vino SE VE (no si se vende). */
   status: WineStatus;
+  /** Precio por botella en USD; null = sin precio. */
+  priceUsd: number | null;
+  /** «Activo para la venta»: aparte de `status`. Solo se vende si además está publicado y tiene precio (ver `isWineForSale`). */
+  saleActive: boolean;
+  /** Máximo de botellas por pedido (1..24); null = el tope por defecto del sitio. */
+  maxPerOrder: number | null;
   createdAt: string;
   updatedAt: string;
 }
+
+/**
+ * Datos públicos de un vino para tarjetas y listados (lista de inclusión: nunca se arma con Omit).
+ * Incluye `status` para que `isWineForSale` decida con el mismo dato que en el servidor.
+ */
+export type PublicWine = Pick<
+  Wine,
+  "id" | "slug" | "name" | "winery" | "region" | "type" | "vintage" | "imageUrl" | "status" | "priceUsd" | "saleActive" | "maxPerOrder"
+>;

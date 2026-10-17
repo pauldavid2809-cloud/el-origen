@@ -1,14 +1,17 @@
 import "server-only";
 import crypto from "crypto";
 import { unstable_noStore as noStore } from "next/cache";
-import { WINE_TYPES, type Wine, type WineSpec, type WineStatus, type WineType } from "@/types";
+import { WINE_TYPES, type PublicWine, type Wine, type WineSpec, type WineStatus, type WineType } from "@/types";
 import { getAdminClient } from "./orders";
-import type { PublicWine } from "@/components/WineCard";
+import { isWineForSale, WINE_MAX_PER_ORDER_LIMIT } from "./wineSale";
+import { wineHasOrders } from "./wineOrders";
+import { parseAmount } from "./proofs";
 
 /* ─────────────────────────────────────────────────────────────
    Vinos (tabla public.wines): catálogo de los productos degustados en las catas,
    con foto de la botella y ficha técnica. Se cargan desde el panel (Admin → Vinos)
    y se publican en /vinos. Sin Supabase se guardan en memoria (solo pruebas locales).
+   Cada vino puede además estar «Activo para la venta» (precio + saleActive, aparte de Publicado/Borrador).
    ───────────────────────────────────────────────────────────── */
 
 export type WineInput = Omit<Wine, "id" | "slug" | "createdAt" | "updatedAt">;
@@ -38,6 +41,61 @@ function imageUrl(v: unknown): string {
     /* se reporta abajo */
   }
   throw new WineInputError("La URL de la foto no es válida.");
+}
+
+/**
+ * Precio en USD: número o texto escrito por una persona ("12,5", "12.50", "$1.234,50"); vacío o null = sin precio.
+ * El texto se interpreta con las mismas reglas que los montos de los comprobantes (`parseAmount`).
+ */
+function parsePriceUsd(v: unknown): number | null {
+  if (v === null || v === undefined) return null;
+  let n: number;
+  if (typeof v === "number") n = v;
+  else if (typeof v === "string") {
+    if (!v.trim()) return null;
+    // parseAmount descarta cualquier carácter que no sea dígito, punto o coma ("1e9" sería 19, "-5" sería 5):
+    // solo se admiten números con separadores, con "$" o "USD" opcionales.
+    const clean = v.replace(/usd|\$|\s/gi, "");
+    n = /^[\d.,]+$/.test(clean) ? parseAmount(clean) : NaN;
+  } else n = NaN;
+  if (!Number.isFinite(n) || n < 0 || n > 100_000) throw new WineInputError("El precio no es válido.");
+  return Math.round(n * 100) / 100;
+}
+
+/** Máximo de botellas por pedido: entero de 1 a 24; vacío o null = el tope por defecto del sitio. */
+function parseMaxPerOrder(v: unknown): number | null {
+  if (v === null || v === undefined || (typeof v === "string" && v.trim() === "")) return null;
+  const n = typeof v === "number" ? v : typeof v === "string" ? Number(v.trim()) : NaN;
+  if (!Number.isInteger(n) || n < 1 || n > WINE_MAX_PER_ORDER_LIMIT) {
+    throw new WineInputError(`El máximo por pedido debe ser un número entero de 1 a ${WINE_MAX_PER_ORDER_LIMIT}.`);
+  }
+  return n;
+}
+
+const NEEDS_PRICE_MESSAGE = "Defina el precio para activar la venta.";
+const KEEP_PRICE_MESSAGE = "Este vino está activo para la venta: desactive la venta antes de quitarle el precio.";
+
+/** La venta exige precio mayor que cero (mismo criterio que el check wines_sale_needs_price_chk de la base). */
+function assertSaleHasPrice(sale: { saleActive: boolean; priceUsd: number | null }, message = NEEDS_PRICE_MESSAGE) {
+  if (sale.saleActive && !((sale.priceUsd ?? 0) > 0)) throw new WineInputError(message);
+}
+
+/** El parche trae solo uno de los dos (activar la venta sin precio, o cambiar el precio): hay que mirar lo ya guardado. */
+const partialSalePatch = (patch: Partial<WineInput>) => ("saleActive" in patch) !== ("priceUsd" in patch);
+
+/**
+ * En una actualización parcial, compara lo enviado con lo ya guardado: activar la venta sin enviar precio usa el
+ * precio guardado, y quitar el precio con la venta activa se rechaza. `current` solo hace falta si `partialSalePatch`.
+ */
+function assertSaleConsistent(patch: Partial<WineInput>, current: Pick<Wine, "saleActive" | "priceUsd"> | null) {
+  const saleActive = patch.saleActive ?? current?.saleActive ?? false;
+  const price = "priceUsd" in patch ? patch.priceUsd ?? null : current?.priceUsd ?? null;
+  assertSaleHasPrice({ saleActive, priceUsd: price }, patch.saleActive === true ? NEEDS_PRICE_MESSAGE : KEEP_PRICE_MESSAGE);
+}
+
+/** La base rechazó la combinación venta/precio (check wines_sale_needs_price_chk de v6.sql): se avisa como error de validación. */
+function saleCheckError(error: { code?: string; message: string }): WineInputError | null {
+  return error.code === "23514" && error.message.includes("wines_sale_needs_price_chk") ? new WineInputError(NEEDS_PRICE_MESSAGE) : null;
 }
 
 /** Normaliza los campos presentes en `input`. Con `requireAll` exige los obligatorios (crear). */
@@ -73,6 +131,12 @@ function normalize(input: unknown, requireAll: boolean): Partial<WineInput> {
     if (!WINE_STATUSES.includes(r.status as WineStatus)) throw new WineInputError("Estado inválido.");
     out.status = r.status as WineStatus;
   }
+  if (has("priceUsd")) out.priceUsd = parsePriceUsd(r.priceUsd);
+  if (has("saleActive")) {
+    if (typeof r.saleActive !== "boolean") throw new WineInputError("Estado de venta inválido.");
+    out.saleActive = r.saleActive;
+  }
+  if (has("maxPerOrder")) out.maxPerOrder = parseMaxPerOrder(r.maxPerOrder);
   return out;
 }
 
@@ -87,6 +151,9 @@ const DEFAULTS: Omit<WineInput, "name"> = {
   specs: [],
   tastingIds: [],
   status: "draft",
+  priceUsd: null,
+  saleActive: false,
+  maxPerOrder: null,
 };
 
 /* ─── Filas ─── */
@@ -108,6 +175,9 @@ function fromRow(row: Row): Wine {
     specs: Array.isArray(row.specs) ? (row.specs as WineSpec[]) : [],
     tastingIds: Array.isArray(row.tasting_ids) ? (row.tasting_ids as string[]) : [],
     status: row.status === "published" ? "published" : "draft",
+    priceUsd: row.price_usd === null || row.price_usd === undefined ? null : Number(row.price_usd),
+    saleActive: row.sale_active === true,
+    maxPerOrder: row.max_per_order === null || row.max_per_order === undefined ? null : Number(row.max_per_order),
     createdAt: String(row.created_at ?? ""),
     updatedAt: String(row.updated_at ?? row.created_at ?? ""),
   };
@@ -116,6 +186,7 @@ function fromRow(row: Row): Wine {
 const COLUMNS: Record<keyof WineInput, string> = {
   name: "name", winery: "winery", region: "region", type: "wine_type", grapes: "grapes", vintage: "vintage",
   description: "description", imageUrl: "image_url", specs: "specs", tastingIds: "tasting_ids", status: "status",
+  priceUsd: "price_usd", saleActive: "sale_active", maxPerOrder: "max_per_order",
 };
 
 function toRow(patch: Partial<WineInput>): Row {
@@ -190,6 +261,7 @@ export async function getWine(idOrSlug: string): Promise<Wine | null> {
 /** Lanza `WineInputError` si los datos no son válidos. */
 export async function createWine(input: unknown): Promise<Wine> {
   const clean = { ...DEFAULTS, ...normalize(input, true) } as WineInput;
+  assertSaleHasPrice(clean);
   const now = new Date().toISOString();
   const wine: Wine = { ...clean, id: crypto.randomUUID(), slug: await uniqueSlug(clean.name, clean.vintage), createdAt: now, updatedAt: now };
   const sb = getAdminClient();
@@ -198,7 +270,7 @@ export async function createWine(input: unknown): Promise<Wine> {
     return wine;
   }
   const { data, error } = await sb.from("wines").insert({ ...toRow(clean), id: wine.id, slug: wine.slug }).select().single();
-  if (error) throw new Error(`No se pudo guardar el vino: ${error.message}`);
+  if (error) throw saleCheckError(error) ?? new Error(`No se pudo guardar el vino: ${error.message}`);
   return fromRow(data);
 }
 
@@ -209,6 +281,7 @@ export async function updateWine(id: string, input: unknown): Promise<Wine | nul
   if (!sb) {
     const current = memWines.get(id);
     if (!current) return null;
+    assertSaleConsistent(patch, current);
     const updated: Wine = { ...current, ...patch, updatedAt: new Date().toISOString() };
     memWines.set(id, updated);
     return updated;
@@ -216,23 +289,79 @@ export async function updateWine(id: string, input: unknown): Promise<Wine | nul
   if (!UUID_RE.test(id)) return null;
   const row = toRow(patch);
   if (!Object.keys(row).length) return getWine(id);
+  const current = partialSalePatch(patch) ? await getWine(id) : null;
+  if (partialSalePatch(patch) && !current) return null;
+  assertSaleConsistent(patch, current);
   const { data, error } = await sb.from("wines").update(row).eq("id", id).select().maybeSingle();
-  if (error) throw new Error(`No se pudo actualizar el vino: ${error.message}`);
+  if (error) throw saleCheckError(error) ?? new Error(`No se pudo actualizar el vino: ${error.message}`);
   return data ? fromRow(data) : null;
 }
 
+/** Un vino con pedidos no se borra (los pedidos guardan su copia, pero el historial debe poder consultarse): se desactiva la venta. */
 export async function deleteWine(id: string): Promise<boolean> {
   const sb = getAdminClient();
+  if (sb && !UUID_RE.test(id)) return false;
+  if (await wineHasOrders(id)) throw new WineInputError("Este vino ya tiene pedidos: desactive la venta en lugar de borrarlo.");
   if (!sb) return memWines.delete(id);
-  if (!UUID_RE.test(id)) return false;
   const { data, error } = await sb.from("wines").delete().eq("id", id).select("id");
   if (error) throw new Error(`No se pudo eliminar el vino: ${error.message}`);
   return Boolean(data && data.length);
 }
 
 /** Lo que necesitan las tarjetas públicas (sin catas ni ficha). */
-export function toPublicWine({ id, slug, name, winery, region, type, vintage, imageUrl }: Wine): PublicWine {
-  return { id, slug, name, winery, region, type, vintage, imageUrl };
+export function toPublicWine({ id, slug, name, winery, region, type, vintage, imageUrl, status, priceUsd, saleActive, maxPerOrder }: Wine): PublicWine {
+  return { id, slug, name, winery, region, type, vintage, imageUrl, status, priceUsd, saleActive, maxPerOrder };
+}
+
+/** Un vino tal como lo necesita el carrito (público, sin sesión): precio actual y si se puede comprar ahora. */
+export type SaleWine = {
+  id: string;
+  slug: string;
+  name: string;
+  winery: string;
+  vintage: string;
+  type: WineType;
+  imageUrl: string;
+  priceUsd: number | null;
+  maxPerOrder: number | null;
+  forSale: boolean;
+};
+
+/** Máximo de ids que se consultan de una vez (igual al máximo de líneas de un pedido). */
+const SALE_WINES_MAX_IDS = 20;
+
+/**
+ * Vinos publicados con los ids dados (máx. 20), en el orden pedido, con `forSale` según `isWineForSale`.
+ * Los que no existen o no están publicados no aparecen. Lo usan el carrito y el resumen del pedido.
+ */
+export async function getSaleWinesByIds(ids: string[]): Promise<SaleWine[]> {
+  const wanted = Array.from(new Set(ids.filter((id): id is string => typeof id === "string" && UUID_RE.test(id)))).slice(0, SALE_WINES_MAX_IDS);
+  if (!wanted.length) return [];
+  let found: Wine[];
+  const sb = getAdminClient();
+  if (!sb) {
+    found = wanted.map((id) => memWines.get(id)).filter((w): w is Wine => Boolean(w));
+  } else {
+    const { data, error } = await sb.from("wines").select("*").in("id", wanted).eq("status", "published");
+    if (error) throw new Error(`No se pudieron leer los vinos: ${error.message}`);
+    found = (data ?? []).map(fromRow);
+  }
+  const byId = new Map(found.filter((w) => w.status === "published").map((w) => [w.id, w]));
+  return wanted
+    .map((id) => byId.get(id))
+    .filter((w): w is Wine => Boolean(w))
+    .map((w) => ({
+      id: w.id,
+      slug: w.slug,
+      name: w.name,
+      winery: w.winery,
+      vintage: w.vintage,
+      type: w.type,
+      imageUrl: w.imageUrl,
+      priceUsd: w.priceUsd,
+      maxPerOrder: w.maxPerOrder,
+      forSale: isWineForSale(w),
+    }));
 }
 
 /** Etiqueta de caché de los vinos de la portada: el panel la invalida al guardar (revalidateTag). */

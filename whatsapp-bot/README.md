@@ -1,23 +1,52 @@
 # Bot de WhatsApp · El Origen
 
-Envía por WhatsApp la entrada con código QR cuando se aprueba un pago en el panel
-(**Admin → Reservas & Pagos → Aprobar y enviar QR**). Es el mismo esquema del bot del
-Congreso AMCJ: un WhatsApp normal vinculado como "dispositivo" (librería Baileys) que
-corre en una computadora.
+Envía por WhatsApp lo que se aprueba en el panel:
+
+- la **entrada con código QR** de una reserva de cata
+  (**Admin → Reservas & Pagos → Aprobar y enviar QR**), y
+- la **confirmación de un pedido de vinos**, como mensaje de texto
+  (**Admin → Pedidos de vinos → Aprobar y enviar confirmación**).
+
+Es el mismo esquema del bot del Congreso AMCJ: un WhatsApp normal vinculado como
+"dispositivo" (librería Baileys) que corre en una computadora.
 
 ## Cómo funciona
 
-1. Al aprobar una reserva, el sitio deja el WhatsApp **en cola**.
-2. El bot consulta la cola cada 4 segundos (`/api/whatsapp/queue`) y envía **una imagen con
-   código QR por persona** (una reserva de 3 cupos = 3 imágenes, para que cada invitado tenga la suya):
-   - la primera imagen lleva el mensaje con los datos de la cata, el enlace a las entradas y las
-     políticas de la experiencia (si el texto es muy largo, las políticas salen en un mensaje aparte);
-   - las demás dicen "Entrada 2 de 3 · EO-XXXXX-2" (y el nombre del asistente, si el comprador lo puso).
+1. Al aprobar una reserva o un pedido de vinos, el sitio deja el WhatsApp **en cola**.
+2. El bot consulta la cola cada 4 segundos (`/api/whatsapp/queue`; entradas y pedidos de vinos
+   van en la misma cola, del más antiguo al más reciente). Cada elemento trae un `kind`:
+   - `kind: "tickets"` (reservas de catas): el bot envía **una imagen con código QR por persona**
+     (una reserva de 3 cupos = 3 imágenes, para que cada invitado tenga la suya):
+     - la primera imagen lleva el mensaje con los datos de la cata, el enlace a las entradas y las
+       políticas de la experiencia (si el texto es muy largo, las políticas salen en un mensaje aparte);
+     - las demás dicen "Entrada 2 de 3 · EO-XXXXX-2" (y el nombre del asistente, si el comprador lo puso).
+   - `kind: "text"` (pedidos de vinos, código `EV-XXXXX`): el bot envía **un solo mensaje de texto**
+     con el resumen del pedido y el enlace `/pedido/<token>`. No lleva imagen ni QR.
 3. Avisa al sitio si se envió o falló; el panel muestra el estado de cada orden y si el bot está conectado.
-   Si falla a mitad de una orden, el panel la marca como fallida: "Reenviar QR" vuelve a enviarla completa.
+   Si falla a mitad de una orden, el panel la marca como fallida: "Reenviar QR" (reservas) o
+   "Reenviar confirmación" (pedidos de vinos) vuelve a enviarla completa.
+   Si el mensaje **sí salió** pero el aviso al sitio falla (por ejemplo, sin internet justo en ese momento),
+   el bot **no lo reenvía**: recuerda que ya lo envió y solo reintenta el aviso en cada consulta, para que el
+   cliente no reciba el mismo mensaje varias veces.
 
 No usa túneles ni direcciones públicas: es la computadora la que consulta al sitio, y el
 panel del bot solo se abre desde esa misma computadora.
+
+### Versión del bot y pedidos de vinos
+
+El bot declara lo que sabe hacer con el encabezado `x-bot-caps: text` en cada consulta. **El sitio solo le
+manda pedidos de vinos a un bot que lo declara**; a un bot anterior no se los manda (esos pedidos esperan
+en la cola, con el WhatsApp "en cola del bot", sin afectar las entradas de las catas). Por eso, después de
+actualizar el sitio hay que **actualizar también el bot**:
+
+- Si lo usa en una computadora: genere un paquete nuevo con `npm run empaquetar-bot` (ver abajo), extráigalo
+  y ábralo en lugar del anterior (copie la carpeta `auth_info/` si no quiere vincular de nuevo).
+- Si está en Railway: vuelva a desplegar el servicio.
+
+El panel (Admin → Correo y WhatsApp) avisa cuando el bot conectado es una versión anterior y no envía
+pedidos de vinos.
+
+Las respuestas automáticas a los "gracias" usan un texto neutro (sirve igual para una entrada que para un pedido).
 
 ### Protección contra bloqueos (igual que el congreso)
 
@@ -57,8 +86,8 @@ cliente (`dist/` no se sube a git).
 La sesión queda guardada en `auth_info/`: al reiniciar la computadora no pide el QR otra vez.
 Para cambiar de número use "Desvincular / usar otro número".
 
-**Mientras el bot esté apagado, las entradas aprobadas esperan en la cola** y se envían
-apenas se encienda. El correo con el QR sale igual desde el sitio.
+**Mientras el bot esté apagado, las entradas y los pedidos aprobados esperan en la cola** y se envían
+apenas se encienda. El correo (con el QR en las reservas, con el resumen en los pedidos de vinos) sale igual desde el sitio.
 
 ## En Railway (siempre encendido, sin computadora)
 

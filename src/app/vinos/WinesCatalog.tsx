@@ -5,15 +5,23 @@ import Link from "next/link";
 import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
 import { PageHeader } from "@/components/Brand";
+import { useBcvRates } from "@/components/TastingCard";
 import { WineCard, type PublicWine } from "@/components/WineCard";
 import { useLang } from "@/lib/useLang";
 import { useDocumentTitle } from "@/lib/useDocumentTitle";
+import { useWineCart } from "@/lib/useWineCart";
+import { isWineForSale } from "@/lib/wineSale";
+import { CartLink } from "./CartLink";
 import { WINES_COPY } from "./copy";
 
 export function WinesCatalog({ wines }: { wines: PublicWine[] }) {
   const [lang, setLang] = useLang();
   useDocumentTitle(lang, { es: "Nuestros vinos", en: "Our wines" });
   const t = WINES_COPY[lang];
+  // Tasas del día (una sola consulta para todas las tarjetas) y carrito: solo importan si hay vinos a la venta.
+  const rates = useBcvRates();
+  const cart = useWineCart();
+  const hasSale = wines.some(isWineForSale);
 
   return (
     <div className="bg-background text-on-background min-h-screen flex flex-col">
@@ -31,6 +39,11 @@ export function WinesCatalog({ wines }: { wines: PublicWine[] }) {
         />
 
         <section className="max-w-[1320px] mx-auto px-5 sm:px-8 lg:px-12 pt-8 pb-24">
+          {(hasSale || cart.count > 0) && (
+            <div className="mb-8 flex justify-end">
+              <CartLink lang={lang} count={cart.count} />
+            </div>
+          )}
           {wines.length === 0 ? (
             <div className="max-w-md mx-auto text-center py-16">
               <span className="material-symbols-outlined text-5xl text-primary-container/60" aria-hidden="true">wine_bar</span>
@@ -47,7 +60,7 @@ export function WinesCatalog({ wines }: { wines: PublicWine[] }) {
             <ul className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-x-4 gap-y-10 sm:gap-x-6">
               {wines.map((wine) => (
                 <li key={wine.id}>
-                  <WineCard wine={wine} lang={lang} />
+                  <WineCard wine={wine} lang={lang} rates={rates} />
                 </li>
               ))}
             </ul>

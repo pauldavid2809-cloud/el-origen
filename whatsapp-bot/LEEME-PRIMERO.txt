@@ -4,6 +4,8 @@
 Qué hace: cada vez que en el panel se aprueba un pago (Reservas y pagos →
 "Aprobar y enviar QR" o "Marcar como pagado y enviar QR"), el bot envía por
 WhatsApp al comprador una imagen con el código QR de cada entrada.
+Cuando se aprueba el pago de un pedido de vinos (Pedidos de vinos → "Aprobar
+y enviar confirmación"), envía un mensaje de texto con el resumen del pedido.
 
 
 PASO 1 · REQUISITO (una sola vez)
@@ -32,8 +34,8 @@ Pruebe con "Enviar prueba" a su propio número.
 EL DÍA A DÍA
 ------------
 - Deje la ventana negra abierta mientras quiera que se envíen las entradas.
-- Si la computadora estuvo apagada no se pierde nada: las entradas aprobadas
-  esperan en cola y se envían apenas se abre el bot.
+- Si la computadora estuvo apagada no se pierde nada: las entradas y los
+  pedidos aprobados esperan en cola y se envían apenas se abre el bot.
 - El bot revisa la cola cada 4 segundos y envía con pausas naturales
   ("escribiendo...") para cuidar la línea.
 - Al reiniciar la computadora solo hay que abrir INICIAR-BOT.bat: no vuelve

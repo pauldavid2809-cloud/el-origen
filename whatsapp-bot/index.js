@@ -1,7 +1,8 @@
 /* ─────────────────────────────────────────────────────────────
    Bot de WhatsApp de El Origen
    Conecta un WhatsApp como "dispositivo vinculado" (Baileys) y envía
-   las entradas aprobadas en el panel (una imagen con QR por persona). Funciona en MODO COLA: el bot
+   las entradas aprobadas en el panel (una imagen con QR por persona) y las confirmaciones de los
+   pedidos de vinos (un mensaje de texto). Funciona en MODO COLA: el bot
    consulta al sitio cada pocos segundos, así que no necesita túneles
    ni direcciones públicas. Basado en el bot del Congreso AMCJ.
    ───────────────────────────────────────────────────────────── */
@@ -28,6 +29,7 @@ const QUEUE_SECRET = process.env.WHATSAPP_QUEUE_SECRET || "";
 // Cada 4 s por defecto (como el bot del congreso): la entrada sale casi al instante de aprobarla.
 const POLL_MS = Math.max(3, Number(process.env.POLL_SECONDS || 4)) * 1000;
 const AUTH_DIR = process.env.AUTH_DIR || path.join(__dirname, "auth_info");
+const BOT_CAPS = "text";
 // Vinculación sin pantalla (servidores como Railway, donde nadie ve el panel local): con PAIRING_PHONE
 // (el número de El Origen con código de país, ej. 584141074007) el bot pide un código de 8 caracteres
 // y se escribe en WhatsApp → Dispositivos vinculados → «Vincular con el número de teléfono».
@@ -86,6 +88,9 @@ let connected = false;
 let myPhone = null;
 let draining = false;
 let resetting = false;
+// Órdenes ya enviadas cuyo acuse al sitio todavía no se logró (orderId → { at, warned }). Mientras el acuse falle,
+// el sitio sigue listando la orden en la cola: sin esta memoria el bot la volvería a enviar en cada consulta.
+const unacked = new Map();
 const stats = { sent: 0, failed: 0, pending: 0, lastPoll: null, lastError: null, message: "Iniciando…" };
 const log = [];
 
@@ -139,14 +144,29 @@ function qrImage(data) {
 }
 
 /**
- * Envía las entradas de una orden: una imagen con QR por persona.
- * La primera lleva el mensaje completo y las políticas; las demás, "Entrada 2 de 3 · EO-XXXXX-2".
- * Si el texto no cabe al pie de la imagen, las políticas salen en un mensaje aparte.
+ * Envía un elemento de la cola y devuelve cuántas entradas (imágenes) salieron.
+ *  - kind "text" (pedido de vinos): un solo mensaje de texto, sin imágenes → devuelve 0.
+ *  - kind "tickets" (reserva de catas; también lo que no trae `kind`, de versiones anteriores del sitio):
+ *    una imagen con QR por persona. La primera lleva el mensaje completo y las políticas; las demás,
+ *    "Entrada 2 de 3 · EO-XXXXX-2". Si el texto no cabe al pie de la imagen, las políticas salen en un mensaje aparte.
  */
 async function sendTicket(item) {
   const jid = toJid(item.phone);
   const [exists] = await sock.onWhatsApp(jid);
   if (!exists?.exists) throw new Error(`El número ${item.phone} no tiene WhatsApp`);
+
+  if (item.kind && item.kind !== "text" && item.kind !== "tickets") {
+    throw new Error(`Tipo de mensaje no soportado (${String(item.kind).slice(0, 30)}): actualice el bot`);
+  }
+  if (item.kind === "text") {
+    const body = String(item.message ?? "").trim();
+    if (!body) throw new Error("El mensaje del pedido llegó vacío");
+    const policies = item.policies ? String(item.policies) : "";
+    const text = policies ? `${body}\n\n${policies}` : body;
+    await typeLikeHuman(exists.jid, text.length);
+    await sock.sendMessage(exists.jid, { text });
+    return 0;
+  }
 
   // Compatibilidad con la cola anterior (una sola imagen por orden).
   const tickets = item.tickets?.length ? item.tickets : [{ qrData: item.qrData, code: item.code, number: 1 }];
@@ -183,6 +203,8 @@ async function api(method, body) {
       "x-queue-token": QUEUE_SECRET,
       "x-bot-connected": connected ? "1" : "0",
       "x-bot-phone": myPhone ?? "",
+      // Capacidades de este bot: "text" = sabe enviar pedidos de vinos (mensajes de texto). Sin esto el sitio no se los manda.
+      "x-bot-caps": BOT_CAPS,
     },
     body: body ? JSON.stringify(body) : undefined,
   });
@@ -203,28 +225,55 @@ async function drainQueue() {
     stats.lastError = null;
     const queue = connected ? data.queue ?? [] : [];
     stats.pending = (data.queue ?? []).length;
+    // Lo que el sitio ya no lista (su acuse llegó por otra vía o se re-encoló desde el panel) deja de recordarse:
+    // así un reenvío pedido a propósito desde el panel sí vuelve a salir.
+    const listed = new Set((data.queue ?? []).map((it) => it.orderId));
+    for (const id of unacked.keys()) if (!listed.has(id)) unacked.delete(id);
     stats.message = !connected
       ? "Esperando vinculación de WhatsApp…"
       : queue.length
-        ? `Enviando ${queue.length} orden(es)…`
+        ? `Enviando ${queue.length} mensaje(s)…`
         : "Cola al día";
 
     for (let i = 0; i < queue.length; i++) {
       if (!connected) break;
       const item = queue[i];
-      try {
-        const count = await sendTicket(item);
-        await api("POST", { orderId: item.orderId, status: "sent" });
-        stats.sent++;
-        remember(`✅ ${item.code}: ${count} entrada${count === 1 ? "" : "s"} enviada${count === 1 ? "" : "s"} a ${item.name} (+${item.phone})`);
-      } catch (err) {
-        stats.failed++;
-        remember(`❌ ${item.code} (${item.name}): ${err.message}`);
-        await api("POST", { orderId: item.orderId, status: "failed", error: err.message }).catch(() => {});
+      // Ya salió en una consulta anterior y solo falta confirmarlo: se reintenta el acuse, no el envío.
+      const alreadySent = unacked.has(item.orderId);
+      if (!alreadySent) {
+        try {
+          const count = await sendTicket(item);
+          unacked.set(item.orderId, { at: Date.now(), warned: false });
+          stats.sent++;
+          remember(
+            count === 0
+              ? `✅ ${item.code}: pedido enviado a ${item.name} (+${item.phone})`
+              : `✅ ${item.code}: ${count} entrada${count === 1 ? "" : "s"} enviada${count === 1 ? "" : "s"} a ${item.name} (+${item.phone})`
+          );
+        } catch (err) {
+          stats.failed++;
+          remember(`❌ ${item.code} (${item.name}): ${err.message}`);
+          await api("POST", { orderId: item.orderId, status: "failed", error: err.message }).catch(() => {});
+        }
+      }
+      const pendingAck = unacked.get(item.orderId);
+      if (pendingAck) {
+        try {
+          await api("POST", { orderId: item.orderId, status: "sent" });
+          unacked.delete(item.orderId);
+        } catch (err) {
+          // El mensaje YA salió: no se marca como fallido ni se reenvía; el acuse se reintenta en la próxima consulta
+          // (el aviso se registra una sola vez por orden para no llenar la actividad cada pocos segundos).
+          if (!pendingAck.warned) {
+            pendingAck.warned = true;
+            remember(`⚠️ ${item.code}: enviado, pero no se pudo confirmar al sitio (${err.message}). Se reintentará sin reenviar.`);
+          }
+        }
       }
       stats.pending = Math.max(0, queue.length - i - 1);
 
-      if (i < queue.length - 1) {
+      // Solo se espera tras un envío real (reintentar un acuse no manda nada a WhatsApp).
+      if (i < queue.length - 1 && !alreadySent) {
         // Pausa aleatoria entre mensajes y descanso largo cada 4 envíos
         await sleep(jitter(5000, 9000));
         if ((i + 1) % 4 === 0) {
@@ -249,10 +298,11 @@ async function drainQueue() {
 
 const repliedAt = new Map();
 const THANKS = /gracias|recibid|listo|perfecto|excelente|genial|ok\b|👍|🙏/i;
+// Texto neutro: el mismo mensaje puede responder a una entrada de cata o a un pedido de vinos.
 const REPLIES = [
-  "¡Con gusto! Nos vemos en la cata. 🍷",
-  "¡Gracias a ti! Te esperamos. 🥂",
-  "¡Un placer! Cualquier duda, aquí estamos. ✨",
+  "¡Con gusto! Cualquier duda, aquí estamos. 🍷",
+  "¡Gracias a ti! Que lo disfrutes. 🥂",
+  "¡Un placer! Estamos para ayudarte. ✨",
 ];
 
 async function onIncoming({ messages }) {

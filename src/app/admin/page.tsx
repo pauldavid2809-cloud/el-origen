@@ -7,6 +7,8 @@ interface Stats {
   persistent: boolean;
   orders: { inReview: number; pendingPayment: number };
   sales: { approvedOrders: number; approvedSpots: number; approvedUsd: number; last30DaysUsd: number; last30DaysSpots: number };
+  /** Pedidos de vinos (aparte de las reservas de catas). */
+  wineOrders: { inReview: number; toDeliver: number; approvedUsd: number; approvedOrders: number };
   tickets: { issued: number; checkedIn: number };
   upcoming: {
     id: string;
@@ -124,7 +126,7 @@ export default function AdminDashboardPage() {
           )}
 
           {/* Pendientes de acción */}
-          {(stats.orders.inReview > 0 || newLeads > 0) && (
+          {(stats.orders.inReview > 0 || stats.wineOrders.inReview > 0 || newLeads > 0) && (
             <div className="flex flex-col sm:flex-row gap-3">
               {stats.orders.inReview > 0 && (
                 <Link
@@ -134,6 +136,19 @@ export default function AdminDashboardPage() {
                   <span className="material-symbols-outlined" aria-hidden="true">pending_actions</span>
                   <span>
                     <strong>{stats.orders.inReview}</strong> {stats.orders.inReview === 1 ? "pago por revisar" : "pagos por revisar"}
+                  </span>
+                  <span className="material-symbols-outlined ml-auto" aria-hidden="true">chevron_right</span>
+                </Link>
+              )}
+              {stats.wineOrders.inReview > 0 && (
+                <Link
+                  href="/admin/pedidos-vinos"
+                  className="flex-1 flex items-center gap-3 rounded-xl border border-tertiary/40 bg-tertiary-fixed/60 px-4 min-h-[56px] text-[14px] text-on-tertiary-fixed-variant hover:border-tertiary"
+                >
+                  <span className="material-symbols-outlined" aria-hidden="true">shopping_bag</span>
+                  <span>
+                    <strong>{stats.wineOrders.inReview}</strong>{" "}
+                    {stats.wineOrders.inReview === 1 ? "pago de vinos por revisar" : "pagos de vinos por revisar"}
                   </span>
                   <span className="material-symbols-outlined ml-auto" aria-hidden="true">chevron_right</span>
                 </Link>
@@ -207,6 +222,37 @@ export default function AdminDashboardPage() {
               href="/admin/catas"
             />
           </div>
+
+          {/* Pedidos de vinos */}
+          <section aria-label="Pedidos de vinos" className="space-y-3">
+            <div className="flex items-center justify-between gap-3">
+              <h2 className="font-serif text-xl">Vinos</h2>
+              <Link href="/admin/pedidos-vinos" className="text-[13px] font-semibold text-primary-container hover:underline">
+                Pedidos de vinos
+              </Link>
+            </div>
+            <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
+              <Metric
+                icon="pending_actions"
+                label="Vinos: pagos por revisar"
+                value={String(stats.wineOrders.inReview)}
+                href="/admin/pedidos-vinos"
+              />
+              <Metric
+                icon="local_shipping"
+                label="Vinos: por entregar"
+                value={String(stats.wineOrders.toDeliver)}
+                hint="pagados y sin entregar"
+                href="/admin/pedidos-vinos"
+              />
+              <Metric
+                icon="shopping_bag"
+                label="Ventas de vinos"
+                value={usd(stats.wineOrders.approvedUsd)}
+                hint={`${stats.wineOrders.approvedOrders} ${stats.wineOrders.approvedOrders === 1 ? "pedido aprobado" : "pedidos aprobados"}`}
+              />
+            </div>
+          </section>
 
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
             {/* Próximas catas */}

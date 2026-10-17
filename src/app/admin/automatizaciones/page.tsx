@@ -3,12 +3,16 @@
 import React, { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 
-/* Estado de los envíos automáticos: correo (Gmail/Resend) y WhatsApp (bot o API de Meta). Datos de /api/admin/whatsapp. */
+/* Estado de los envíos automáticos: correo (Gmail/Resend) y WhatsApp (bot o API de Meta). Datos de /api/admin/whatsapp.
+   Sirven a las dos ventas: las entradas con QR de las catas y la confirmación de los pedidos de vinos. */
 
 interface DeliveryInfo {
   provider: "meta" | "bot" | "none";
-  bot: { phone: string | null; connected: boolean; running: boolean; online: boolean; lastSeen: string } | null;
+  /** `text`: el bot sabe enviar pedidos de vinos (los bots anteriores no). */
+  bot: { phone: string | null; connected: boolean; running: boolean; online: boolean; lastSeen: string; text?: boolean } | null;
   queued: number;
+  /** De `queued`, los que son pedidos de vinos. */
+  wineQueued?: number;
   mail: "gmail" | "resend" | "none";
 }
 
@@ -59,7 +63,8 @@ export default function AdminDeliveryStatusPage() {
           <p className="eyebrow mb-2">Panel</p>
           <h1 className="font-serif text-3xl sm:text-4xl">Correo y WhatsApp</h1>
           <p className="text-[14px] text-on-surface-variant mt-1">
-            Al aprobar un pago, cada persona recibe su entrada con QR por correo y por WhatsApp.
+            Al aprobar un pago, el cliente recibe su confirmación por correo y por WhatsApp: las entradas con QR en las
+            reservas de catas y el resumen del pedido en las compras de vinos.
           </p>
         </div>
         <button
@@ -98,6 +103,10 @@ export default function AdminDeliveryStatusPage() {
         <Link href="/admin/reservas" className="font-semibold text-primary-container hover:underline">
           Reservas y pagos
         </Link>
+        ; el de cada confirmación de pedido y «Reenviar confirmación», en{" "}
+        <Link href="/admin/pedidos-vinos" className="font-semibold text-primary-container hover:underline">
+          Pedidos de vinos
+        </Link>
         .
       </p>
     </div>
@@ -119,11 +128,13 @@ function StatusCard({ tone, icon, title, children }: { tone: Tone; icon: string;
 
 function WhatsAppCard({ info }: { info: DeliveryInfo }) {
   const queued = `${info.queued} ${info.queued === 1 ? "mensaje" : "mensajes"} en cola`;
+  const wineQueued = info.wineQueued ?? 0;
+  const wineQueuedNote = wineQueued > 0 ? ` (${wineQueued} ${wineQueued === 1 ? "pedido de vinos" : "pedidos de vinos"})` : "";
 
   if (info.provider === "meta") {
     return (
       <StatusCard tone="ok" icon="forum" title="WhatsApp: API oficial de Meta">
-        <p>Las entradas se envían directamente desde la API de WhatsApp Business.</p>
+        <p>Las entradas y las confirmaciones de pedidos se envían directamente desde la API de WhatsApp Business.</p>
       </StatusCard>
     );
   }
@@ -132,7 +143,7 @@ function WhatsAppCard({ info }: { info: DeliveryInfo }) {
       <StatusCard tone="off" icon="forum" title="WhatsApp sin configurar">
         <p>
           Defina <code>WHATSAPP_QUEUE_SECRET</code> en el servidor y encienda el bot (carpeta <code>whatsapp-bot/</code>) en la computadora con el
-          WhatsApp Business de El Origen. Mientras tanto, las entradas solo salen por correo.
+          WhatsApp Business de El Origen. Mientras tanto, las entradas y las confirmaciones de pedidos solo salen por correo.
         </p>
       </StatusCard>
     );
@@ -141,15 +152,26 @@ function WhatsAppCard({ info }: { info: DeliveryInfo }) {
   const bot = info.bot;
   if (bot?.online) {
     return (
-      <StatusCard tone="ok" icon="forum" title={`Bot de WhatsApp conectado${bot.phone ? ` (+${bot.phone})` : ""}`}>
-        <p>{queued}. Último contacto: {when(bot.lastSeen)}.</p>
+      <StatusCard
+        tone={bot.text === false ? "warn" : "ok"}
+        icon="forum"
+        title={`Bot de WhatsApp conectado${bot.phone ? ` (+${bot.phone})` : ""}`}
+      >
+        <p>{queued}{wineQueuedNote}. Último contacto: {when(bot.lastSeen)}.</p>
+        {bot.text === false && (
+          <p>
+            <strong>Este bot es una versión anterior y no envía los pedidos de vinos</strong> (esos mensajes esperan en la cola; las
+            entradas de las catas siguen saliendo). Actualice el bot con la carpeta <code>whatsapp-bot/</code> más reciente
+            (<code>npm run empaquetar-bot</code> o, en Railway, un nuevo despliegue).
+          </p>
+        )}
       </StatusCard>
     );
   }
   if (bot?.running) {
     return (
       <StatusCard tone="warn" icon="forum" title="Bot encendido, sin WhatsApp vinculado">
-        <p>{queued}.</p>
+        <p>{queued}{wineQueuedNote}.</p>
         <p>
           Abra el panel del bot en esa computadora (<code>http://localhost:3001</code>) y escanee el QR con el teléfono de El Origen: WhatsApp →
           Dispositivos vinculados → Vincular un dispositivo.
@@ -159,7 +181,7 @@ function WhatsAppCard({ info }: { info: DeliveryInfo }) {
   }
   return (
     <StatusCard tone="off" icon="forum" title="Bot de WhatsApp apagado">
-      <p>{queued}{bot ? ` · última conexión: ${when(bot.lastSeen)}` : " · nunca se ha conectado"}.</p>
+      <p>{queued}{wineQueuedNote}{bot ? ` · última conexión: ${when(bot.lastSeen)}` : " · nunca se ha conectado"}.</p>
       <p>Encienda el bot en la computadora para que envíe los mensajes pendientes; la cola se conserva mientras tanto.</p>
     </StatusCard>
   );
@@ -171,14 +193,17 @@ function MailCard({ mail }: { mail: DeliveryInfo["mail"] }) {
       <StatusCard tone="off" icon="mail" title="Correo sin configurar">
         <p>
           Defina <code>GMAIL_USER</code> y <code>GMAIL_APP_PASSWORD</code> (contraseña de aplicación de Google, con la verificación en dos pasos
-          activa) para enviar las entradas, los avisos de rechazo y las alertas de comprobantes.
+          activa) para enviar las entradas, las confirmaciones de pedidos, los avisos de rechazo y las alertas de comprobantes.
         </p>
       </StatusCard>
     );
   }
   return (
     <StatusCard tone="ok" icon="mail" title={`Correo activo: ${MAIL_LABEL[mail]}`}>
-      <p>Las entradas con QR, los rechazos y las alertas de comprobantes se envían por {MAIL_LABEL[mail]}.</p>
+      <p>
+        Las entradas con QR, las confirmaciones de pedidos de vinos, los rechazos y las alertas de comprobantes se envían por{" "}
+        {MAIL_LABEL[mail]}.
+      </p>
     </StatusCard>
   );
 }
