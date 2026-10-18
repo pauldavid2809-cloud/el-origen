@@ -32,6 +32,28 @@ const es = {
   ask: "Pregúntanos por este vino",
   askMessage: (name: string) => `Hola El Origen, quisiera saber más sobre el vino ${name}.`,
   imageAlt: (name: string) => `Botella de ${name}`,
+
+  // Venta (solo los vinos activos para la venta muestran precio y botones)
+  buy: "Comprar",
+  openForSale: (name: string, price: string) => `Ver la ficha de ${name} y comprar, ${price}`,
+  bsApprox: (bs: string) => `≈ Bs ${bs}`,
+  bsTitle: "Calculado con la tasa BCV del día",
+  buyEyebrow: "Comprar este vino",
+  perBottle: "por botella",
+  quantity: "Cantidad",
+  fewer: "Una botella menos",
+  more: "Una botella más",
+  maxPerOrder: (n: number) => `Máximo ${n} por pedido.`,
+  inCart: (n: number) => `Ya tienes ${n} ${n === 1 ? "botella" : "botellas"} en tu carrito.`,
+  addToCart: "Agregar al carrito",
+  buyNow: "Comprar ahora",
+  added: "Agregado a tu carrito.",
+  viewCart: "Ver carrito",
+  limitMax: (n: number) => `Llegaste al máximo de ${n} por pedido para este vino.`,
+  limitBottles: (n: number) => `Un pedido admite hasta ${n} botellas en total.`,
+  limitLines: (n: number) => `Un pedido admite hasta ${n} vinos distintos.`,
+  cartLabel: "Carrito",
+  cartAria: (n: number) => (n > 0 ? `Ver el carrito: ${n} ${n === 1 ? "botella" : "botellas"}` : "Ver el carrito"),
 };
 
 type WinesCopy = typeof es;
@@ -60,6 +82,27 @@ const en: WinesCopy = {
   ask: "Ask us about this wine",
   askMessage: (name) => `Hi El Origen, I'd like to know more about the wine ${name}.`,
   imageAlt: (name) => `Bottle of ${name}`,
+
+  buy: "Buy",
+  openForSale: (name, price) => `View the sheet of ${name} and buy, ${price}`,
+  bsApprox: (bs) => `≈ Bs ${bs}`,
+  bsTitle: "Calculated with the BCV rate of the day",
+  buyEyebrow: "Buy this wine",
+  perBottle: "per bottle",
+  quantity: "Quantity",
+  fewer: "One bottle less",
+  more: "One bottle more",
+  maxPerOrder: (n) => `Maximum ${n} per order.`,
+  inCart: (n) => `You already have ${n} ${n === 1 ? "bottle" : "bottles"} in your cart.`,
+  addToCart: "Add to cart",
+  buyNow: "Buy now",
+  added: "Added to your cart.",
+  viewCart: "View cart",
+  limitMax: (n) => `You reached the maximum of ${n} per order for this wine.`,
+  limitBottles: (n) => `An order allows up to ${n} bottles in total.`,
+  limitLines: (n) => `An order allows up to ${n} different wines.`,
+  cartLabel: "Cart",
+  cartAria: (n) => (n > 0 ? `View cart: ${n} ${n === 1 ? "bottle" : "bottles"}` : "View cart"),
 };
 
 export const WINES_COPY: Record<Language, WinesCopy> = { es, en };

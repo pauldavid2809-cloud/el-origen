@@ -18,7 +18,10 @@ export async function GET() {
   }
 }
 
-/** Body: { name, winery?, region?, type?, grapes?, vintage?, description?, imageUrl?, specs?, tastingIds?, status? } */
+/**
+ * Body: { name, winery?, region?, type?, grapes?, vintage?, description?, imageUrl?, specs?, tastingIds?, status?,
+ *         priceUsd?, saleActive?, maxPerOrder? }  (priceUsd acepta "12,5"; saleActive exige precio mayor que cero)
+ */
 export async function POST(request: Request) {
   const denied = requireAdmin();
   if (denied) return denied;

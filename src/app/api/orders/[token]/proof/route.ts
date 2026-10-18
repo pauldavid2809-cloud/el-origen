@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { clientIp, hit, isLimited, tooManyAttempts, type RateLimit } from "@/lib/rateLimit";
+import { clientIp, hit, isLimited, tooManyAttempts } from "@/lib/rateLimit";
 import { tastingWithAvailability } from "@/lib/availability";
 import { getCata } from "@/lib/catas";
 import { isBsMethod, methodsForTasting, zelleForTasting } from "@/lib/paymentMethods";
@@ -8,70 +8,32 @@ import {
   getOrderByToken,
   holdExpired,
   PAYMENT_METHODS,
-  referenceInUse,
   toPublicOrder,
   transitionOrder,
   uploadProof,
   type Order,
   type PaymentMethod,
 } from "@/lib/orders";
+import {
+  parseAmount,
+  PROOF_MAX_BODY_BYTES as MAX_BODY_BYTES,
+  PROOF_MAX_BYTES as MAX_BYTES,
+  PROOF_NOTE_MAX as NOTE_MAX,
+  PROOF_REPORTS_PER_IP as REPORTS_PER_IP,
+  PROOF_TYPES as TYPES,
+  proofTypeFamily as family,
+  referenceInUseAnywhere,
+  sniffProofType,
+} from "@/lib/proofs";
 import { getBcvRate } from "@/lib/rates";
 import { findPaymentAccount, getPaymentConfig } from "@/lib/settings";
 
 export const dynamic = "force-dynamic";
 
-const TYPES: Record<string, string> = {
-  "image/jpeg": "jpg",
-  "image/png": "png",
-  "image/webp": "webp",
-  "image/heic": "heic",
-  "image/heif": "heif",
-  "application/pdf": "pdf",
-};
-const MAX_BYTES = 8 * 1024 * 1024;
-/** Margen para los demás campos y los separadores del multipart. */
-const MAX_BODY_BYTES = MAX_BYTES + 256 * 1024;
-const NOTE_MAX = 500;
-/** Reportes de pago por IP (cada uno avisa al admin por correo). */
-const REPORTS_PER_IP: RateLimit = { max: 10, windowMs: 15 * 60_000 };
 const DUPLICATE_REFERENCE = "Esa referencia ya fue reportada en otra reserva. Si es un error, escríbanos por WhatsApp.";
 
 const bad = (message: string, status = 400) => NextResponse.json({ success: false, message }, { status });
 const field = (form: FormData, key: string, max = 80) => String(form.get(key) ?? "").replace(/\s+/g, " ").trim().slice(0, max);
-
-/** HEIC y HEIF comparten contenedor (y marcas como "mif1"): se tratan como un mismo formato. */
-const family = (type: string) => (type === "image/heif" ? "image/heic" : type);
-
-/** Tipo real del comprobante según sus primeros bytes (no se confía en el tipo que declara el navegador). */
-function sniffProofType(data: Buffer): string | null {
-  if (data.length >= 3 && data[0] === 0xff && data[1] === 0xd8 && data[2] === 0xff) return "image/jpeg";
-  if (data.length >= 8 && data.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]))) return "image/png";
-  if (data.length >= 12 && data.toString("ascii", 0, 4) === "RIFF" && data.toString("ascii", 8, 12) === "WEBP") return "image/webp";
-  if (data.length >= 5 && data.toString("ascii", 0, 5) === "%PDF-") return "application/pdf";
-  if (data.length >= 12 && data.toString("ascii", 4, 8) === "ftyp") {
-    const brand = data.toString("ascii", 8, 12);
-    if (["heic", "heix", "heim", "heis", "hevc", "hevx", "hevm", "hevs"].includes(brand)) return "image/heic";
-    if (brand === "mif1" || brand === "msf1") return "image/heif";
-  }
-  return null;
-}
-
-/**
- * Monto escrito por el cliente: acepta "1.234,56", "1234,56", "1,234.56" o "25.5".
- * Con un solo punto seguido de exactamente 3 dígitos ("1.234") se interpreta como separador de miles (uso local).
- */
-function parseAmount(raw: string): number {
-  const s = raw.replace(/[^\d.,]/g, "");
-  if (!s) return NaN;
-  const lastComma = s.lastIndexOf(",");
-  const lastDot = s.lastIndexOf(".");
-  let decimal = -1;
-  if (lastComma >= 0 && lastDot >= 0) decimal = Math.max(lastComma, lastDot);
-  else if (lastComma >= 0) decimal = lastComma;
-  else if (lastDot >= 0 && s.indexOf(".") === lastDot && s.length - lastDot - 1 !== 3) decimal = lastDot;
-  if (decimal < 0) return Number(s.replace(/[.,]/g, ""));
-  return Number(`${s.slice(0, decimal).replace(/[.,]/g, "") || "0"}.${s.slice(decimal + 1).replace(/[.,]/g, "")}`);
-}
 
 /**
  * El cliente reporta su pago.
@@ -169,7 +131,7 @@ export async function POST(request: Request, { params }: { params: { token: stri
       if (!actual || (declared && declared !== "application/octet-stream" && family(declared) !== family(actual))) {
         return bad("Formato no permitido: use JPG, PNG, WEBP, HEIC o PDF.");
       }
-      if (await referenceInUse(reference, order.id)) return bad(DUPLICATE_REFERENCE, 409);
+      if (await referenceInUseAnywhere(reference, order.id)) return bad(DUPLICATE_REFERENCE, 409);
 
       const isBs = isBsMethod(method);
       const [proofPath, rate] = await Promise.all([
@@ -201,7 +163,7 @@ export async function POST(request: Request, { params }: { params: { token: stri
       });
     } catch (error) {
       // El índice único de referencias puede saltar si otra orden reportó la misma referencia a la vez.
-      if (reference && (await referenceInUse(reference, order.id))) return bad(DUPLICATE_REFERENCE, 409);
+      if (reference && (await referenceInUseAnywhere(reference, order.id))) return bad(DUPLICATE_REFERENCE, 409);
       throw error;
     }
     if (!updated) return bad("Esta orden ya tiene un pago reportado.", 409);

@@ -1,15 +1,22 @@
 "use client";
 
-import React from "react";
+import React, { useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
+import { formatBs, formatUsd } from "@/components/PaymentDetails";
+import { useBcvRates } from "@/components/TastingCard";
 import { WineCard, type PublicWine } from "@/components/WineCard";
 import { whatsappLink } from "@/lib/contact";
 import { formatTastingDate } from "@/lib/dates";
 import { useLang } from "@/lib/useLang";
 import { useDocumentTitle } from "@/lib/useDocumentTitle";
+import { useWineCart, type WineCartLimit } from "@/lib/useWineCart";
+import { WINE_ORDER_MAX_BOTTLES, WINE_ORDER_MAX_LINES, isWineForSale, round2, wineMaxQty } from "@/lib/wineSale";
 import type { Wine } from "@/types";
+import { CartLink } from "../CartLink";
+import { QtyStepper } from "../QtyStepper";
 import { WINE_TYPE_LABEL, WINES_COPY } from "../copy";
 
 export interface WineTasting {
@@ -28,6 +35,31 @@ export function WineDetail({ wine, tastings, related }: { wine: Wine; tastings: 
   const [lang, setLang] = useLang();
   useDocumentTitle(lang, { es: wine.name, en: wine.name });
   const t = WINES_COPY[lang];
+  const router = useRouter();
+
+  // Compra: solo si el vino está a la venta (publicado + activo + precio). El servidor vuelve a comprobarlo al pedir.
+  const rates = useBcvRates();
+  const cart = useWineCart();
+  const forSale = isWineForSale(wine);
+  const priceUsd = forSale ? wine.priceUsd : null;
+  const maxQty = wineMaxQty(wine);
+  const rate = rates?.USD ?? null;
+  const priceBs = priceUsd !== null && rate ? round2(priceUsd * rate) : null;
+  const inCart = cart.items.find((i) => i.wineId === wine.id)?.quantity ?? 0;
+  const [qty, setQty] = useState(1);
+  const [note, setNote] = useState<{ text: string; warn: boolean } | null>(null);
+
+  const limitText = (limit: WineCartLimit) =>
+    limit === "max" ? t.limitMax(maxQty) : limit === "bottles" ? t.limitBottles(WINE_ORDER_MAX_BOTTLES) : t.limitLines(WINE_ORDER_MAX_LINES);
+  const addToCart = () => {
+    const result = cart.add(wine.id, qty, maxQty);
+    setNote(result.limit ? { text: limitText(result.limit), warn: true } : { text: t.added, warn: false });
+    return result;
+  };
+  const buyNow = () => {
+    // Agrega y pasa al carrito; si no cupo ni una botella (tope de vinos distintos), avisa y se queda aquí.
+    if (addToCart().quantity > 0) router.push("/vinos/carrito");
+  };
 
   const basics = (
     [
@@ -63,10 +95,13 @@ export function WineDetail({ wine, tastings, related }: { wine: Wine; tastings: 
             </div>
 
             <div className="lg:col-span-7">
-              <Link href="/vinos" className="inline-flex items-center gap-1.5 min-h-[44px] text-[13px] font-semibold text-paper/70 hover:text-sun">
-                <span className="material-symbols-outlined text-[18px]" aria-hidden="true">arrow_back</span>
-                {t.back}
-              </Link>
+              <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1">
+                <Link href="/vinos" className="inline-flex items-center gap-1.5 min-h-[44px] text-[13px] font-semibold text-paper/70 hover:text-sun">
+                  <span className="material-symbols-outlined text-[18px]" aria-hidden="true">arrow_back</span>
+                  {t.back}
+                </Link>
+                {(forSale || cart.count > 0) && <CartLink lang={lang} count={cart.count} tone="dark" />}
+              </div>
               <p className="mt-4 text-[12px] font-semibold uppercase tracking-[0.2em] text-sun">
                 {[WINE_TYPE_LABEL[lang][wine.type], wine.vintage].filter(Boolean).join(" · ")}
               </p>
@@ -77,11 +112,73 @@ export function WineDetail({ wine, tastings, related }: { wine: Wine; tastings: 
               {wine.description && (
                 <p className="mt-6 text-[16px] leading-relaxed text-paper/85 max-w-2xl whitespace-pre-line text-pretty">{wine.description}</p>
               )}
+              {priceUsd !== null && (
+                <div className="mt-8 max-w-md rounded-xl border border-paper/20 bg-paper/5 p-5 sm:p-6">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-sun">{t.buyEyebrow}</p>
+                  <p className="mt-3 font-serif text-4xl leading-none text-paper">
+                    {formatUsd(priceUsd)}
+                    <span className="ml-2 text-[13px] font-sans text-paper/70">{t.perBottle}</span>
+                  </p>
+                  {priceBs !== null && (
+                    <p className="mt-2 text-[13px] text-paper/75 tabular-nums" title={t.bsTitle}>
+                      {t.bsApprox(formatBs(priceBs, lang))}
+                    </p>
+                  )}
+
+                  <div className="mt-5 flex items-center justify-between gap-3">
+                    <span id="wine-qty-label" className="text-[12px] font-semibold uppercase tracking-[0.14em] text-paper/75">
+                      {t.quantity}
+                    </span>
+                    <QtyStepper
+                      value={qty}
+                      max={maxQty}
+                      onChange={(v) => setQty(Math.max(1, Math.min(maxQty, v)))}
+                      lessLabel={t.fewer}
+                      moreLabel={t.more}
+                      labelledBy="wine-qty-label"
+                      tone="dark"
+                    />
+                  </div>
+                  <p className="mt-2 text-[12px] text-paper/65">
+                    {t.maxPerOrder(maxQty)}
+                    {inCart > 0 && <> {t.inCart(inCart)}</>}
+                  </p>
+
+                  <div className="mt-5 flex flex-col sm:flex-row gap-3">
+                    <button
+                      type="button"
+                      onClick={buyNow}
+                      className="flex-1 inline-flex items-center justify-center gap-2 h-[52px] px-6 bg-sun hover:bg-tertiary-fixed-dim text-ink text-[14px] font-semibold rounded transition-colors"
+                    >
+                      <span className="material-symbols-outlined text-[18px]" aria-hidden="true">shopping_bag</span>
+                      {t.buyNow}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={addToCart}
+                      className="flex-1 inline-flex items-center justify-center gap-2 h-[52px] px-6 border border-paper/40 hover:border-sun hover:text-sun text-paper text-[14px] font-semibold rounded transition-colors"
+                    >
+                      <span className="material-symbols-outlined text-[18px]" aria-hidden="true">add_shopping_cart</span>
+                      {t.addToCart}
+                    </button>
+                  </div>
+                  <div role="status" aria-live="polite" className="mt-3 min-h-[20px] text-[13px]">
+                    {note && (
+                      <>
+                        <span className={note.warn ? "text-tertiary-fixed" : "text-paper/85"}>{note.text}</span>{" "}
+                        <Link href="/vinos/carrito" className="font-semibold text-sun underline underline-offset-4">
+                          {t.viewCart}
+                        </Link>
+                      </>
+                    )}
+                  </div>
+                </div>
+              )}
               <a
                 href={whatsappLink(t.askMessage(wine.name))}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="mt-8 inline-flex items-center gap-2 h-[52px] px-7 bg-sun hover:bg-tertiary-fixed-dim text-ink text-[14px] font-semibold rounded transition-colors"
+                className={`${priceUsd !== null ? "mt-4 border border-paper/40 hover:border-sun hover:text-sun text-paper" : "mt-8 bg-sun hover:bg-tertiary-fixed-dim text-ink"} inline-flex items-center gap-2 h-[52px] px-7 text-[14px] font-semibold rounded transition-colors`}
               >
                 <span className="material-symbols-outlined text-[18px]" aria-hidden="true">chat</span>
                 {t.ask}
@@ -144,7 +241,7 @@ export function WineDetail({ wine, tastings, related }: { wine: Wine; tastings: 
             <ul className="grid grid-cols-2 lg:grid-cols-4 gap-x-4 gap-y-10 sm:gap-x-6">
               {related.map((w) => (
                 <li key={w.id}>
-                  <WineCard wine={w} lang={lang} />
+                  <WineCard wine={w} lang={lang} rates={rates} />
                 </li>
               ))}
             </ul>

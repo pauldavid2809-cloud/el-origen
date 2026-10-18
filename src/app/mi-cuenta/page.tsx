@@ -8,6 +8,7 @@ import { useLang } from "@/lib/useLang";
 import { useDocumentTitle } from "@/lib/useDocumentTitle";
 import type { Language } from "@/lib/i18n";
 import type { OrderStatus } from "@/lib/orders";
+import { WINE_PENDING_TTL_HOURS } from "@/lib/wineSale";
 import { whatsappLink } from "@/lib/contact";
 import { AuthShell, Panel, Spinner, notifyMemberChange, secondaryButtonClass } from "../ingresar/_components/AuthUI";
 import { ACCOUNT_COPY } from "./copy";
@@ -35,9 +36,20 @@ interface AccountOrder {
   holdExpired: boolean;
 }
 
+/** Resumen de un pedido de vinos (GET /api/members/me → wineOrders). */
+interface AccountWineOrder {
+  code: string;
+  token: string;
+  status: OrderStatus;
+  totalUsd: number;
+  bottlesCount: number;
+  createdAt: string;
+}
+
 interface AccountData {
   member: AccountMember;
   orders: AccountOrder[];
+  wineOrders: AccountWineOrder[];
   welcomeCoupon: { code: string; discountPercent: number } | null;
 }
 
@@ -81,7 +93,7 @@ export default function MyAccountPage() {
         router.replace("/ingresar?next=/mi-cuenta");
         return;
       }
-      setData({ member: d.member, orders: d.orders ?? [], welcomeCoupon: d.welcomeCoupon ?? null });
+      setData({ member: d.member, orders: d.orders ?? [], wineOrders: d.wineOrders ?? [], welcomeCoupon: d.welcomeCoupon ?? null });
     } catch {
       setFailed(true);
     }
@@ -145,6 +157,7 @@ export default function MyAccountPage() {
             <div className="lg:col-span-7 space-y-6 min-w-0">
               {data.welcomeCoupon && <WelcomeCoupon lang={lang} coupon={data.welcomeCoupon} />}
               <Bookings lang={lang} orders={data.orders} />
+              {data.wineOrders.length > 0 && <WineOrders lang={lang} orders={data.wineOrders} />}
             </div>
             <aside className="lg:col-span-5 min-w-0">
               <Profile lang={lang} member={data.member} />
@@ -247,6 +260,70 @@ function OrderCard({ lang, order: o }: { lang: Language; order: AccountOrder }) 
           {o.status === "approved" && (
             <span className="material-symbols-outlined text-[18px]" aria-hidden="true">qr_code_2</span>
           )}
+          {action}
+        </Link>
+      </div>
+    </article>
+  );
+}
+
+/* Pedidos de vinos del miembro (solo aparece si ya hizo alguno). */
+function WineOrders({ lang, orders }: { lang: Language; orders: AccountWineOrder[] }) {
+  const t = ACCOUNT_COPY[lang];
+  return (
+    <Panel>
+      <h2 className="font-serif text-2xl">{t.wineOrdersTitle}</h2>
+      <p className="text-[14px] text-on-surface-variant mt-1">{t.wineOrdersHint}</p>
+      <ul className="mt-6 space-y-4">
+        {orders.map((o) => (
+          <li key={o.code}>
+            <WineOrderCard lang={lang} order={o} />
+          </li>
+        ))}
+      </ul>
+    </Panel>
+  );
+}
+
+function WineOrderCard({ lang, order: o }: { lang: Language; order: AccountWineOrder }) {
+  const t = ACCOUNT_COPY[lang];
+  // Vencimiento lógico (igual que en el servidor): pendiente de pago con más de WINE_PENDING_TTL_HOURS desde que se creó.
+  const expired = o.status === "pending_payment" && Date.parse(o.createdAt) + WINE_PENDING_TTL_HOURS * 3_600_000 < Date.now();
+  const action = o.status === "pending_payment" || o.status === "rejected" ? t.payNow : t.viewWineOrder;
+  return (
+    <article className="rounded-xl border border-outline-variant bg-paper/40 p-4 sm:p-5">
+      <div className="flex flex-wrap items-center gap-2">
+        <span className={`px-2.5 py-0.5 rounded-full text-[12px] font-semibold ${STATUS_TONE[o.status]}`}>{t.wineStatus[o.status]}</span>
+        {expired && (
+          <span className="px-2.5 py-0.5 rounded-full text-[12px] font-semibold bg-surface-container-high text-on-surface-variant">
+            {t.wineExpired}
+          </span>
+        )}
+      </div>
+      <dl className="mt-3 flex flex-wrap gap-x-5 gap-y-1 text-[13px]">
+        <div className="flex gap-1.5">
+          <dt className="text-on-surface-variant">{t.code}</dt>
+          <dd className="font-semibold tracking-wider text-primary-container">{o.code}</dd>
+        </div>
+        <div>
+          <dt className="sr-only">{t.bottles(o.bottlesCount)}</dt>
+          <dd className="text-on-surface">{t.bottles(o.bottlesCount)}</dd>
+        </div>
+        <div className="flex gap-1.5">
+          <dt className="text-on-surface-variant">{t.total}</dt>
+          <dd className="font-semibold text-on-surface">{usd(o.totalUsd)}</dd>
+        </div>
+      </dl>
+      <div className="mt-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <p className="text-[12px] text-on-surface-variant">{t.orderedOn(formatDate(o.createdAt, lang))}</p>
+        <Link
+          href={`/pedido/${encodeURIComponent(o.token)}`}
+          className={`inline-flex items-center justify-center gap-2 h-11 px-4 rounded text-[14px] font-semibold transition-colors ${
+            o.status === "approved"
+              ? "bg-primary-container hover:bg-primary text-white"
+              : "border border-outline-variant text-on-surface hover:border-primary-container hover:text-primary-container"
+          }`}
+        >
           {action}
         </Link>
       </div>

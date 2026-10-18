@@ -4,8 +4,11 @@ import React, { useCallback, useEffect, useId, useState } from "react";
 import { shrinkImage } from "@/lib/shrinkImage";
 import { WINE_TYPES, type Tasting, type Wine, type WineSpec, type WineStatus, type WineType } from "@/types";
 import { WINE_TYPE_LABEL } from "@/app/vinos/copy";
+import { isWineForSale, WINE_DEFAULT_MAX_PER_ORDER, WINE_MAX_PER_ORDER_LIMIT } from "@/lib/wineSale";
 
-/* Vinos: catálogo de los productos degustados en las catas. Se publican en /vinos con su ficha técnica. */
+/* Vinos: catálogo de los productos degustados en las catas. Se publican en /vinos con su ficha técnica.
+   Cada vino puede además estar «Activo para la venta» (precio + interruptor, aparte de Publicado/Borrador):
+   solo los vinos a la venta muestran precio y botón Comprar en el sitio. */
 
 const MAX_IMAGE_BYTES = 6 * 1024 * 1024;
 /** Filas habituales de la ficha técnica (un clic las agrega). */
@@ -29,6 +32,11 @@ interface FormState {
   specs: SpecRow[];
   tastingIds: string[];
   status: WineStatus;
+  /** Texto del campo (acepta coma o punto); vacío = sin precio. */
+  priceUsd: string;
+  saleActive: boolean;
+  /** Texto del campo; vacío = el tope por defecto del sitio. */
+  maxPerOrder: string;
 }
 
 function toForm(w: Wine | null): FormState {
@@ -44,7 +52,28 @@ function toForm(w: Wine | null): FormState {
     specs: w ? w.specs.map((s) => specRow(s.label, s.value)) : [specRow("Procedencia"), specRow("Crianza")],
     tastingIds: w?.tastingIds ?? [],
     status: w?.status ?? "draft",
+    priceUsd: w?.priceUsd != null ? String(w.priceUsd) : "",
+    saleActive: w?.saleActive ?? false,
+    maxPerOrder: w?.maxPerOrder != null ? String(w.maxPerOrder) : "",
   };
+}
+
+/** ¿El campo de precio trae algún valor distinto de cero? (solo para avisar antes de enviar: el servidor valida el número exacto) */
+const hasPrice = (text: string) => /[1-9]/.test(text);
+
+const usd = (n: number) => `$${n.toLocaleString("en-US", { minimumFractionDigits: Number.isInteger(n) ? 0 : 2, maximumFractionDigits: 2 })}`;
+
+/** Insignia de venta de la tarjeta: «En venta · $X» / «En venta (oculto: borrador)» / «Sin venta». */
+function saleBadge(w: Wine): { label: string; cls: string; title?: string } {
+  if (isWineForSale(w)) return { label: `En venta · ${usd(w.priceUsd as number)}`, cls: "bg-emerald-100 text-emerald-900" };
+  if (w.saleActive && (w.priceUsd ?? 0) > 0) {
+    return {
+      label: "En venta (oculto: borrador)",
+      cls: "bg-tertiary-fixed text-on-tertiary-fixed-variant",
+      title: "Está activo para la venta, pero en Borrador no se muestra en el sitio: publíquelo para que se pueda comprar.",
+    };
+  }
+  return { label: "Sin venta", cls: "bg-surface-container-high text-on-surface-variant" };
 }
 
 const inputCls =
@@ -61,7 +90,8 @@ export default function AdminWinesPage() {
   const [catas, setCatas] = useState<CataOption[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
-  const [editing, setEditing] = useState<{ wine: Wine | null } | null>(null);
+  /** `notice`: aviso al abrir el formulario; `activateSale`: lo abre con «Activo para la venta» ya marcado (falta el precio). */
+  const [editing, setEditing] = useState<{ wine: Wine | null; notice?: string; activateSale?: boolean } | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [toast, setToast] = useState<{ text: string; ok: boolean } | null>(null);
 
@@ -114,7 +144,38 @@ export default function AdminWinesPage() {
     }
   };
 
+  /** Interruptor de un clic de la venta (como el de los cupones). Sin precio no se puede activar: abre el formulario. */
+  const toggleSale = async (w: Wine) => {
+    if (!w.saleActive && !((w.priceUsd ?? 0) > 0)) {
+      setEditing({ wine: w, notice: "Defina el precio para activar la venta.", activateSale: true });
+      return;
+    }
+    setBusy(w.id);
+    try {
+      const res = await fetch(`/api/admin/wines/${w.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ saleActive: !w.saleActive }),
+      });
+      const data = await res.json();
+      if (!data.success) throw new Error(data.message);
+      notify(
+        w.saleActive
+          ? `Venta de «${w.name}» desactivada.`
+          : w.status === "published"
+            ? `«${w.name}» está en venta.`
+            : `Venta de «${w.name}» activada, pero sigue en Borrador: no se mostrará hasta que lo publique.`
+      );
+      await load();
+    } catch (err) {
+      notify((err as Error).message || "No se pudo cambiar el estado de la venta.", false);
+    } finally {
+      setBusy(null);
+    }
+  };
+
   const published = wines.filter((w) => w.status === "published").length;
+  const forSale = wines.filter((w) => isWineForSale(w)).length;
 
   return (
     <div className="p-5 sm:p-8 lg:p-10 max-w-6xl mx-auto space-y-6">
@@ -138,7 +199,10 @@ export default function AdminWinesPage() {
             <a href="/vinos" target="_blank" rel="noopener noreferrer" className="font-semibold text-primary-container hover:underline">
               /vinos
             </a>{" "}
-            y en la portada. {wines.length > 0 && `${published} de ${wines.length} publicados.`}
+            y en la portada. {wines.length > 0 && `${published} de ${wines.length} publicados · ${forSale} en venta.`}
+            <span className="block mt-0.5">
+              Active la venta de un vino para que muestre su precio y el botón Comprar; un vino en Borrador no se muestra aunque tenga la venta activa.
+            </span>
           </p>
         </div>
         <button
@@ -169,63 +233,77 @@ export default function AdminWinesPage() {
         </div>
       ) : (
         <ul className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {wines.map((w) => (
-            <li key={w.id} className="rounded-xl border border-outline-variant bg-surface-container-lowest overflow-hidden flex flex-col">
-              <div className="relative aspect-[4/3] bg-ink flex items-center justify-center">
-                {w.imageUrl ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={w.imageUrl} alt="" className="absolute inset-0 h-full w-full object-contain p-3" />
-                ) : (
-                  <span className="material-symbols-outlined text-5xl text-paper/30" aria-hidden="true">wine_bar</span>
-                )}
-                <span
-                  className={`absolute top-3 left-3 text-[11px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-full ${
-                    w.status === "published" ? "bg-emerald-100 text-emerald-900" : "bg-surface-container-high text-on-surface-variant"
-                  }`}
-                >
-                  {w.status === "published" ? "Publicado" : "Borrador"}
-                </span>
-              </div>
-              <div className="p-4 flex-1">
-                <p className="font-serif text-xl leading-snug">{w.name}</p>
-                <p className="text-[13px] text-on-surface-variant mt-1">
-                  {[WINE_TYPE_LABEL.es[w.type], w.winery, w.vintage].filter(Boolean).join(" · ")}
-                </p>
-                {w.tastingIds.length > 0 && (
-                  <p className="text-[12px] text-on-surface-variant mt-1">
-                    Degustado en {w.tastingIds.length} {w.tastingIds.length === 1 ? "cata" : "catas"}
+          {wines.map((w) => {
+            const badge = saleBadge(w);
+            return (
+              <li key={w.id} className="rounded-xl border border-outline-variant bg-surface-container-lowest overflow-hidden flex flex-col">
+                <div className="relative aspect-[4/3] bg-ink flex items-center justify-center">
+                  {w.imageUrl ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={w.imageUrl} alt="" className="absolute inset-0 h-full w-full object-contain p-3" />
+                  ) : (
+                    <span className="material-symbols-outlined text-5xl text-paper/30" aria-hidden="true">wine_bar</span>
+                  )}
+                  <span
+                    className={`absolute top-3 left-3 text-[11px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-full ${
+                      w.status === "published" ? "bg-emerald-100 text-emerald-900" : "bg-surface-container-high text-on-surface-variant"
+                    }`}
+                  >
+                    {w.status === "published" ? "Publicado" : "Borrador"}
+                  </span>
+                </div>
+                <div className="p-4 flex-1">
+                  <p className="font-serif text-xl leading-snug">{w.name}</p>
+                  <p className="text-[13px] text-on-surface-variant mt-1">
+                    {[WINE_TYPE_LABEL.es[w.type], w.winery, w.vintage].filter(Boolean).join(" · ")}
                   </p>
-                )}
-              </div>
-              <div className="flex flex-wrap gap-2 border-t border-outline-variant bg-surface-container-low/60 px-4 py-3">
-                <button type="button" disabled={busy === w.id} onClick={() => setEditing({ wine: w })} className={actionBtn}>
-                  <span className="material-symbols-outlined text-[18px]" aria-hidden="true">edit</span>
-                  Editar
-                </button>
-                {w.status === "published" && (
-                  <a href={`/vinos/${w.slug}`} target="_blank" rel="noopener noreferrer" className={actionBtn}>
-                    <span className="material-symbols-outlined text-[18px]" aria-hidden="true">open_in_new</span>
-                    Ver
-                  </a>
-                )}
-                <button
-                  type="button"
-                  disabled={busy === w.id}
-                  onClick={() => remove(w)}
-                  className="h-10 px-3 rounded text-[13px] font-semibold text-on-surface-variant hover:text-error ml-auto inline-flex items-center gap-1.5"
-                >
-                  <span className="material-symbols-outlined text-[18px]" aria-hidden="true">delete</span>
-                  Eliminar
-                </button>
-              </div>
-            </li>
-          ))}
+                  {w.tastingIds.length > 0 && (
+                    <p className="text-[12px] text-on-surface-variant mt-1">
+                      Degustado en {w.tastingIds.length} {w.tastingIds.length === 1 ? "cata" : "catas"}
+                    </p>
+                  )}
+                  <div className="flex flex-wrap gap-1.5 mt-3">
+                    <span title={badge.title} className={`text-[11px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-full ${badge.cls}`}>
+                      {badge.label}
+                    </span>
+                  </div>
+                </div>
+                <div className="flex flex-wrap gap-2 border-t border-outline-variant bg-surface-container-low/60 px-4 py-3">
+                  <button type="button" disabled={busy === w.id} onClick={() => setEditing({ wine: w })} className={actionBtn}>
+                    <span className="material-symbols-outlined text-[18px]" aria-hidden="true">edit</span>
+                    Editar
+                  </button>
+                  <button type="button" disabled={busy === w.id} onClick={() => toggleSale(w)} className={actionBtn}>
+                    <span className="material-symbols-outlined text-[18px]" aria-hidden="true">{w.saleActive ? "toggle_off" : "toggle_on"}</span>
+                    {w.saleActive ? "Desactivar venta" : "Activar venta"}
+                  </button>
+                  {w.status === "published" && (
+                    <a href={`/vinos/${w.slug}`} target="_blank" rel="noopener noreferrer" className={actionBtn}>
+                      <span className="material-symbols-outlined text-[18px]" aria-hidden="true">open_in_new</span>
+                      Ver
+                    </a>
+                  )}
+                  <button
+                    type="button"
+                    disabled={busy === w.id}
+                    onClick={() => remove(w)}
+                    className="h-10 px-3 rounded text-[13px] font-semibold text-on-surface-variant hover:text-error ml-auto inline-flex items-center gap-1.5"
+                  >
+                    <span className="material-symbols-outlined text-[18px]" aria-hidden="true">delete</span>
+                    Eliminar
+                  </button>
+                </div>
+              </li>
+            );
+          })}
         </ul>
       )}
 
       {editing && (
         <WineForm
           wine={editing.wine}
+          notice={editing.notice}
+          activateSale={editing.activateSale}
           catas={catas}
           onClose={() => setEditing(null)}
           onSaved={async (message) => {
@@ -241,18 +319,22 @@ export default function AdminWinesPage() {
 
 function WineForm({
   wine,
+  notice,
+  activateSale,
   catas,
   onClose,
   onSaved,
 }: {
   wine: Wine | null;
+  notice?: string;
+  activateSale?: boolean;
   catas: CataOption[];
   onClose: () => void;
   onSaved: (message: string) => void;
 }) {
   const uid = useId();
   const id = (name: string) => `${uid}-${name}`;
-  const [s, setS] = useState<FormState>(() => toForm(wine));
+  const [s, setS] = useState<FormState>(() => ({ ...toForm(wine), ...(activateSale ? { saleActive: true } : {}) }));
   const [dirty, setDirty] = useState(false);
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -308,11 +390,19 @@ function WineForm({
   const save = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
+    if (s.saleActive && !hasPrice(s.priceUsd)) {
+      setError("Defina el precio para activar la venta.");
+      document.getElementById(id("price"))?.focus();
+      return;
+    }
     setSaving(true);
     try {
       const payload = {
         ...s,
         specs: s.specs.filter((row) => row.label.trim() && row.value.trim()).map(({ label, value }) => ({ label, value })),
+        // El servidor interpreta el texto ("12,5" o "12.50") y valida el rango; vacío = sin precio / tope por defecto.
+        priceUsd: s.priceUsd.trim(),
+        maxPerOrder: s.maxPerOrder.trim(),
       };
       const res = await fetch(wine ? `/api/admin/wines/${wine.id}` : "/api/admin/wines", {
         method: wine ? "PATCH" : "POST",
@@ -345,6 +435,11 @@ function WineForm({
         </header>
 
         <div className="flex-1 overflow-y-auto px-5 sm:px-6 py-6 space-y-8">
+          {notice && !error && (
+            <div role="status" className="rounded-lg border border-tertiary/40 bg-tertiary-fixed/60 p-3 text-[14px] text-on-tertiary-fixed-variant">
+              {notice}
+            </div>
+          )}
           {error && (
             <div role="alert" className="rounded-lg border border-error/40 bg-error-container/60 p-3 text-[14px] text-on-error-container">
               {error}
@@ -487,6 +582,75 @@ function WineForm({
                 })}
               </div>
             )}
+          </section>
+
+          {/* Venta */}
+          <section className="space-y-4 rounded-xl border border-outline-variant bg-surface-container-low/50 p-4 sm:p-5">
+            <div>
+              <h3 className="font-serif text-xl">Venta</h3>
+              <p className={hintCls}>
+                Un vino activo para la venta muestra su precio y el botón «Comprar» en el sitio. Es un interruptor aparte del estado
+                Borrador/Publicado: para que se pueda comprar debe estar publicado, activo y con precio.
+              </p>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label htmlFor={id("price")} className={labelCls}>Precio por botella (USD)</label>
+                <input
+                  id={id("price")}
+                  inputMode="decimal"
+                  maxLength={12}
+                  value={s.priceUsd}
+                  onChange={(e) => set("priceUsd", e.target.value)}
+                  placeholder="Ej.: 18,50"
+                  aria-describedby={id("price-hint")}
+                  className={inputCls}
+                />
+                <p id={id("price-hint")} className={hintCls}>Escriba el precio con coma o punto. Déjelo vacío si no se vende.</p>
+              </div>
+              <div>
+                <label htmlFor={id("max")} className={labelCls}>Máximo por pedido</label>
+                <input
+                  id={id("max")}
+                  type="number"
+                  min={1}
+                  max={WINE_MAX_PER_ORDER_LIMIT}
+                  step={1}
+                  value={s.maxPerOrder}
+                  onChange={(e) => set("maxPerOrder", e.target.value)}
+                  placeholder={`${WINE_DEFAULT_MAX_PER_ORDER} (por defecto)`}
+                  aria-describedby={id("max-hint")}
+                  className={inputCls}
+                />
+                <p id={id("max-hint")} className={hintCls}>Botellas de este vino en un mismo pedido (de 1 a {WINE_MAX_PER_ORDER_LIMIT}).</p>
+              </div>
+            </div>
+            <div>
+              <label className="flex items-start gap-3 min-h-11 cursor-pointer text-[14px]">
+                <input
+                  type="checkbox"
+                  checked={s.saleActive}
+                  onChange={(e) => set("saleActive", e.target.checked)}
+                  className="accent-[#7D2A46] w-4 h-4 mt-1"
+                />
+                <span>
+                  <span className="block font-semibold">Activo para la venta</span>
+                  <span className="block text-[12px] text-on-surface-variant">
+                    Apáguelo cuando se agote el vino: no hay control de existencias.
+                  </span>
+                </span>
+              </label>
+              {s.saleActive && !hasPrice(s.priceUsd) && (
+                <p role="status" className="mt-1 text-[12px] font-semibold text-error">
+                  Defina el precio para activar la venta.
+                </p>
+              )}
+              {s.saleActive && s.status === "draft" && hasPrice(s.priceUsd) && (
+                <p role="status" className="mt-1 text-[12px] text-on-tertiary-fixed-variant">
+                  Está en Borrador: no se mostrará ni se podrá comprar hasta que lo publique.
+                </p>
+              )}
+            </div>
           </section>
 
           {/* Estado */}

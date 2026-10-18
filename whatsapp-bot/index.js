@@ -1,12 +1,14 @@
 /* ─────────────────────────────────────────────────────────────
    Bot de WhatsApp de El Origen
    Conecta un WhatsApp como "dispositivo vinculado" (Baileys) y envía
-   las entradas aprobadas en el panel (una imagen con QR por persona). Funciona en MODO COLA: el bot
+   las entradas aprobadas en el panel (una imagen con QR por persona) y las confirmaciones de los
+   pedidos de vinos (un mensaje de texto). Funciona en MODO COLA: el bot
    consulta al sitio cada pocos segundos, así que no necesita túneles
    ni direcciones públicas. Basado en el bot del Congreso AMCJ.
    ───────────────────────────────────────────────────────────── */
 
 import "dotenv/config";
+import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -27,6 +29,41 @@ const QUEUE_SECRET = process.env.WHATSAPP_QUEUE_SECRET || "";
 // Cada 4 s por defecto (como el bot del congreso): la entrada sale casi al instante de aprobarla.
 const POLL_MS = Math.max(3, Number(process.env.POLL_SECONDS || 4)) * 1000;
 const AUTH_DIR = process.env.AUTH_DIR || path.join(__dirname, "auth_info");
+const BOT_CAPS = "text";
+// Vinculación sin pantalla (servidores como Railway, donde nadie ve el panel local): con PAIRING_PHONE
+// (el número de El Origen con código de país, ej. 584141074007) el bot pide un código de 8 caracteres
+// y se escribe en WhatsApp → Dispositivos vinculados → «Vincular con el número de teléfono».
+// Panel con dirección pública (Railway): sin PANEL_TOKEN el panel solo abre en esta máquina (127.0.0.1).
+// Con PANEL_TOKEN se publica y TODO exige la clave: se entra con  https://…/?key=<PANEL_TOKEN>  (queda en
+// una cookie y se quita de la URL). Quien tenga el enlace puede ver el QR y vincular el WhatsApp: no lo comparta.
+const PANEL_TOKEN = (process.env.PANEL_TOKEN || "").trim();
+const PANEL_HOST = PANEL_TOKEN ? "0.0.0.0" : "127.0.0.1";
+// Solo caracteres seguros en una URL (un "+" o "&" de una clave en base64 rompería el enlace).
+if (PANEL_TOKEN && !/^[A-Za-z0-9_-]{24,}$/.test(PANEL_TOKEN)) {
+  console.error("\n❌ PANEL_TOKEN: use solo letras, números, - y _ (mínimo 24). Ejemplo: openssl rand -hex 32\n");
+  process.exit(1);
+}
+// En un servidor, mientras el WhatsApp no está vinculado y nadie mira el panel, el bot descansa en vez de pedirle
+// un QR nuevo a WhatsApp cada ~3 minutos (muchos intentos seguidos desde una IP de servidor pueden hacer que
+// WhatsApp restrinja la vinculación). Se reanuda solo al abrir el panel.
+const IDLE_AFTER_MS = Math.max(30, Number(process.env.PANEL_IDLE_SECONDS || 300)) * 1000;
+const PAIRING_PHONE = (process.env.PAIRING_PHONE || "").replace(/\D/g, "");
+// Un código nuevo vale ~3 min; no se pide otro antes para no invalidar el que se está escribiendo.
+const PAIRING_COOLDOWN_MS = 150_000;
+// Cada código le avisa al teléfono con una notificación: tras unos intentos sin usarlo, se detiene
+// (para pedir otro: reiniciar el servicio o «Generar un QR nuevo desde cero» en el panel).
+const PAIRING_MAX_TRIES = 4;
+
+/* libsignal imprime en consola las claves de cada sesión ("Closing session: SessionEntry {…privKey…}").
+   En un servidor eso quedaría guardado en los logs: se descartan solo esos mensajes. */
+const SIGNAL_NOISE = /^(Closing session|Opening session|Removing old closed session|Session already (closed|open))/;
+for (const level of ["info", "warn"]) {
+  const original = console[level].bind(console);
+  console[level] = (...args) => {
+    if (typeof args[0] === "string" && SIGNAL_NOISE.test(args[0])) return;
+    original(...args);
+  };
+}
 
 if (!QUEUE_SECRET) {
   console.error("\n❌ Falta WHATSAPP_QUEUE_SECRET en el archivo .env (debe ser igual al de Vercel).\n");
@@ -36,11 +73,24 @@ if (!QUEUE_SECRET) {
 /* ─── Estado ─── */
 
 let sock = null;
-let qrDataUrl = null;
+let qrSvg = null; // QR vectorial (nítido a cualquier tamaño); se renueva cada ~20 s
+let lastPanelHit = Date.now();
+let idle = false; // sin vincular y sin nadie mirando el panel: no se piden más QR
+let qrAt = 0;
+let qrCount = 0; // QR emitidos por esta conexión: el 1.º vale ~60 s, los siguientes ~20 s
+let pairingCode = null;
+let pairingAt = 0;
+let lastPairRequest = 0;
+let pairingAskedAt = 0;
+let pairingTries = 0;
+let siteOk = null; // null = aún no se sabe; true/false = último resultado al consultar la cola
 let connected = false;
 let myPhone = null;
 let draining = false;
 let resetting = false;
+// Órdenes ya enviadas cuyo acuse al sitio todavía no se logró (orderId → { at, warned }). Mientras el acuse falle,
+// el sitio sigue listando la orden en la cola: sin esta memoria el bot la volvería a enviar en cada consulta.
+const unacked = new Map();
 const stats = { sent: 0, failed: 0, pending: 0, lastPoll: null, lastError: null, message: "Iniciando…" };
 const log = [];
 
@@ -94,14 +144,29 @@ function qrImage(data) {
 }
 
 /**
- * Envía las entradas de una orden: una imagen con QR por persona.
- * La primera lleva el mensaje completo y las políticas; las demás, "Entrada 2 de 3 · EO-XXXXX-2".
- * Si el texto no cabe al pie de la imagen, las políticas salen en un mensaje aparte.
+ * Envía un elemento de la cola y devuelve cuántas entradas (imágenes) salieron.
+ *  - kind "text" (pedido de vinos): un solo mensaje de texto, sin imágenes → devuelve 0.
+ *  - kind "tickets" (reserva de catas; también lo que no trae `kind`, de versiones anteriores del sitio):
+ *    una imagen con QR por persona. La primera lleva el mensaje completo y las políticas; las demás,
+ *    "Entrada 2 de 3 · EO-XXXXX-2". Si el texto no cabe al pie de la imagen, las políticas salen en un mensaje aparte.
  */
 async function sendTicket(item) {
   const jid = toJid(item.phone);
   const [exists] = await sock.onWhatsApp(jid);
   if (!exists?.exists) throw new Error(`El número ${item.phone} no tiene WhatsApp`);
+
+  if (item.kind && item.kind !== "text" && item.kind !== "tickets") {
+    throw new Error(`Tipo de mensaje no soportado (${String(item.kind).slice(0, 30)}): actualice el bot`);
+  }
+  if (item.kind === "text") {
+    const body = String(item.message ?? "").trim();
+    if (!body) throw new Error("El mensaje del pedido llegó vacío");
+    const policies = item.policies ? String(item.policies) : "";
+    const text = policies ? `${body}\n\n${policies}` : body;
+    await typeLikeHuman(exists.jid, text.length);
+    await sock.sendMessage(exists.jid, { text });
+    return 0;
+  }
 
   // Compatibilidad con la cola anterior (una sola imagen por orden).
   const tickets = item.tickets?.length ? item.tickets : [{ qrData: item.qrData, code: item.code, number: 1 }];
@@ -138,6 +203,8 @@ async function api(method, body) {
       "x-queue-token": QUEUE_SECRET,
       "x-bot-connected": connected ? "1" : "0",
       "x-bot-phone": myPhone ?? "",
+      // Capacidades de este bot: "text" = sabe enviar pedidos de vinos (mensajes de texto). Sin esto el sitio no se los manda.
+      "x-bot-caps": BOT_CAPS,
     },
     body: body ? JSON.stringify(body) : undefined,
   });
@@ -151,32 +218,62 @@ async function drainQueue() {
   draining = true;
   try {
     const data = await api("GET");
+    // Un solo aviso por cambio de estado (el panel local no se ve en un servidor: esto queda en los logs).
+    if (siteOk !== true) remember("🟢 El sitio aceptó la clave del bot: cola conectada.");
+    siteOk = true;
     stats.lastPoll = new Date();
     stats.lastError = null;
     const queue = connected ? data.queue ?? [] : [];
     stats.pending = (data.queue ?? []).length;
+    // Lo que el sitio ya no lista (su acuse llegó por otra vía o se re-encoló desde el panel) deja de recordarse:
+    // así un reenvío pedido a propósito desde el panel sí vuelve a salir.
+    const listed = new Set((data.queue ?? []).map((it) => it.orderId));
+    for (const id of unacked.keys()) if (!listed.has(id)) unacked.delete(id);
     stats.message = !connected
       ? "Esperando vinculación de WhatsApp…"
       : queue.length
-        ? `Enviando ${queue.length} orden(es)…`
+        ? `Enviando ${queue.length} mensaje(s)…`
         : "Cola al día";
 
     for (let i = 0; i < queue.length; i++) {
       if (!connected) break;
       const item = queue[i];
-      try {
-        const count = await sendTicket(item);
-        await api("POST", { orderId: item.orderId, status: "sent" });
-        stats.sent++;
-        remember(`✅ ${item.code}: ${count} entrada${count === 1 ? "" : "s"} enviada${count === 1 ? "" : "s"} a ${item.name} (+${item.phone})`);
-      } catch (err) {
-        stats.failed++;
-        remember(`❌ ${item.code} (${item.name}): ${err.message}`);
-        await api("POST", { orderId: item.orderId, status: "failed", error: err.message }).catch(() => {});
+      // Ya salió en una consulta anterior y solo falta confirmarlo: se reintenta el acuse, no el envío.
+      const alreadySent = unacked.has(item.orderId);
+      if (!alreadySent) {
+        try {
+          const count = await sendTicket(item);
+          unacked.set(item.orderId, { at: Date.now(), warned: false });
+          stats.sent++;
+          remember(
+            count === 0
+              ? `✅ ${item.code}: pedido enviado a ${item.name} (+${item.phone})`
+              : `✅ ${item.code}: ${count} entrada${count === 1 ? "" : "s"} enviada${count === 1 ? "" : "s"} a ${item.name} (+${item.phone})`
+          );
+        } catch (err) {
+          stats.failed++;
+          remember(`❌ ${item.code} (${item.name}): ${err.message}`);
+          await api("POST", { orderId: item.orderId, status: "failed", error: err.message }).catch(() => {});
+        }
+      }
+      const pendingAck = unacked.get(item.orderId);
+      if (pendingAck) {
+        try {
+          await api("POST", { orderId: item.orderId, status: "sent" });
+          unacked.delete(item.orderId);
+        } catch (err) {
+          // El mensaje YA salió: no se marca como fallido ni se reenvía; el acuse se reintenta en la próxima consulta
+          // (el aviso se registra una sola vez por orden para no llenar la actividad cada pocos segundos).
+          if (!pendingAck.warned) {
+            pendingAck.warned = true;
+            remember(`⚠️ ${item.code}: enviado, pero no se pudo confirmar al sitio (${err.message}). Se reintentará sin reenviar.`);
+          }
+        }
       }
       stats.pending = Math.max(0, queue.length - i - 1);
 
-      if (i < queue.length - 1) {
+      // Solo se espera tras un envío real (reintentar un acuse no manda nada a WhatsApp).
+      if (i < queue.length - 1 && !alreadySent) {
         // Pausa aleatoria entre mensajes y descanso largo cada 4 envíos
         await sleep(jitter(5000, 9000));
         if ((i + 1) % 4 === 0) {
@@ -187,6 +284,8 @@ async function drainQueue() {
     }
     if (queue.length) stats.message = "Cola al día";
   } catch (err) {
+    if (siteOk !== false || stats.lastError !== err.message) remember(`🔴 Sin conexión con el sitio: ${err.message}`);
+    siteOk = false;
     stats.lastError = err.message;
     stats.message = `Sin conexión con el sitio: ${err.message}`;
   } finally {
@@ -199,10 +298,11 @@ async function drainQueue() {
 
 const repliedAt = new Map();
 const THANKS = /gracias|recibid|listo|perfecto|excelente|genial|ok\b|👍|🙏/i;
+// Texto neutro: el mismo mensaje puede responder a una entrada de cata o a un pedido de vinos.
 const REPLIES = [
-  "¡Con gusto! Nos vemos en la cata. 🍷",
-  "¡Gracias a ti! Te esperamos. 🥂",
-  "¡Un placer! Cualquier duda, aquí estamos. ✨",
+  "¡Con gusto! Cualquier duda, aquí estamos. 🍷",
+  "¡Gracias a ti! Que lo disfrutes. 🥂",
+  "¡Un placer! Estamos para ayudarte. ✨",
 ];
 
 async function onIncoming({ messages }) {
@@ -227,6 +327,22 @@ async function onIncoming({ messages }) {
 
 /* ─── Conexión ─── */
 
+/** Pide a WhatsApp un código de 8 caracteres para vincular con el número (alternativa al QR). */
+async function requestPairing(digits) {
+  if (!sock || sock.authState.creds.registered) throw new Error("WhatsApp no está listo para vincular");
+  const raw = await sock.requestPairingCode(digits);
+  pairingCode = (raw.match(/.{1,4}/g) ?? [raw]).join("-");
+  pairingAt = Date.now();
+  stats.message = `Escriba el código ${pairingCode} en WhatsApp → Dispositivos vinculados`;
+  console.log("\n===================================================================");
+  console.log(`🔑 CÓDIGO DE VINCULACIÓN: ${pairingCode}`);
+  console.log(`   En el teléfono de +${digits}: WhatsApp → Ajustes → Dispositivos vinculados`);
+  console.log("   → Vincular un dispositivo → «Vincular con el número de teléfono» y escríbalo.");
+  console.log("   Vale unos 3 minutos.");
+  console.log("===================================================================\n");
+  return pairingCode;
+}
+
 async function connect() {
   try {
     fs.mkdirSync(AUTH_DIR, { recursive: true });
@@ -238,6 +354,7 @@ async function connect() {
       /* usa la versión por defecto de la librería */
     }
 
+    qrCount = 0;
     sock = makeWASocket({
       ...(version ? { version } : {}),
       auth: state,
@@ -253,22 +370,54 @@ async function connect() {
     sock.ev.on("messages.upsert", onIncoming);
     sock.ev.on("connection.update", async ({ connection, lastDisconnect, qr }) => {
       if (qr) {
-        qrDataUrl = await QRCode.toDataURL(qr, { width: 320, margin: 1 });
+        qrSvg = await QRCode.toString(qr, { type: "svg", margin: 4, errorCorrectionLevel: "L" });
+        qrAt = Date.now();
+        qrCount += 1;
         connected = false;
         stats.message = "Escanee el código QR desde WhatsApp → Dispositivos vinculados";
-        console.log(`\n📱 Código QR listo: abra http://localhost:${PORT} y escanéelo.\n`);
+        console.log(
+          PANEL_TOKEN
+            ? "\n📱 Código QR listo: ábralo en el panel (enlace con su clave) y escanéelo.\n"
+            : `\n📱 Código QR listo: abra http://localhost:${PORT} y escanéelo.\n`
+        );
+        if (PAIRING_PHONE && !sock.authState.creds.registered && Date.now() - pairingAskedAt > PAIRING_COOLDOWN_MS) {
+          if (pairingTries >= PAIRING_MAX_TRIES) {
+            if (pairingTries === PAIRING_MAX_TRIES) {
+              pairingTries += 1;
+              remember("⏸️ Código de vinculación sin usar tras varios intentos: reinicie el servicio para pedir otro.");
+            }
+          } else {
+            pairingTries += 1;
+            pairingAskedAt = Date.now();
+            try {
+              await requestPairing(PAIRING_PHONE);
+            } catch (err) {
+              remember(`⚠️ No se pudo pedir el código de vinculación: ${err?.message ?? err}`);
+            }
+          }
+        }
       }
       if (connection === "open") {
         connected = true;
-        qrDataUrl = null;
+        qrSvg = null;
+        pairingCode = null;
         myPhone = sock.user?.id?.split(":")[0]?.split("@")[0] ?? null;
         remember(`🟢 WhatsApp conectado (+${myPhone})`);
         setTimeout(drainQueue, 3000);
       }
       if (connection === "close") {
         connected = false;
+        pairingCode = null; // el código pertenecía a esta conexión
         if (resetting) return;
         const code = lastDisconnect?.error?.output?.statusCode;
+        const registered = Boolean(sock?.authState?.creds?.registered);
+        if (PANEL_TOKEN && !registered && code === DisconnectReason.timedOut && Date.now() - lastPanelHit > IDLE_AFTER_MS) {
+          idle = true;
+          qrSvg = null;
+          stats.message = "En pausa: se reanuda al abrir el panel";
+          remember("⏸️ Nadie está mirando el panel: se pausa la generación de QR hasta que se abra.");
+          return;
+        }
         if (code === DisconnectReason.loggedOut) {
           remember("🔴 Sesión cerrada desde el teléfono. Generando un QR nuevo…");
           fs.rmSync(AUTH_DIR, { recursive: true, force: true });
@@ -287,12 +436,79 @@ async function connect() {
 /* ─── Panel local (solo en esta computadora) ─── */
 
 const app = express();
-app.use(express.urlencoded({ extended: false }));
+app.disable("x-powered-by");
+app.set("trust proxy", 1); // detrás del proxy de Railway: req.secure según x-forwarded-proto
+
+const sameSecret = (a, b) =>
+  crypto.timingSafeEqual(crypto.createHash("sha256").update(String(a)).digest(), crypto.createHash("sha256").update(String(b)).digest());
+const readCookie = (req, name) =>
+  (req.headers.cookie ?? "")
+    .split(";")
+    .map((c) => c.trim().split("="))
+    .find(([k]) => k === name)?.slice(1).join("=");
+
+/** Alguien autorizado abrió el panel: si el bot estaba en pausa, vuelve a conectar para mostrar el QR. */
+function touchPanel() {
+  lastPanelHit = Date.now();
+  if (idle && !resetting) {
+    idle = false;
+    remember("▶️ Panel abierto: se reanuda la conexión con WhatsApp.");
+    connect();
+  }
+}
+
+// Nada del panel se guarda en caché ni se indexa; con PANEL_TOKEN, nada responde sin la clave.
+app.use((req, res, next) => {
+  res.set({ "Cache-Control": "no-store", "X-Robots-Tag": "noindex, nofollow", "Referrer-Policy": "no-referrer" });
+  if (!PANEL_TOKEN) return next();
+  const cookie = readCookie(req, "eo_panel");
+  let cookieValue = "";
+  try {
+    cookieValue = cookie ? decodeURIComponent(cookie) : "";
+  } catch {
+    /* cookie mal formada: se trata como ausente */
+  }
+  if (cookieValue && sameSecret(cookieValue, PANEL_TOKEN)) return touchPanel(), next();
+  const rawKey = req.method === "GET" ? req.query.key : undefined;
+  // Al copiar el enlace de un chat suelen quedar pegados un punto, una coma, un paréntesis o un espacio al final.
+  const key = typeof rawKey === "string" ? rawKey.trim().replace(/[^A-Za-z0-9_-]+$/, "") : undefined;
+  if (typeof key === "string" && sameSecret(key, PANEL_TOKEN)) {
+    touchPanel();
+    res.cookie("eo_panel", PANEL_TOKEN, { httpOnly: true, sameSite: "lax", secure: req.secure, maxAge: 12 * 3600_000, path: "/" });
+    return res.redirect("/"); // la clave no queda en la barra de direcciones ni en el historial
+  }
+  // Quien trae una clave (pero equivocada o cortada) merece saber qué pasó; quien no trae ninguna recibe un 404 liso.
+  if (typeof rawKey === "string") {
+    return res
+      .status(404)
+      .type("text/plain; charset=utf-8")
+      .send("Enlace incompleto o con la clave equivocada.\nPida el enlace de nuevo y ábralo tal cual, completo, en una sola línea (sin espacios ni signos al final).");
+  }
+  res.status(404).type("text/plain").send("Not found");
+});
+
+// Los formularios del panel (POST) se leen solo con la clave ya validada y con tamaño mínimo.
+app.use(express.urlencoded({ extended: false, limit: "2kb" }));
 
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
 
 app.get("/", (req, res) => {
   const notice = req.query.ok ? `<p class="ok">${esc(req.query.ok)}</p>` : req.query.error ? `<p class="err">${esc(req.query.error)}</p>` : "";
+  const steps = (last) =>
+    `<ol><li>Abra <strong>WhatsApp</strong> en el teléfono de El Origen.</li><li>Toque <strong>⋮ / Ajustes → Dispositivos vinculados</strong>.</li><li>Toque <strong>Vincular un dispositivo</strong> y ${last}</li></ol>`;
+  const qrBlock = qrSvg
+    ? `${steps("escanee este código con el lector que se abre dentro de WhatsApp (no con la cámara normal del teléfono):")}
+       <div id="qrbox" class="qrbox" data-age="${Math.max(0, Math.round((Date.now() - qrAt) / 1000))}" data-ttl="${qrCount <= 1 ? 60 : 20}">${qrSvg}</div>
+       <p id="qrage" class="muted"></p>`
+    : `<p class="muted">${idle ? "Reanudando la conexión con WhatsApp…" : "Conectando con WhatsApp…"}</p>`;
+  const codeBlock = pairingCode
+    ? `<div class="paircode"><strong>Código de vinculación</strong>
+       <p class="code">${esc(pairingCode)}</p>
+       <p class="muted">En el teléfono: <strong>Dispositivos vinculados → Vincular un dispositivo → «Vincular con el número de teléfono»</strong> y escriba este código. Vale unos 3 minutos${pairingAt ? ` (pedido hace ${Math.round((Date.now() - pairingAt) / 1000)} s)` : ""}.</p></div>`
+    : "";
+  const pairForm = `<details${pairingCode ? " open" : ""}><summary class="muted">¿No le funciona el QR? Vincular con el número de teléfono</summary>
+       <form method="post" action="/pair" class="row" style="margin-top:10px"><input name="phone" inputmode="tel" placeholder="Número de El Origen, ej. 0414-107-4007" value="${esc(PAIRING_PHONE)}" required><button>Pedir código</button></form>
+       <p class="muted" style="margin-top:8px">WhatsApp le mostrará una notificación en ese teléfono; entre al aviso o escriba el código que sale aquí.</p></details>`;
   const body = connected
     ? `<div class="state on"><span class="dot"></span><div><strong>WhatsApp conectado</strong><br>Número: +${esc(myPhone)}</div></div>
        <dl class="stats">
@@ -304,12 +520,8 @@ app.get("/", (req, res) => {
        <form method="post" action="/drain-now"><button>Revisar la cola ahora</button></form>
        <form method="post" action="/test-send" class="row"><input name="phone" placeholder="Su número, ej. 0414-123-4567" required><button>Enviar prueba</button></form>
        <form method="post" action="/reset-session" onsubmit="return confirm('¿Desvincular este WhatsApp del bot?')"><button class="ghost">Desvincular / usar otro número</button></form>`
-    : qrDataUrl
-      ? `<ol><li>Abra <strong>WhatsApp</strong> en el teléfono de El Origen.</li><li>Toque <strong>⋮ / Ajustes → Dispositivos vinculados</strong>.</li><li>Toque <strong>Vincular un dispositivo</strong> y escanee:</li></ol>
-         <img class="qr" src="${qrDataUrl}" alt="Código QR de WhatsApp">
-         <p class="muted">El código cambia cada pocos segundos; la página se actualiza sola.</p>
-         <form method="post" action="/reset-session"><button class="ghost">Generar un QR nuevo desde cero</button></form>`
-      : `<p class="muted">Conectando con WhatsApp…</p>`;
+    : `${codeBlock}${qrBlock}${pairForm}
+       <form method="post" action="/reset-session"><button class="ghost">Generar un QR nuevo desde cero</button></form>`;
 
   res.send(`<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Bot de WhatsApp · El Origen</title>
@@ -325,14 +537,37 @@ app.get("/", (req, res) => {
   .muted{color:var(--muted);font-size:13px;margin:0}
   button{width:100%;height:44px;border:0;border-radius:6px;background:var(--wine);color:#fff;font-weight:600;font-size:14px;cursor:pointer}button.ghost{background:transparent;color:var(--muted);border:1px solid var(--line)}
   .row{display:flex;gap:8px}.row input{flex:1;height:44px;border:1px solid var(--line);border-radius:6px;padding:0 12px;font-size:14px}.row button{width:auto;padding:0 16px}
-  ol{margin:0;padding-left:20px}.qr{width:260px;height:260px;margin:0 auto;display:block;border:1px solid var(--line);border-radius:10px;padding:8px;background:#fff}
+  .code{margin:0;text-align:center;font:700 34px ui-monospace,Menlo,Consolas,monospace;letter-spacing:4px;color:var(--wine)}
+  ol{margin:0;padding-left:20px}
+  .qrbox{width:min(100%,360px);margin:0 auto;background:#fff;border:1px solid var(--line);border-radius:10px;padding:4px;transition:opacity .3s}.qrbox svg{display:block;width:100%;height:auto;shape-rendering:crispEdges}
+  .paircode{background:#FBF3E4;border:1px solid var(--sun);border-radius:10px;padding:14px;display:grid;gap:6px;text-align:center}
+  details summary{cursor:pointer}
   .ok,.err{margin:0;padding:10px 12px;border-radius:6px;font-size:14px}.ok{background:#E7F5EC;color:#14532D}.err{background:#F9DEDC;color:#8C1D18}
   pre{margin:0;max-height:180px;overflow:auto;background:#F2EADF;border-radius:8px;padding:10px;font-size:12px;white-space:pre-wrap}
 </style></head><body><main>
 <header><h1>EL ORIGEN</h1><p>Bot de WhatsApp</p></header>
 <section>${notice}${body}${stats.lastError ? `<p class="err">${esc(stats.lastError)}</p>` : ""}
 ${log.length ? `<details><summary class="muted">Actividad reciente</summary><pre>${esc(log.join("\n"))}</pre></details>` : ""}</section>
-</main><script>${connected ? "setTimeout(()=>location.replace('/'),15000)" : "setTimeout(()=>location.replace('/'),5000)"}</script></body></html>`);
+</main><script>
+(function () {
+  var box = document.getElementById("qrbox"), msg = document.getElementById("qrage");
+  var age0 = box ? Number(box.getAttribute("data-age")) : 0, ttl = box ? Number(box.getAttribute("data-ttl")) : 20, t0 = Date.now();
+  function tick() {
+    if (!box) return;
+    var s = age0 + Math.floor((Date.now() - t0) / 1000), old = s > ttl;
+    box.style.opacity = old ? "0.2" : "1";
+    msg.textContent = old ? "Este código ya venció: espere, se está actualizando…" : "Código generado hace " + s + " s · vale unos " + ttl + " s";
+  }
+  tick(); setInterval(tick, 1000);
+  // Recarga sola (QR nuevo / estado), salvo que se esté escribiendo o el formulario de respaldo esté abierto.
+  function reload() {
+    var typing = document.activeElement && document.activeElement.tagName === "INPUT";
+    if (typing || document.querySelector("details[open]")) return setTimeout(reload, 4000);
+    location.replace("/");
+  }
+  setTimeout(reload, ${connected ? 15000 : 3000});
+})();
+</script></body></html>`);
 });
 
 app.get("/status", (_req, res) => {
@@ -360,6 +595,29 @@ app.post("/test-send", async (req, res) => {
   }
 });
 
+app.post("/pair", async (req, res) => {
+  const fail = (m) => res.redirect("/?error=" + encodeURIComponent(m));
+  if (connected) return fail("WhatsApp ya está conectado");
+  let digits = "";
+  try {
+    digits = toJid(String(req.body?.phone ?? "")).split("@")[0];
+  } catch {
+    /* se valida abajo */
+  }
+  if (!/^\d{10,15}$/.test(digits)) return fail("Escriba el número con código de país, ej. 0414-107-4007");
+  // Cada código le manda una notificación al teléfono: un solo pedido por minuto.
+  if (Date.now() - lastPairRequest < 60_000) return fail("Espere un minuto antes de pedir otro código");
+  lastPairRequest = Date.now();
+  try {
+    await requestPairing(digits);
+    remember(`🔑 Código de vinculación pedido para +${digits}`);
+    res.redirect("/?ok=" + encodeURIComponent("Código listo: escríbalo en el teléfono"));
+  } catch (err) {
+    remember(`⚠️ No se pudo pedir el código de vinculación: ${err?.message ?? err}`);
+    fail("No se pudo pedir el código: " + (err?.message ?? "intente de nuevo"));
+  }
+});
+
 app.post("/reset-session", async (_req, res) => {
   resetting = true;
   try {
@@ -370,7 +628,10 @@ app.post("/reset-session", async (_req, res) => {
   fs.rmSync(AUTH_DIR, { recursive: true, force: true });
   connected = false;
   myPhone = null;
-  qrDataUrl = null;
+  qrSvg = null;
+  pairingCode = null;
+  pairingAskedAt = 0;
+  pairingTries = 0;
   remember("🔄 Sesión reiniciada: escanee el nuevo QR.");
   setTimeout(() => {
     resetting = false;
@@ -379,11 +640,16 @@ app.post("/reset-session", async (_req, res) => {
   res.redirect("/");
 });
 
-// Solo escucha en esta computadora: el panel no queda expuesto a internet.
-app.listen(PORT, "127.0.0.1", () => {
+// Último recurso: ningún error revela trazas ni que hay Express detrás (todo es un 404 simple).
+app.use((_err, _req, res, _next) => {
+  res.status(404).type("text/plain").send("Not found");
+});
+
+// Sin PANEL_TOKEN solo escucha en esta computadora: el panel no queda expuesto a internet.
+app.listen(PORT, PANEL_HOST, () => {
   console.log("===================================================================");
   console.log("   BOT DE WHATSAPP · EL ORIGEN");
-  console.log(`   Panel: http://localhost:${PORT}`);
+  console.log(PANEL_TOKEN ? `   Panel: público en el puerto ${PORT}, protegido con PANEL_TOKEN` : `   Panel: http://localhost:${PORT}`);
   console.log(`   Sitio: ${APP_URL} (revisa la cola cada ${POLL_MS / 1000} s)`);
   console.log("===================================================================");
   connect();

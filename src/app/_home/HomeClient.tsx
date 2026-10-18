@@ -313,7 +313,7 @@ export default function HomeClient({ ads, wines }: { ads: PublicAds; wines: Publ
         </section>
 
         {/* ─── NUESTROS VINOS ─── */}
-        {wines.length > 0 && <WinesShowcase wines={wines} lang={lang} index={num("wines")} />}
+        {wines.length > 0 && <WinesShowcase wines={wines} lang={lang} index={num("wines")} rates={rates} />}
 
         {/* ─── FICHA DE CATA INTERACTIVA ─── */}
         <section className="px-5 sm:px-8 lg:px-12 max-w-[1320px] mx-auto w-full pb-24 sm:pb-32">

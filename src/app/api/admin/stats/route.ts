@@ -4,6 +4,7 @@ import { listCatas } from "@/lib/catas";
 import { countNewLeads } from "@/lib/leads";
 import { listMembers } from "@/lib/members";
 import { heldSpotsByTasting, holdExpired, isPersistent, listOrders, ticketStats } from "@/lib/orders";
+import { listWineOrders } from "@/lib/wineOrders";
 import { orderStatsByTasting, statsFor } from "../catas/shared";
 
 export const dynamic = "force-dynamic";
@@ -17,7 +18,7 @@ export async function GET() {
   if (denied) return denied;
   try {
     const now = Date.now();
-    const [orders, tickets, catas, held, byTasting, members, leads] = await Promise.all([
+    const [orders, tickets, catas, held, byTasting, members, leads, wineOrders] = await Promise.all([
       listOrders(),
       ticketStats(),
       listCatas({ includeDrafts: true, upcomingOnly: true }),
@@ -25,11 +26,19 @@ export async function GET() {
       orderStatsByTasting(),
       listMembers(),
       countNewLeads(),
+      // Si aún no existe la tabla de pedidos de vinos (falta ejecutar v6.sql), el resumen de las catas no debe caerse.
+      listWineOrders().catch((err) => {
+        console.error("[admin/stats] No se pudieron leer los pedidos de vinos:", err);
+        return [];
+      }),
     ]);
 
     const approved = orders.filter((o) => o.status === "approved");
     const approvedAt = (o: (typeof orders)[number]) => Date.parse(o.reviewedAt ?? o.createdAt);
     const last30 = approved.filter((o) => now - approvedAt(o) <= 30 * DAY);
+
+    // Pedidos de vinos: pagos por revisar, aprobados que faltan por entregar y ventas aprobadas (aparte de las catas).
+    const wineApproved = wineOrders.filter((o) => o.status === "approved");
 
     const upcoming = catas
       .filter((t) => t.status !== "archived")
@@ -66,6 +75,12 @@ export async function GET() {
         approvedUsd: round2(approved.reduce((n, o) => n + o.totalUsd, 0)),
         last30DaysUsd: round2(last30.reduce((n, o) => n + o.totalUsd, 0)),
         last30DaysSpots: last30.reduce((n, o) => n + o.spotsCount, 0),
+      },
+      wineOrders: {
+        inReview: wineOrders.filter((o) => o.status === "in_review").length,
+        toDeliver: wineApproved.filter((o) => !o.deliveredAt).length,
+        approvedUsd: round2(wineApproved.reduce((n, o) => n + o.totalUsd, 0)),
+        approvedOrders: wineApproved.length,
       },
       tickets,
       upcoming,
