@@ -43,6 +43,9 @@ interface AccountWineOrder {
   status: OrderStatus;
   totalUsd: number;
   bottlesCount: number;
+  /** Envío ya incluido en `totalUsd` y su zona (los pedidos sin envío, o si la API no los trae, no muestran la fila). */
+  shippingUsd?: number;
+  deliveryZone?: string | null;
   createdAt: string;
 }
 
@@ -309,6 +312,12 @@ function WineOrderCard({ lang, order: o }: { lang: Language; order: AccountWineO
           <dt className="sr-only">{t.bottles(o.bottlesCount)}</dt>
           <dd className="text-on-surface">{t.bottles(o.bottlesCount)}</dd>
         </div>
+        {typeof o.shippingUsd === "number" && o.shippingUsd > 0 && (
+          <div className="flex gap-1.5 min-w-0">
+            <dt className="text-on-surface-variant">{o.deliveryZone ? t.shippingWithZone(o.deliveryZone) : t.shipping}</dt>
+            <dd className="text-on-surface">{usd(o.shippingUsd)}</dd>
+          </div>
+        )}
         <div className="flex gap-1.5">
           <dt className="text-on-surface-variant">{t.total}</dt>
           <dd className="font-semibold text-on-surface">{usd(o.totalUsd)}</dd>

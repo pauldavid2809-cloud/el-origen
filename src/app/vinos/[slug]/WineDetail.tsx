@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Navbar } from "@/components/Navbar";
@@ -14,9 +14,11 @@ import { useLang } from "@/lib/useLang";
 import { useDocumentTitle } from "@/lib/useDocumentTitle";
 import { useWineCart, type WineCartLimit } from "@/lib/useWineCart";
 import { WINE_ORDER_MAX_BOTTLES, WINE_ORDER_MAX_LINES, isWineForSale, round2, wineMaxQty } from "@/lib/wineSale";
-import type { Wine } from "@/types";
+import type { PublicWineStore } from "@/lib/wineStoreRules";
+import type { PublicWineDetail, SaleWine } from "@/lib/wines";
 import { CartLink } from "../CartLink";
 import { QtyStepper } from "../QtyStepper";
+import { StoreClosedNotice } from "../StoreClosedNotice";
 import { WINE_TYPE_LABEL, WINES_COPY } from "../copy";
 
 export interface WineTasting {
@@ -30,8 +32,19 @@ export interface WineTasting {
 }
 
 /* Ficha de un vino: la botella sobre fondo oscuro, su descripción, la ficha técnica,
-   las catas en que se degustó y otros vinos. */
-export function WineDetail({ wine, tastings, related }: { wine: Wine; tastings: WineTasting[]; related: PublicWine[] }) {
+   las catas en que se degustó y otros vinos. `wine` llega sin `stock` (las existencias exactas no se publican) y con `soldOut`;
+   `store` es el estado de la tienda cuando se armó la página. */
+export function WineDetail({
+  wine,
+  tastings,
+  related,
+  store: initialStore,
+}: {
+  wine: PublicWineDetail;
+  tastings: WineTasting[];
+  related: PublicWine[];
+  store: PublicWineStore;
+}) {
   const [lang, setLang] = useLang();
   useDocumentTitle(lang, { es: wine.name, en: wine.name });
   const t = WINES_COPY[lang];
@@ -42,17 +55,45 @@ export function WineDetail({ wine, tastings, related }: { wine: Wine; tastings: 
   const cart = useWineCart();
   const forSale = isWineForSale(wine);
   const priceUsd = forSale ? wine.priceUsd : null;
-  const maxQty = wineMaxQty(wine);
+
+  // Datos de ahora (botellas que quedan y estado de la tienda): la página parte de lo calculado en el servidor y lo
+  // refresca al abrirse con la misma consulta pública que usa el carrito. Si falla, se queda con lo del servidor.
+  const [live, setLive] = useState<{ available: number | null; soldOut: boolean; store: PublicWineStore } | null>(null);
+  useEffect(() => {
+    let alive = true;
+    fetch(`/api/wines/cart?ids=${encodeURIComponent(wine.id)}`, { cache: "no-store" })
+      .then((r) => r.json())
+      .then((d) => {
+        const current = Array.isArray(d?.wines) ? (d.wines as SaleWine[]).find((w) => w.id === wine.id) : undefined;
+        if (alive && d?.success && current && d.store) setLive({ available: current.available, soldOut: current.soldOut, store: d.store as PublicWineStore });
+      })
+      .catch(() => undefined);
+    return () => {
+      alive = false;
+    };
+  }, [wine.id]);
+  const store = live?.store ?? initialStore;
+  const soldOut = live ? live.soldOut : wine.soldOut;
+  const available = live?.available ?? null;
+
+  // Tope de este vino = el menor entre su máximo por pedido (o el configurado por defecto) y las botellas que quedan.
+  const perOrder = wineMaxQty(wine, store.defaultMaxPerOrder);
+  const maxQty = available === null ? perOrder : Math.max(1, Math.min(perOrder, available));
+  const stockLimited = available !== null && available < perOrder;
+  const canBuy = forSale && store.enabled && !soldOut;
   const rate = rates?.USD ?? null;
   const priceBs = priceUsd !== null && rate ? round2(priceUsd * rate) : null;
   const inCart = cart.items.find((i) => i.wineId === wine.id)?.quantity ?? 0;
   const [qty, setQty] = useState(1);
+  const shownQty = Math.min(qty, maxQty);
   const [note, setNote] = useState<{ text: string; warn: boolean } | null>(null);
 
-  const limitText = (limit: WineCartLimit) =>
-    limit === "max" ? t.limitMax(maxQty) : limit === "bottles" ? t.limitBottles(WINE_ORDER_MAX_BOTTLES) : t.limitLines(WINE_ORDER_MAX_LINES);
+  const limitText = (limit: WineCartLimit) => {
+    if (limit === "max") return stockLimited ? t.limitStock(maxQty) : t.limitMax(maxQty);
+    return limit === "bottles" ? t.limitBottles(WINE_ORDER_MAX_BOTTLES) : t.limitLines(WINE_ORDER_MAX_LINES);
+  };
   const addToCart = () => {
-    const result = cart.add(wine.id, qty, maxQty);
+    const result = cart.add(wine.id, shownQty, maxQty);
     setNote(result.limit ? { text: limitText(result.limit), warn: true } : { text: t.added, warn: false });
     return result;
   };
@@ -100,7 +141,7 @@ export function WineDetail({ wine, tastings, related }: { wine: Wine; tastings: 
                   <span className="material-symbols-outlined text-[18px]" aria-hidden="true">arrow_back</span>
                   {t.back}
                 </Link>
-                {(forSale || cart.count > 0) && <CartLink lang={lang} count={cart.count} tone="dark" />}
+                {(canBuy || cart.count > 0) && <CartLink lang={lang} count={cart.count} tone="dark" />}
               </div>
               <p className="mt-4 text-[12px] font-semibold uppercase tracking-[0.2em] text-sun">
                 {[WINE_TYPE_LABEL[lang][wine.type], wine.vintage].filter(Boolean).join(" · ")}
@@ -125,53 +166,67 @@ export function WineDetail({ wine, tastings, related }: { wine: Wine; tastings: 
                     </p>
                   )}
 
-                  <div className="mt-5 flex items-center justify-between gap-3">
-                    <span id="wine-qty-label" className="text-[12px] font-semibold uppercase tracking-[0.14em] text-paper/75">
-                      {t.quantity}
-                    </span>
-                    <QtyStepper
-                      value={qty}
-                      max={maxQty}
-                      onChange={(v) => setQty(Math.max(1, Math.min(maxQty, v)))}
-                      lessLabel={t.fewer}
-                      moreLabel={t.more}
-                      labelledBy="wine-qty-label"
-                      tone="dark"
-                    />
-                  </div>
-                  <p className="mt-2 text-[12px] text-paper/65">
-                    {t.maxPerOrder(maxQty)}
-                    {inCart > 0 && <> {t.inCart(inCart)}</>}
-                  </p>
+                  {!store.enabled ? (
+                    <StoreClosedNotice lang={lang} message={store.closedMessage} tone="dark" className="mt-5" />
+                  ) : soldOut ? (
+                    <div className="mt-5">
+                      <p className="inline-flex items-center gap-2 h-9 px-3.5 rounded bg-paper/15 text-paper text-[12px] font-semibold uppercase tracking-[0.12em]">
+                        <span className="material-symbols-outlined text-[16px]" aria-hidden="true">remove_shopping_cart</span>
+                        {t.soldOut}
+                      </p>
+                      <p role="status" className="mt-3 text-[13px] leading-relaxed text-paper/80">{t.soldOutText}</p>
+                    </div>
+                  ) : (
+                    <>
+                      <div className="mt-5 flex items-center justify-between gap-3">
+                        <span id="wine-qty-label" className="text-[12px] font-semibold uppercase tracking-[0.14em] text-paper/75">
+                          {t.quantity}
+                        </span>
+                        <QtyStepper
+                          value={shownQty}
+                          max={maxQty}
+                          onChange={(v) => setQty(Math.max(1, Math.min(maxQty, v)))}
+                          lessLabel={t.fewer}
+                          moreLabel={t.more}
+                          labelledBy="wine-qty-label"
+                          tone="dark"
+                        />
+                      </div>
+                      <p className={`mt-2 text-[12px] ${stockLimited ? "text-tertiary-fixed" : "text-paper/65"}`}>
+                        {stockLimited && available !== null ? t.onlyLeft(available) : t.maxPerOrder(maxQty)}
+                        {inCart > 0 && <> {t.inCart(inCart)}</>}
+                      </p>
 
-                  <div className="mt-5 flex flex-col sm:flex-row gap-3">
-                    <button
-                      type="button"
-                      onClick={buyNow}
-                      className="flex-1 inline-flex items-center justify-center gap-2 h-[52px] px-6 bg-sun hover:bg-tertiary-fixed-dim text-ink text-[14px] font-semibold rounded transition-colors"
-                    >
-                      <span className="material-symbols-outlined text-[18px]" aria-hidden="true">shopping_bag</span>
-                      {t.buyNow}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={addToCart}
-                      className="flex-1 inline-flex items-center justify-center gap-2 h-[52px] px-6 border border-paper/40 hover:border-sun hover:text-sun text-paper text-[14px] font-semibold rounded transition-colors"
-                    >
-                      <span className="material-symbols-outlined text-[18px]" aria-hidden="true">add_shopping_cart</span>
-                      {t.addToCart}
-                    </button>
-                  </div>
-                  <div role="status" aria-live="polite" className="mt-3 min-h-[20px] text-[13px]">
-                    {note && (
-                      <>
-                        <span className={note.warn ? "text-tertiary-fixed" : "text-paper/85"}>{note.text}</span>{" "}
-                        <Link href="/vinos/carrito" className="font-semibold text-sun underline underline-offset-4">
-                          {t.viewCart}
-                        </Link>
-                      </>
-                    )}
-                  </div>
+                      <div className="mt-5 flex flex-col sm:flex-row gap-3">
+                        <button
+                          type="button"
+                          onClick={buyNow}
+                          className="flex-1 inline-flex items-center justify-center gap-2 h-[52px] px-6 bg-sun hover:bg-tertiary-fixed-dim text-ink text-[14px] font-semibold rounded transition-colors"
+                        >
+                          <span className="material-symbols-outlined text-[18px]" aria-hidden="true">shopping_bag</span>
+                          {t.buyNow}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={addToCart}
+                          className="flex-1 inline-flex items-center justify-center gap-2 h-[52px] px-6 border border-paper/40 hover:border-sun hover:text-sun text-paper text-[14px] font-semibold rounded transition-colors"
+                        >
+                          <span className="material-symbols-outlined text-[18px]" aria-hidden="true">add_shopping_cart</span>
+                          {t.addToCart}
+                        </button>
+                      </div>
+                      <div role="status" aria-live="polite" className="mt-3 min-h-[20px] text-[13px]">
+                        {note && (
+                          <>
+                            <span className={note.warn ? "text-tertiary-fixed" : "text-paper/85"}>{note.text}</span>{" "}
+                            <Link href="/vinos/carrito" className="font-semibold text-sun underline underline-offset-4">
+                              {t.viewCart}
+                            </Link>
+                          </>
+                        )}
+                      </div>
+                    </>
+                  )}
                 </div>
               )}
               <a
@@ -241,7 +296,7 @@ export function WineDetail({ wine, tastings, related }: { wine: Wine; tastings: 
             <ul className="grid grid-cols-2 lg:grid-cols-4 gap-x-4 gap-y-10 sm:gap-x-6">
               {related.map((w) => (
                 <li key={w.id}>
-                  <WineCard wine={w} lang={lang} rates={rates} />
+                  <WineCard wine={w} lang={lang} rates={rates} storeOpen={store.enabled} />
                 </li>
               ))}
             </ul>

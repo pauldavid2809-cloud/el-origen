@@ -227,9 +227,14 @@ export default function AdminDashboardPage() {
           <section aria-label="Pedidos de vinos" className="space-y-3">
             <div className="flex items-center justify-between gap-3">
               <h2 className="font-serif text-xl">Vinos</h2>
-              <Link href="/admin/pedidos-vinos" className="text-[13px] font-semibold text-primary-container hover:underline">
-                Pedidos de vinos
-              </Link>
+              <div className="flex flex-wrap justify-end gap-x-4 gap-y-1">
+                <Link href="/admin/tienda" className="text-[13px] font-semibold text-primary-container hover:underline">
+                  Configurar la tienda
+                </Link>
+                <Link href="/admin/pedidos-vinos" className="text-[13px] font-semibold text-primary-container hover:underline">
+                  Pedidos de vinos
+                </Link>
+              </div>
             </div>
             <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
               <Metric

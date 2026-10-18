@@ -2,12 +2,13 @@ import "server-only";
 import crypto from "crypto";
 import { RATE_CURRENCIES, type PaymentMethodId, type RateCurrency } from "@/types";
 import { fetchAllRows, generateToken, getAdminClient, type DeliveryStatus, type OrderStatus } from "./orders";
-import { WINE_PENDING_TTL_HOURS } from "./wineSale";
+import { round2, WINE_PENDING_TTL_HOURS } from "./wineSale";
 
 /* ─────────────────────────────────────────────────────────────
-   Pedidos de vinos con pago verificado (tabla public.wine_orders, supabase/v6.sql).
+   Pedidos de vinos con pago verificado (tabla public.wine_orders, supabase/v6.sql; envío y zona en supabase/v7.sql).
    Misma máquina de estados que las reservas (orders.ts): pending_payment → in_review → approved | rejected ;
-   cancelled. No reserva stock, no genera entradas ni QR. Sin Supabase guarda en memoria
+   cancelled. No genera entradas ni QR. Reservan existencias de los vinos que las controlan (ver `getWineHolds`)
+   mientras estén en revisión, aprobados o pendientes de pago vigentes. Sin Supabase guarda en memoria
    (solo sirve para probar en local: se pierde al reiniciar).
    NO importa wines.ts (wines.ts consulta `wineHasOrders` desde aquí: evita un ciclo).
    ───────────────────────────────────────────────────────────── */
@@ -42,7 +43,13 @@ export interface WineOrder {
   fulfillment: FulfillmentMethod;
   deliveryAddress: string | null;
   deliveryNote: string | null;
+  /** Suma de las botellas (sin envío). */
   subtotalUsd: number;
+  /** Costo de envío cobrado; 0 en retiro, con envío gratis, con el costo acordado por WhatsApp y en pedidos anteriores a v7. */
+  shippingUsd: number;
+  /** Nombre de la zona de entrega elegida (copia: no cambia si luego se renombra la zona); null si no aplica. */
+  deliveryZone: string | null;
+  /** subtotalUsd + shippingUsd. */
   totalUsd: number;
   /** Siempre 'USD' en los pedidos de vino. */
   rateCurrency: RateCurrency;
@@ -77,13 +84,13 @@ export type NewWineOrder = Pick<
   | "customerName" | "customerEmail" | "customerPhone" | "customerDocId"
   | "items" | "bottlesCount" | "fulfillment" | "subtotalUsd" | "totalUsd"
 > &
-  Partial<Pick<WineOrder, "memberId" | "deliveryAddress" | "deliveryNote" | "acceptedTermsAt">>;
+  Partial<Pick<WineOrder, "memberId" | "deliveryAddress" | "deliveryNote" | "acceptedTermsAt" | "shippingUsd" | "deliveryZone">>;
 
 /** Lo que puede ver el cliente con el enlace de su pedido: lista de inclusión (sin id, token, correo, miembro ni comprobante). */
 export type PublicWineOrder = Pick<
   WineOrder,
   | "code" | "status" | "customerName" | "customerPhone" | "customerDocId" | "items" | "bottlesCount"
-  | "fulfillment" | "deliveryAddress" | "deliveryNote" | "subtotalUsd" | "totalUsd" | "rateCurrency"
+  | "fulfillment" | "deliveryAddress" | "deliveryNote" | "subtotalUsd" | "shippingUsd" | "deliveryZone" | "totalUsd" | "rateCurrency"
   | "paymentMethod" | "paymentReference" | "paymentAmountBs" | "rejectionReason" | "deliveredAt"
   | "createdAt" | "updatedAt"
 >;
@@ -101,6 +108,8 @@ export function toPublicWineOrder(o: WineOrder): PublicWineOrder {
     deliveryAddress: o.deliveryAddress,
     deliveryNote: o.deliveryNote,
     subtotalUsd: o.subtotalUsd,
+    shippingUsd: o.shippingUsd,
+    deliveryZone: o.deliveryZone,
     totalUsd: o.totalUsd,
     rateCurrency: o.rateCurrency,
     paymentMethod: o.paymentMethod,
@@ -122,7 +131,8 @@ const FIELDS: [keyof WineOrder, string][] = [
   ["customerName", "customer_name"], ["customerEmail", "customer_email"], ["customerPhone", "customer_phone"],
   ["customerDocId", "customer_doc_id"], ["items", "items"], ["bottlesCount", "bottles_count"],
   ["fulfillment", "fulfillment"], ["deliveryAddress", "delivery_address"], ["deliveryNote", "delivery_note"],
-  ["subtotalUsd", "subtotal_usd"], ["totalUsd", "total_usd"], ["rateCurrency", "rate_currency"], ["bcvRate", "bcv_rate"],
+  ["subtotalUsd", "subtotal_usd"], ["shippingUsd", "shipping_usd"], ["deliveryZone", "delivery_zone"],
+  ["totalUsd", "total_usd"], ["rateCurrency", "rate_currency"], ["bcvRate", "bcv_rate"],
   ["paymentMethod", "payment_method"], ["paymentBank", "payment_bank"], ["paymentReference", "payment_reference"],
   ["paymentAmountBs", "payment_amount_bs"], ["payerBank", "payer_bank"], ["payerDocId", "payer_doc_id"],
   ["payerPhone", "payer_phone"], ["paymentNote", "payment_note"], ["proofPath", "proof_path"],
@@ -132,7 +142,7 @@ const FIELDS: [keyof WineOrder, string][] = [
   ["createdAt", "created_at"], ["updatedAt", "updated_at"],
 ];
 
-const NUMERIC: (keyof WineOrder)[] = ["bottlesCount", "subtotalUsd", "totalUsd", "bcvRate", "paymentAmountBs"];
+const NUMERIC: (keyof WineOrder)[] = ["bottlesCount", "subtotalUsd", "shippingUsd", "totalUsd", "bcvRate", "paymentAmountBs"];
 
 /** Las líneas llegan como jsonb: se normalizan por si alguna fila trae tipos distintos. */
 function itemsFromRow(v: unknown): WineOrderItem[] {
@@ -157,6 +167,9 @@ function fromRow(row: Row): WineOrder {
     o[k] = NUMERIC.includes(k) && v !== null && v !== undefined ? Number(v) : v ?? null;
   }
   o.items = itemsFromRow(row.items);
+  // Pedidos anteriores a v7.sql (o base sin migrar): sin columnas de envío → sin costo y sin zona.
+  o.shippingUsd = Number(row.shipping_usd) || 0;
+  o.deliveryZone = typeof row.delivery_zone === "string" && row.delivery_zone ? row.delivery_zone : null;
   o.fulfillment = row.fulfillment === "delivery" ? "delivery" : "pickup";
   o.rateCurrency = RATE_CURRENCIES.includes(row.rate_currency as RateCurrency) ? row.rate_currency : "USD";
   o.emailStatus = row.email_status ?? "not_sent";
@@ -205,6 +218,11 @@ export function isWineOrderPendingExpired(
   return Date.parse(o.createdAt) + WINE_PENDING_TTL_HOURS * 3_600_000 < now;
 }
 
+/** Fecha (ISO) anterior a la cual un pedido pendiente de pago ya venció. */
+function pendingCutoffIso(now = Date.now()): string {
+  return new Date(now - WINE_PENDING_TTL_HOURS * 3_600_000).toISOString();
+}
+
 /* ─── Operaciones ─── */
 
 /** Pedido nuevo (pendiente de pago) con sus valores iniciales, aún sin guardar. */
@@ -225,6 +243,8 @@ export function buildWineOrder(input: NewWineOrder): WineOrder {
     deliveryAddress: input.deliveryAddress ?? null,
     deliveryNote: input.deliveryNote ?? null,
     subtotalUsd: input.subtotalUsd,
+    shippingUsd: input.shippingUsd && Number.isFinite(input.shippingUsd) && input.shippingUsd > 0 ? round2(input.shippingUsd) : 0,
+    deliveryZone: input.deliveryZone ?? null,
     totalUsd: input.totalUsd,
     rateCurrency: "USD",
     bcvRate: null,
@@ -237,6 +257,11 @@ export function buildWineOrder(input: NewWineOrder): WineOrder {
   };
 }
 
+/** La base no tiene las columnas de supabase/v7.sql: PostgREST (PGRST204) o Postgres (42703). */
+function isMissingV7Column(error: { code?: string; message: string }): boolean {
+  return (error.code === "PGRST204" || error.code === "42703") && /shipping_usd|delivery_zone/.test(error.message);
+}
+
 /** Crea el pedido. Los precios y el total los calcula el servidor antes de llamar aquí (nunca el cliente). */
 export async function createWineOrder(input: NewWineOrder): Promise<WineOrder> {
   let base = buildWineOrder(input);
@@ -247,9 +272,24 @@ export async function createWineOrder(input: NewWineOrder): Promise<WineOrder> {
     memWineOrders.set(base.id, base);
     return base;
   }
+  // Si falta ejecutar v7.sql, un pedido sin envío ni zona se guarda igual (las columnas tienen valor por defecto);
+  // uno con costo de envío no puede guardarse sin perder el monto, y falla con un mensaje claro.
+  let withShippingColumns = true;
   for (let attempt = 0; ; attempt++) {
-    const { data, error } = await sb.from("wine_orders").insert({ ...toRow(base), id: base.id }).select().single();
+    const row = toRow(base);
+    if (!withShippingColumns) {
+      delete row.shipping_usd;
+      delete row.delivery_zone;
+    }
+    const { data, error } = await sb.from("wine_orders").insert({ ...row, id: base.id }).select().single();
     if (!error) return fromRow(data);
+    if (withShippingColumns && isMissingV7Column(error)) {
+      if (base.shippingUsd > 0) {
+        throw new Error("Falta ejecutar supabase/v7.sql en Supabase: la tabla wine_orders no tiene las columnas de envío.");
+      }
+      withShippingColumns = false;
+      continue;
+    }
     // Código repetido (31^5 combinaciones: casi imposible): se genera otro y se reintenta.
     if (error.code === "23505" && error.message.includes("wine_orders_code_key") && attempt < 3) {
       base = { ...base, code: generateWineOrderCode() };
@@ -313,7 +353,7 @@ export async function countPendingWineOrders(memberId: string): Promise<number> 
       (o) => o.memberId === memberId && o.status === "pending_payment" && !isWineOrderPendingExpired(o, now)
     ).length;
   }
-  const cutoff = new Date(now - WINE_PENDING_TTL_HOURS * 3_600_000).toISOString();
+  const cutoff = pendingCutoffIso(now);
   const { count, error } = await sb
     .from("wine_orders")
     .select("id", { count: "exact", head: true })
@@ -410,6 +450,98 @@ export async function wineHasOrders(wineId: string): Promise<boolean> {
     .limit(1);
   if (error) throw new Error(`No se pudieron consultar los pedidos del vino: ${error.message}`);
   return Boolean(data && data.length);
+}
+
+/* ─── Existencias: botellas reservadas por vino ─── */
+
+/** Botellas de un vino dentro de un pedido que hoy cuenta contra las existencias. */
+export interface WineReservation {
+  orderId: string;
+  createdAt: string;
+  wineId: string;
+  quantity: number;
+}
+
+/**
+ * Reservas vigentes: líneas de los pedidos en revisión, aprobados y pendientes de pago que no han vencido
+ * (rechazados, anulados y vencidos se liberan solos). `wineIds` limita a esos vinos. Una sola consulta paginada.
+ * En error lanza (el llamador decide si degrada o falla).
+ */
+export async function listWineReservations(wineIds?: string[]): Promise<WineReservation[]> {
+  const wanted = wineIds ? new Set(wineIds) : null;
+  const now = Date.now();
+  const sb = getAdminClient();
+  let orders: { id: string; createdAt: string; items: WineOrderItem[] }[];
+  if (!sb) {
+    orders = Array.from(memWineOrders.values())
+      .filter((o) => o.status === "in_review" || o.status === "approved" || (o.status === "pending_payment" && !isWineOrderPendingExpired(o, now)))
+      .map((o) => ({ id: o.id, createdAt: o.createdAt, items: o.items }));
+  } else {
+    const cutoff = pendingCutoffIso(now);
+    const rows = await fetchAllRows<Row>((from, to) =>
+      sb
+        .from("wine_orders")
+        .select("id, created_at, items")
+        .or(`status.in.(in_review,approved),and(status.eq.pending_payment,created_at.gte.${cutoff})`)
+        .order("created_at", { ascending: true })
+        .order("id", { ascending: true })
+        .range(from, to)
+    );
+    orders = rows.map((r) => ({ id: String(r.id), createdAt: String(r.created_at ?? ""), items: itemsFromRow(r.items) }));
+  }
+  const out: WineReservation[] = [];
+  for (const o of orders) {
+    for (const i of o.items) {
+      if (i.quantity > 0 && i.wineId && (!wanted || wanted.has(i.wineId))) {
+        out.push({ orderId: o.id, createdAt: o.createdAt, wineId: i.wineId, quantity: i.quantity });
+      }
+    }
+  }
+  return out;
+}
+
+/**
+ * Botellas reservadas por vino (suma de `quantity` en pedidos en revisión, aprobados y pendientes de pago vigentes).
+ * Con `wineIds`, cada id pedido aparece en el mapa (0 si no tiene reservas). En error lanza.
+ * Disponibles = `availableOf(wine.stock, holds.get(wine.id) ?? 0)`.
+ */
+export async function getWineHolds(wineIds?: string[]): Promise<Map<string, number>> {
+  const holds = new Map<string, number>((wineIds ?? []).map((id) => [id, 0]));
+  for (const r of await listWineReservations(wineIds)) holds.set(r.wineId, (holds.get(r.wineId) ?? 0) + r.quantity);
+  return holds;
+}
+
+/** Orden en que se atienden las reservas de un vino: la más antigua primero (empate por id), igual para todas las peticiones. */
+const byReservationOrder = (a: WineReservation, b: WineReservation) =>
+  (Date.parse(a.createdAt) || 0) - (Date.parse(b.createdAt) || 0) || (a.orderId < b.orderId ? -1 : a.orderId > b.orderId ? 1 : 0);
+
+/**
+ * Rechequeo de carreras (función pura): ordena las reservas de cada vino por (createdAt, id); si la suma acumulada
+ * hasta este pedido supera las existencias, este pedido pierde. Devuelve el primer vino del pedido que no cabe y
+ * cuántas botellas quedaban para él, o null si cabe. `stocks`: existencias de los vinos que controlan existencias.
+ */
+export function stockConflictOf(
+  reservations: WineReservation[],
+  orderId: string,
+  stocks: Map<string, number>
+): { wineId: string; available: number } | null {
+  for (const [wineId, stock] of Array.from(stocks.entries())) {
+    let before = 0;
+    for (const r of reservations.filter((x) => x.wineId === wineId).sort(byReservationOrder)) {
+      if (r.orderId === orderId) {
+        if (before + r.quantity > stock) return { wineId, available: Math.max(0, stock - before) };
+        break;
+      }
+      before += r.quantity;
+    }
+  }
+  return null;
+}
+
+/** Tras crear un pedido: ¿alguna de sus líneas supera las existencias por haberse cruzado con otro pedido? En error lanza. */
+export async function findStockConflict(orderId: string, stocks: Map<string, number>): Promise<{ wineId: string; available: number } | null> {
+  if (!stocks.size) return null;
+  return stockConflictOf(await listWineReservations(Array.from(stocks.keys())), orderId, stocks);
 }
 
 /* ─── Cola del bot de WhatsApp ─── */

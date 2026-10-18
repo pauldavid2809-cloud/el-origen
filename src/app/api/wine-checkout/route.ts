@@ -2,8 +2,19 @@ import { NextResponse } from "next/server";
 import { clientIp, consume, hit, isLimited, tooManyAttempts, type RateLimit } from "@/lib/rateLimit";
 import { currentMember } from "@/lib/members";
 import { getWine } from "@/lib/wines";
-import { countPendingWineOrders, createWineOrder, type FulfillmentMethod, type WineOrderItem } from "@/lib/wineOrders";
 import {
+  countPendingWineOrders,
+  createWineOrder,
+  findStockConflict,
+  getWineHolds,
+  transitionWineOrder,
+  type FulfillmentMethod,
+  type WineOrderItem,
+} from "@/lib/wineOrders";
+import { getWineStoreConfig } from "@/lib/wineStore";
+import { quoteShipping, type ShippingQuote } from "@/lib/wineStoreRules";
+import {
+  availableOf,
   isWineForSale,
   round2,
   wineMaxQty,
@@ -41,10 +52,26 @@ function parseQuantity(v: unknown): number | null {
   return Number.isInteger(n) && n >= 1 && n <= WINE_MAX_PER_ORDER_LIMIT ? n : null;
 }
 
+/** «Solo quedan 3 botellas de «X»», «Solo queda 1 botella de «X»» o «X se agotó». */
+function stockMessage(name: string, available: number): string {
+  if (available <= 0) return `«${name}» se agotó.`;
+  return available === 1 ? `Solo queda 1 botella de «${name}».` : `Solo quedan ${available} botellas de «${name}».`;
+}
+
+/** Respuesta cuando el envío elegido no es válido con la configuración de ahora (zona obligatoria, zona quitada, modo apagado). */
+function shippingError(quote: Extract<ShippingQuote, { ok: false }>) {
+  const field = quote.code === "pickup_disabled" || quote.code === "delivery_disabled" ? "fulfillment" : "deliveryZoneId";
+  // Falta elegir la zona = datos incompletos (400); lo demás significa que la configuración cambió desde que se abrió la página (409).
+  return bad(quote.message, quote.code === "zone_required" ? 400 : 409, { code: quote.code, field });
+}
+
 /**
  * Abre el pedido de vinos (pendiente de pago) y devuelve el enlace privado para pagar y seguirlo.
  * Solo para miembros con sesión (Cuenta Origen): el pedido queda en su cuenta y usa el correo de la cuenta.
- * El cliente solo dice QUÉ vinos y CUÁNTAS botellas: nombre, añada, precio y totales los fija el servidor.
+ * El cliente solo dice QUÉ vinos, CUÁNTAS botellas, cómo recibe el pedido y, si aplica, la zona (`deliveryZoneId`):
+ * nombre, añada, precio, envío, existencias y totales los fija el servidor con la configuración de ahora.
+ * Orden de las validaciones: tienda cerrada (403) → datos → entrega y zona → vinos, precios y tope → existencias (409)
+ * → límite de pendientes → crear (subtotal + envío) → rechequeo de existencias por carreras (409).
  */
 export async function POST(request: Request) {
   try {
@@ -55,6 +82,12 @@ export async function POST(request: Request) {
     const read = await readJsonBody(request, MAX_BODY_BYTES);
     if (!read.ok) return read.tooLarge ? bad("La solicitud es demasiado grande.", 413) : bad("Solicitud inválida.");
     const body = read.body;
+
+    // La configuración se lee una vez y se usa en toda la petición (así no cambia a mitad de camino).
+    const store = await getWineStoreConfig();
+    if (!store.enabled) {
+      return bad("La tienda está cerrada por ahora. Tus pedidos ya hechos se pueden seguir pagando desde su enlace.", 403, { code: "store_closed" });
+    }
 
     const member = await currentMember();
     if (!member) return bad("Inicia sesión con tu Cuenta Origen para comprar.", 401, { code: "login_required" });
@@ -73,6 +106,7 @@ export async function POST(request: Request) {
       const fulfillment: FulfillmentMethod | null = body.fulfillment === "pickup" || body.fulfillment === "delivery" ? body.fulfillment : null;
       const deliveryAddress = text(body.deliveryAddress).slice(0, 300);
       const deliveryNote = text(body.deliveryNote).slice(0, 300);
+      const deliveryZoneId = text(body.deliveryZoneId).slice(0, 60);
 
       if (!name || !phone || !docId) return bad("Faltan datos obligatorios del pedido.");
       if (name.length < 3) return bad("Indica tu nombre completo.", 400, { field: "customerName" });
@@ -87,6 +121,9 @@ export async function POST(request: Request) {
       if (body.acceptedTerms !== true) {
         return bad("Debes aceptar las condiciones de compra para hacer el pedido.", 400, { field: "acceptedTerms" });
       }
+      // ¿Se permite este modo de entrega y la zona existe? El costo definitivo se calcula abajo, con el subtotal.
+      const early = quoteShipping(store, { fulfillment, subtotalUsd: 0, zoneId: deliveryZoneId });
+      if (!early.ok) return shippingError(early);
 
       // Líneas: solo cuentan wineId y quantity. Los vinos repetidos se fusionan y todos los topes se aplican sobre el total.
       const rawItems = Array.isArray(body.items) ? body.items : [];
@@ -126,7 +163,7 @@ export async function POST(request: Request) {
             { code: "wine_unavailable", wineId: ids[i] }
           );
         }
-        const max = wineMaxQty(wine);
+        const max = wineMaxQty(wine, store.defaultMaxPerOrder);
         if (quantity > max) {
           return bad(`Solo puedes pedir hasta ${max} botellas de «${wine.name}» por pedido.`, 400, { field: "items", wineId: wine.id });
         }
@@ -142,6 +179,21 @@ export async function POST(request: Request) {
       }
       if (!Number.isFinite(subtotal) || subtotal <= 0) return bad("No se pudo calcular el total del pedido.", 409, { code: "wine_unavailable" });
 
+      // Existencias: solo los vinos que las controlan. Disponibles = totales − reservadas por pedidos vigentes.
+      const stocks = new Map<string, number>();
+      for (const wine of wines) if (wine && wine.stock !== null) stocks.set(wine.id, wine.stock);
+      if (stocks.size) {
+        const holds = await getWineHolds(Array.from(stocks.keys()));
+        for (let i = 0; i < ids.length; i++) {
+          const wine = wines[i];
+          if (!wine) continue;
+          const available = availableOf(wine.stock, holds.get(wine.id) ?? 0);
+          if (available !== null && (quantities.get(ids[i]) ?? 0) > available) {
+            return bad(stockMessage(wine.name, available), 409, { code: "insufficient_stock", wineId: wine.id, available });
+          }
+        }
+      }
+
       if ((await countPendingWineOrders(member.id)) >= WINE_MAX_PENDING_PER_MEMBER) {
         return bad(
           `Ya tienes pedidos pendientes de pago. Reporta el pago desde el enlace de tu pedido, o espera a que venza (${WINE_PENDING_TTL_HOURS} horas) para hacer otro.`,
@@ -150,8 +202,10 @@ export async function POST(request: Request) {
         );
       }
 
-      // Sin cupones ni costo de envío en esta versión: el total es la suma de las botellas.
-      // PENDIENTE CLIENTE: costo y zonas de envío (hoy se coordina por WhatsApp y no está incluido en el total).
+      // Sin cupones. El envío sale de la configuración (nunca de un monto del cliente) y se suma al total; en modo
+      // «coordinar» vale 0 (el costo se acuerda por WhatsApp y no va en el total).
+      const quote = quoteShipping(store, { fulfillment, subtotalUsd: subtotal, zoneId: deliveryZoneId });
+      if (!quote.ok) return shippingError(quote);
       const order = await createWineOrder({
         memberId: member.id,
         customerName: name,
@@ -164,11 +218,40 @@ export async function POST(request: Request) {
         deliveryAddress: fulfillment === "delivery" ? deliveryAddress : null,
         deliveryNote: deliveryNote || null,
         subtotalUsd: subtotal,
-        totalUsd: subtotal,
+        shippingUsd: quote.shippingUsd,
+        deliveryZone: quote.zone?.name ?? null,
+        totalUsd: round2(subtotal + quote.shippingUsd),
         acceptedTermsAt: new Date().toISOString(),
       });
       hit(ipKey, ORDERS_PER_IP);
       hit(memberKey, ORDERS_PER_MEMBER);
+
+      // Rechequeo por carreras: dos compras de la última botella pueden haber pasado la comprobación de arriba a la vez.
+      // Se atienden por orden de llegada (createdAt, id); la que no cabe se anula y no queda pagable en exceso.
+      if (stocks.size) {
+        let conflict: Awaited<ReturnType<typeof findStockConflict>>;
+        try {
+          conflict = await findStockConflict(order.id, stocks);
+        } catch (err) {
+          // Sin poder comprobar no se deja un pedido que podría exceder las existencias: se anula y se pide reintentar.
+          console.error("[wine-checkout] No se pudo rechequear las existencias; se anula el pedido:", err);
+          await transitionWineOrder(order.id, ["pending_payment"], { status: "cancelled" }).catch((e) =>
+            console.error("[wine-checkout] No se pudo anular el pedido tras el fallo del rechequeo:", e)
+          );
+          return bad("No se pudo confirmar la disponibilidad. Intenta de nuevo.", 503);
+        }
+        if (conflict) {
+          const lost = items.find((i) => i.wineId === conflict?.wineId);
+          await transitionWineOrder(order.id, ["pending_payment"], { status: "cancelled" }).catch((e) =>
+            console.error("[wine-checkout] No se pudo anular el pedido que no cabía en las existencias:", e)
+          );
+          return bad(stockMessage(lost?.name ?? "el vino", conflict.available), 409, {
+            code: "insufficient_stock",
+            wineId: conflict.wineId,
+            available: conflict.available,
+          });
+        }
+      }
 
       return NextResponse.json({ success: true, code: order.code, redirectUrl: `/pedido/${order.token}` });
     } finally {

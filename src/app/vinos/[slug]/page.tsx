@@ -1,7 +1,8 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { getCata } from "@/lib/catas";
-import { getWine, listWines, toPublicWine } from "@/lib/wines";
+import { getWine, listWines, toPublicWineDetail, withSoldOut } from "@/lib/wines";
+import { getPublicWineStore } from "@/lib/wineStore";
 import { WineDetail, type WineTasting } from "./WineDetail";
 
 export const dynamic = "force-dynamic";
@@ -36,9 +37,12 @@ export default async function WinePage({ params }: { params: { slug: string } })
   const wine = await loadWine(params.slug);
   if (!wine) notFound();
 
-  const [catas, all] = await Promise.all([
+  const [catas, all, store, detail] = await Promise.all([
     Promise.all(wine.tastingIds.map((id) => getCata(id).catch(() => null))),
     listWines({ publishedOnly: true }).catch(() => []),
+    getPublicWineStore(),
+    // Ficha sin `stock` (las existencias exactas no se publican) y con `soldOut` calculado en vivo.
+    toPublicWineDetail(wine),
   ]);
   // Solo catas visibles: las publicadas enlazan a su página; las archivadas, a sus recuerdos.
   const tastings: WineTasting[] = catas
@@ -51,7 +55,7 @@ export default async function WinePage({ params }: { params: { slug: string } })
       date: c.dateFull,
       href: c.status === "archived" ? `/recuerdos/${c.slug || c.id}` : `/catas/${c.slug || c.id}`,
     }));
-  const related = all.filter((w) => w.id !== wine.id).slice(0, 4).map(toPublicWine);
+  const related = await withSoldOut(all.filter((w) => w.id !== wine.id).slice(0, 4));
 
-  return <WineDetail wine={wine} tastings={tastings} related={related} />;
+  return <WineDetail wine={detail} tastings={tastings} related={related} store={store} />;
 }

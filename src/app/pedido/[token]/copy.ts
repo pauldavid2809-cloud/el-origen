@@ -5,7 +5,10 @@ import { WINE_PENDING_TTL_HOURS } from "@/lib/wineSale";
 
 /* Textos de la página del pedido de vinos (ES/EN). Los del pago y el reporte de comprobante vienen de
    `@/components/payCopy` (los mismos de la orden de catas); aquí van los propios de los vinos.
-   PENDIENTE CLIENTE: costo y zonas de envío, punto de retiro y devoluciones (ver WINE_POLICIES en @/lib/wineSale). */
+   El retiro, la entrega y las condiciones de compra los define el administrador (Admin → Tienda de vinos): llegan en `store`. */
+
+/** Cierra con punto (sin duplicarlo si el texto ya termina en puntuación). */
+const dot = (s: string) => (/[.!?]$/.test(s) ? s : `${s}.`);
 
 const es = {
   ...PAY_COPY.es,
@@ -37,8 +40,12 @@ const es = {
   deliveryNote: "Nota",
   subtotal: "Subtotal",
   total: "Total",
-  // PENDIENTE CLIENTE: costo y zonas de envío.
-  shippingNote: "El costo de envío, si aplica, no está incluido en el total: lo coordinamos contigo por WhatsApp.",
+  shipping: "Envío",
+  shippingWithZone: (zone: string) => `Envío (${zone})`,
+  shippingFree: "Gratis",
+  shippingNoteCoordinated: "El costo del envío no está incluido en el total: lo acordamos contigo por WhatsApp y se paga aparte.",
+  pickupPlace: "Lugar de retiro",
+  pickupHours: "Horario de retiro",
 
   // Pago (textos propios de los vinos para PayAndReport)
   holdExpired: `Este pedido venció: pasaron más de ${WINE_PENDING_TTL_HOURS} horas sin reportar el pago. Aún puedes reportar tu pago y lo confirmaremos si el pedido sigue disponible, o hacer un pedido nuevo.`,
@@ -71,6 +78,13 @@ const es = {
   delivered: "Entregado",
   deliveredOn: (date: string) => `Entregado el ${date}`,
   toDeliverPickup: "Coordinaremos contigo el punto y la hora de retiro por WhatsApp.",
+  /** Con el lugar y/o el horario de retiro definidos por el administrador (alguno puede venir vacío). */
+  toDeliverPickupAt: (place: string, hours: string) =>
+    place && hours
+      ? `${dot(`Retira tu pedido en ${place}`)} ${dot(`Horario: ${hours}`)} Te escribiremos por WhatsApp para confirmar el día.`
+      : place
+        ? `${dot(`Retira tu pedido en ${place}`)} Coordinaremos contigo el horario por WhatsApp.`
+        : `${dot(`Horario de retiro: ${hours}`)} Coordinaremos contigo el punto de retiro por WhatsApp.`,
   toDeliverDelivery: "Coordinaremos contigo la hora de entrega por WhatsApp.",
   moreWines: "Ver más vinos",
   keepLink: "Guarda este enlace: aquí puedes consultar el estado de tu pedido.",
@@ -110,7 +124,12 @@ const en: OrderCopy = {
   deliveryNote: "Note",
   subtotal: "Subtotal",
   total: "Total",
-  shippingNote: "Delivery cost, if any, is not included in the total: we'll arrange it with you on WhatsApp.",
+  shipping: "Delivery",
+  shippingWithZone: (zone) => `Delivery (${zone})`,
+  shippingFree: "Free",
+  shippingNoteCoordinated: "The delivery cost is not included in the total: we'll agree it with you on WhatsApp and it is paid separately.",
+  pickupPlace: "Pickup place",
+  pickupHours: "Pickup hours",
 
   holdExpired: `This order has expired: more than ${WINE_PENDING_TTL_HOURS} hours passed without a payment report. You can still report your payment and we'll confirm it if the order is still available, or place a new order.`,
   heldUntil: "Order held until",
@@ -140,6 +159,12 @@ const en: OrderCopy = {
   delivered: "Delivered",
   deliveredOn: (date) => `Delivered on ${date}`,
   toDeliverPickup: "We'll arrange the pickup place and time with you on WhatsApp.",
+  toDeliverPickupAt: (place, hours) =>
+    place && hours
+      ? `${dot(`Pick up your order at ${place}`)} ${dot(`Hours: ${hours}`)} We'll message you on WhatsApp to confirm the day.`
+      : place
+        ? `${dot(`Pick up your order at ${place}`)} We'll arrange the time with you on WhatsApp.`
+        : `${dot(`Pickup hours: ${hours}`)} We'll arrange the pickup place with you on WhatsApp.`,
   toDeliverDelivery: "We'll arrange the delivery time with you on WhatsApp.",
   moreWines: "See more wines",
   keepLink: "Keep this link: you can check the status of your order here.",

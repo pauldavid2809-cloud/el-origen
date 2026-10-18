@@ -11,17 +11,20 @@ import { useLang } from "@/lib/useLang";
 import { useDocumentTitle } from "@/lib/useDocumentTitle";
 import { useWineCart } from "@/lib/useWineCart";
 import { isWineForSale } from "@/lib/wineSale";
+import type { PublicWineStore } from "@/lib/wineStoreRules";
 import { CartLink } from "./CartLink";
+import { StoreClosedNotice } from "./StoreClosedNotice";
 import { WINES_COPY } from "./copy";
 
-export function WinesCatalog({ wines }: { wines: PublicWine[] }) {
+/* `store`: estado de la tienda de ahora (la página es dinámica). Cerrada = aviso arriba y sin «Comprar»; los precios se ven. */
+export function WinesCatalog({ wines, store }: { wines: PublicWine[]; store: PublicWineStore }) {
   const [lang, setLang] = useLang();
   useDocumentTitle(lang, { es: "Nuestros vinos", en: "Our wines" });
   const t = WINES_COPY[lang];
   // Tasas del día (una sola consulta para todas las tarjetas) y carrito: solo importan si hay vinos a la venta.
   const rates = useBcvRates();
   const cart = useWineCart();
-  const hasSale = wines.some(isWineForSale);
+  const hasSale = store.enabled && wines.some(isWineForSale);
 
   return (
     <div className="bg-background text-on-background min-h-screen flex flex-col">
@@ -39,6 +42,7 @@ export function WinesCatalog({ wines }: { wines: PublicWine[] }) {
         />
 
         <section className="max-w-[1320px] mx-auto px-5 sm:px-8 lg:px-12 pt-8 pb-24">
+          {!store.enabled && wines.some(isWineForSale) && <StoreClosedNotice lang={lang} message={store.closedMessage} className="mb-8 max-w-3xl" />}
           {(hasSale || cart.count > 0) && (
             <div className="mb-8 flex justify-end">
               <CartLink lang={lang} count={cart.count} />
@@ -60,7 +64,7 @@ export function WinesCatalog({ wines }: { wines: PublicWine[] }) {
             <ul className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-x-4 gap-y-10 sm:gap-x-6">
               {wines.map((wine) => (
                 <li key={wine.id}>
-                  <WineCard wine={wine} lang={lang} rates={rates} />
+                  <WineCard wine={wine} lang={lang} rates={rates} storeOpen={store.enabled} />
                 </li>
               ))}
             </ul>

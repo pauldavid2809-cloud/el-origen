@@ -20,6 +20,7 @@ const NAV_ITEMS: NavItem[] = [
   { href: "/admin/reservas", label: "Reservas & Pagos", icon: "receipt_long" },
   // Ruta propia (no /admin/vinos/pedidos): isActive usa startsWith y marcaría a la vez «Vinos» y este elemento.
   { href: "/admin/pedidos-vinos", label: "Pedidos de vinos", icon: "shopping_bag" },
+  { href: "/admin/tienda", label: "Tienda de vinos", icon: "storefront" },
   { href: "/admin/cupones", label: "Cupones", icon: "sell" },
   { href: "/admin/miembros", label: "Miembros", icon: "group" },
   { href: "/admin/solicitudes", label: "Solicitudes", icon: "inbox", also: ["/admin/privadas"] },

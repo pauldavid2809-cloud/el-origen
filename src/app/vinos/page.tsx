@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
-import { listWines, toPublicWine } from "@/lib/wines";
+import { listWines, withSoldOut } from "@/lib/wines";
+import { getPublicWineStore } from "@/lib/wineStore";
 import { WinesCatalog } from "./WinesCatalog";
 
 export const dynamic = "force-dynamic";
@@ -11,11 +12,14 @@ export const metadata: Metadata = {
   openGraph: { title: "Nuestros vinos | El Origen", url: "/vinos" },
 };
 
-/* Catálogo público de vinos (los publicados en Admin → Vinos). */
+/* Catálogo público de vinos (los publicados en Admin → Vinos), con los agotados y el estado de la tienda de ahora. */
 export default async function WinesPage() {
-  const wines = await listWines({ publishedOnly: true }).catch((error) => {
-    console.error("[vinos] No se pudieron leer los vinos:", error);
-    return [];
-  });
-  return <WinesCatalog wines={wines.map(toPublicWine)} />;
+  const [wines, store] = await Promise.all([
+    listWines({ publishedOnly: true }).catch((error) => {
+      console.error("[vinos] No se pudieron leer los vinos:", error);
+      return [];
+    }),
+    getPublicWineStore(),
+  ]);
+  return <WinesCatalog wines={await withSoldOut(wines)} store={store} />;
 }

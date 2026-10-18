@@ -6,7 +6,16 @@ import { CONTACT } from "./contact";
 import { sendMail, type MailAttachment } from "./mailer";
 import { SITE_URL } from "./site";
 import { policiesEmailHtml, policiesPlainText } from "./policies";
-import { round2, WINE_POLICIES } from "./wineSale";
+import { round2 } from "./wineSale";
+import { getWineStoreConfig } from "./wineStore";
+import {
+  buildWinePolicies,
+  DEFAULT_WINE_STORE,
+  toPublicWineStore,
+  type PolicyText,
+  type PublicWineStore,
+  type WineStoreConfig,
+} from "./wineStoreRules";
 
 /* Notificaciones al cliente: correo (Gmail SMTP o Resend, vía mailer.ts) y WhatsApp
    (API de Meta o cola del bot propio). Cada persona recibe su propia entrada con QR.
@@ -377,14 +386,96 @@ const bottles = (n: number) => plural(n, "botella", "botellas");
 /** Nombre del vino con su añada: "Joven Roble 2021". */
 const wineLabel = (i: Pick<WineOrder["items"][number], "name" | "vintage">) => [i.name, i.vintage].filter(Boolean).join(" ");
 
-/** Líneas del pedido y total, en una tabla para el correo. */
+/* Lo que los avisos necesitan de la configuración de la tienda (el retiro y la entrega). Sirve tanto la configuración
+   completa (correo) como la versión pública (cola del bot). */
+type WineStoreView = Pick<PublicWineStore, "pickup" | "delivery">;
+
+/** Configuración vigente de la tienda para armar un aviso. Nunca lanza: ante un error usa los valores por defecto. */
+async function wineStoreConfigOrDefaults(): Promise<WineStoreConfig> {
+  try {
+    return await getWineStoreConfig();
+  } catch (err) {
+    console.error("[notify] No se pudo leer la configuración de la tienda; se usan los valores por defecto:", err);
+    return DEFAULT_WINE_STORE;
+  }
+}
+
+/**
+ * La tienda tal como la ven los avisos de WhatsApp (`buildWineWhatsAppMessage`). Nunca lanza: ante un error usa los
+ * valores por defecto. Quien arma varios mensajes (la cola del bot) la lee una sola vez y se la pasa a cada uno.
+ */
+export async function wineStoreForNotices(): Promise<PublicWineStore> {
+  return toPublicWineStore(await wineStoreConfigOrDefaults());
+}
+
+/** Cierra una frase con punto (sin duplicarlo si ya termina en puntuación). */
+const sentence = (s: string) => (/[.!?…]$/.test(s) ? s : `${s}.`);
+
+/** Texto de una línea acotado a `max` caracteres (sin saltos de línea ni espacios repetidos; no parte un emoji por la mitad). */
+function clip(v: unknown, max: number): string {
+  const s = String(v ?? "")
+    .replace(/[\u0000-\u001F\u007F-\u009F\u2028\u2029]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  if (s.length <= max) return s;
+  const out = s.slice(0, max - 1);
+  const last = out.charCodeAt(out.length - 1);
+  return `${last >= 0xd800 && last <= 0xdbff ? out.slice(0, -1) : out}…`;
+}
+
+/** Línea de envío de un pedido a domicilio: con costo ("Envío (Chacao)": $5) o, si eligió una zona sin costo, «sin costo». null = no hay nada que mostrar. */
+function wineShippingLine(o: WineOrder): { label: string; amount: string } | null {
+  if (o.fulfillment !== "delivery") return null;
+  const zone = o.deliveryZone ? clip(o.deliveryZone, 60) : "";
+  const label = zone ? `Envío (${zone})` : "Envío";
+  if (o.shippingUsd > 0) return { label, amount: money(o.shippingUsd) };
+  // Sin zona y sin costo no se sabe si el envío salió gratis o se coordina aparte: no se afirma nada.
+  return zone ? { label, amount: "sin costo" } : null;
+}
+
+/** El costo del envío de este pedido se acuerda por WhatsApp y no va en el total (modo «coordinar»; lo cobrado al pedir no se pone en duda). */
+const wineShippingCoordinated = (o: WineOrder, store: WineStoreView) =>
+  o.fulfillment === "delivery" && o.shippingUsd <= 0 && !o.deliveryZone && store.delivery.mode === "coordinate";
+
+/**
+ * Cómo sigue el pedido, en frases de texto plano: retiro (lugar, horario, indicaciones) o entrega (indicaciones y, en
+ * modo «coordinar», que el costo del envío no está incluido). `here` es cómo se nombra el canal ("por WhatsApp" en el
+ * correo, "por aquí" en el propio WhatsApp). Todo lo que viene de la configuración se acota; el correo lo escapa al pintarlo.
+ */
+function wineFulfillmentSentences(o: WineOrder, store: WineStoreView, here: string): string[] {
+  const out: string[] = [];
+  if (o.fulfillment === "delivery") {
+    out.push(`Coordinamos la entrega ${here}`);
+    const instructions = clip(store.delivery.instructions, 240);
+    if (instructions) out.push(instructions);
+    if (wineShippingCoordinated(o, store)) out.push("El costo del envío se acuerda aparte y no está incluido en el total");
+  } else {
+    const place = clip(store.pickup.place, 160);
+    const hours = clip(store.pickup.hours, 160);
+    const instructions = clip(store.pickup.instructions, 240);
+    if (!place && !hours) out.push(`Retiro: coordinamos el punto y la hora ${here}`);
+    else {
+      out.push(place ? `Retiro en ${place}` : `Retiro: coordinamos el punto ${here}`);
+      out.push(hours ? `Horario: ${hours}` : `Coordinamos la hora ${here}`);
+    }
+    if (instructions) out.push(instructions);
+  }
+  return out.map(sentence);
+}
+
+/** Líneas del pedido, envío (si lo hay) y total, en una tabla para el correo. */
 function wineItemsTable(o: WineOrder): string {
   const rows = o.items
     .map(
       (i) => `<tr><td style="padding:7px 0;font-size:14px;color:#2A1519;border-bottom:1px solid #E7DCCB">${esc(wineLabel(i))}<br><span style="font-size:12px;color:#6A5650">${i.quantity} × ${money(i.unitPriceUsd)}</span></td><td align="right" style="padding:7px 0;font-size:14px;font-weight:600;color:#2A1519;white-space:nowrap;vertical-align:top;border-bottom:1px solid #E7DCCB">${money(round2(i.unitPriceUsd * i.quantity))}</td></tr>`
     )
     .join("");
-  return `<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#F2EADF;border-radius:8px;padding:8px 16px;margin:18px 0">${rows}
+  const ship = wineShippingLine(o);
+  const extra = ship
+    ? `<tr><td style="padding:7px 0;font-size:13px;color:#6A5650;border-bottom:1px solid #E7DCCB">Subtotal</td><td align="right" style="padding:7px 0;font-size:13px;color:#6A5650;white-space:nowrap;border-bottom:1px solid #E7DCCB">${money(o.subtotalUsd)}</td></tr>
+<tr><td style="padding:7px 0;font-size:13px;color:#6A5650;border-bottom:1px solid #E7DCCB">${esc(ship.label)}</td><td align="right" style="padding:7px 0;font-size:13px;color:#6A5650;white-space:nowrap;border-bottom:1px solid #E7DCCB">${esc(ship.amount)}</td></tr>`
+    : "";
+  return `<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#F2EADF;border-radius:8px;padding:8px 16px;margin:18px 0">${rows}${extra}
 <tr><td style="padding:10px 0 4px;font-size:13px;color:#6A5650">Total (${esc(bottles(o.bottlesCount))})</td><td align="right" style="padding:10px 0 4px;font-size:16px;font-weight:700;color:#2A1519;white-space:nowrap">${money(o.totalUsd)} USD</td></tr></table>`;
 }
 
@@ -407,9 +498,8 @@ function winePaymentSummary(o: WineOrder): string {
   return `${method} · Referencia: <strong>${esc(o.paymentReference)}</strong> · Monto: ${esc(amount)} · ${total}`;
 }
 
-/** Condiciones de compra (los mismos textos que acepta el cliente en el checkout), al pie del correo. */
-function wineTermsHtml(): string {
-  const { title, items } = WINE_POLICIES.es;
+/** Condiciones de compra (las mismas que acepta el cliente en el checkout: las del administrador o las generadas), al pie del correo. */
+function wineTermsHtml({ title, items }: PolicyText): string {
   return `<div style="margin-top:22px;padding-top:16px;border-top:1px solid #DACDBC">
 <p style="margin:0 0 8px;font-size:11px;letter-spacing:2px;text-transform:uppercase;color:#7D2A46;font-weight:bold">${esc(title)}</p>
 <ul style="margin:0;padding-left:18px;font-size:12px;line-height:1.55;color:#6A5650">${items.map((t) => `<li style="margin:0 0 4px">${esc(t)}</li>`).join("")}</ul></div>`;
@@ -448,21 +538,18 @@ ${button(`${appUrl()}/admin/pedidos-vinos`, "Revisar en el panel")}`,
 export async function sendWineOrderEmail(o: WineOrder): Promise<DeliveryStatus> {
   try {
     const link = wineOrderUrl(o);
+    // El retiro, la entrega y las condiciones salen de la configuración vigente de la tienda (Admin → Tienda de vinos).
+    const config = await wineStoreConfigOrDefaults();
     const html = shell(
       "Tu pedido en El Origen está confirmado",
       `<p style="margin:0 0 12px;font-size:16px">Hola <strong>${esc(o.customerName)}</strong>,</p>
 <p style="margin:0;font-size:15px;line-height:1.6;color:#4A3A36">Verificamos tu pago y tu pedido <strong>${esc(o.code)}</strong> está <strong style="color:#2E7D4F">confirmado</strong>. Gracias por tu compra.</p>
 ${wineItemsTable(o)}
 ${wineDetailsTable(o)}
-<p style="margin:0 0 18px;font-size:15px;line-height:1.6;color:#4A3A36">${
-        // PENDIENTE CLIENTE: costo y zonas de envío, y punto de retiro (hoy se coordinan por WhatsApp).
-        o.fulfillment === "delivery"
-          ? "Te escribiremos por WhatsApp para coordinar la entrega y el costo del envío, que no está incluido en el total."
-          : "Te escribiremos por WhatsApp para coordinar el punto y la hora del retiro."
-      }</p>
+<p style="margin:0 0 18px;font-size:15px;line-height:1.6;color:#4A3A36">${esc(wineFulfillmentSentences(o, config, "por WhatsApp").join(" "))}</p>
 ${button(link, "Ver mi pedido")}
 <p style="margin:18px 0 0;font-size:12px;color:#6A5650;text-align:center">Si el botón no abre, copia este enlace: <a href="${esc(link)}" style="color:#7D2A46;word-break:break-all">${esc(link)}</a></p>
-${wineTermsHtml()}`,
+${wineTermsHtml(buildWinePolicies(config, "es"))}`,
       WINE_MAIL_SUBTITLE
     );
     return await sendMail({
@@ -515,22 +602,27 @@ const shortWineLabel = (i: Pick<WineOrder["items"][number], "name" | "vintage">)
   return label.length > 70 ? `${label.slice(0, 69)}…` : label;
 };
 
-/** Mensaje de WhatsApp del pedido confirmado: texto plano (no imagen), con el resumen y el enlace al pedido. */
-export function buildWineWhatsAppMessage(o: WineOrder): string {
+/**
+ * Mensaje de WhatsApp del pedido confirmado: texto plano (no imagen), con el resumen (envío incluido), cómo sigue el
+ * retiro o la entrega según la configuración de la tienda y el enlace al pedido. Síncrona: `store` es la tienda ya
+ * leída (`wineStoreForNotices()`); sin ella se usan los valores por defecto (retiro y entrega por coordinar).
+ */
+export function buildWineWhatsAppMessage(o: WineOrder, store: WineStoreView = DEFAULT_WINE_STORE): string {
   const seed = Array.from(o.code).reduce((acc, ch) => acc + ch.charCodeAt(0), 0);
   const first = o.customerName.trim().split(/\s+/)[0] || o.customerName;
+  const ship = wineShippingLine(o);
+  const address = o.deliveryAddress ? clip(o.deliveryAddress, 200) : "";
+  const how = wineFulfillmentSentences(o, store, "por aquí").join(" ");
   return [
     GREETINGS[seed % GREETINGS.length](first),
     "",
     `Verificamos tu pago y tu pedido en *El Origen* está confirmado. Código *${o.code}*`,
     "",
     ...o.items.map((i) => `• ${i.quantity} × ${shortWineLabel(i)} — ${money(round2(i.unitPriceUsd * i.quantity))}`),
+    ...(ship ? [`${ship.label}: ${ship.amount}`] : []),
     `Total: *${money(o.totalUsd)} USD* (${bottles(o.bottlesCount)})`,
     "",
-    // PENDIENTE CLIENTE: costo y zonas de envío, y punto de retiro (hoy se coordinan por WhatsApp).
-    o.fulfillment === "delivery"
-      ? `🚚 Entrega a domicilio${o.deliveryAddress ? `: ${o.deliveryAddress.slice(0, 200)}` : ""}. Por aquí coordinamos la entrega y el costo del envío.`
-      : "🏬 Retiro: por aquí coordinamos el punto y la hora.",
+    ...(o.fulfillment === "delivery" ? [`🚚 ${sentence(`Entrega a domicilio${address ? `: ${address}` : ""}`)}`, how] : [`🏬 ${how}`]),
     "",
     "Puedes ver tu pedido aquí:",
     wineOrderUrl(o),
@@ -560,6 +652,8 @@ async function sendWineViaMeta(o: WineOrder): Promise<DeliveryStatus> {
   const phoneId = process.env.WHATSAPP_PHONE_NUMBER_ID as string;
   const to = normalizeVePhone(o.customerPhone);
   const template = process.env.WHATSAPP_WINE_TEMPLATE_NAME;
+  // La plantilla solo lleva nombre, código y enlace: la tienda se lee únicamente para el texto libre.
+  const store = template ? undefined : await wineStoreForNotices();
 
   const payload = template
     ? {
@@ -585,7 +679,7 @@ async function sendWineViaMeta(o: WineOrder): Promise<DeliveryStatus> {
         messaging_product: "whatsapp",
         to,
         type: "text",
-        text: { preview_url: true, body: buildWineWhatsAppMessage(o) },
+        text: { preview_url: true, body: buildWineWhatsAppMessage(o, store) },
       };
 
   try {

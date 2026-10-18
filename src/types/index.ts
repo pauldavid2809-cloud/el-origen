@@ -201,8 +201,14 @@ export interface Wine {
   priceUsd: number | null;
   /** «Activo para la venta»: aparte de `status`. Solo se vende si además está publicado y tiene precio (ver `isWineForSale`). */
   saleActive: boolean;
-  /** Máximo de botellas por pedido (1..24); null = el tope por defecto del sitio. */
+  /** Máximo de botellas por pedido (1..24); null = el tope por defecto del sitio (Admin → Tienda de vinos). */
   maxPerOrder: number | null;
+  /**
+   * Existencias: botellas TOTALES puestas a la venta de este vino; null = sin control. Las disponibles se calculan
+   * restando las reservadas por pedidos vigentes (ver `availableOf` y `getWineHolds`). Es un dato interno: el público
+   * solo ve `soldOut` / `available`.
+   */
+  stock: number | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -214,4 +220,10 @@ export interface Wine {
 export type PublicWine = Pick<
   Wine,
   "id" | "slug" | "name" | "winery" | "region" | "type" | "vintage" | "imageUrl" | "status" | "priceUsd" | "saleActive" | "maxPerOrder"
->;
+> & {
+  /**
+   * Agotado (existencias controladas y ninguna disponible). Solo se rellena en las páginas dinámicas (/vinos y
+   * /vinos/[slug]); en la portada (con caché) queda sin definir y no se muestra agotado.
+   */
+  soldOut?: boolean;
+};

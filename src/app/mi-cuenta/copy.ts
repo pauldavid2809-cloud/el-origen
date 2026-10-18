@@ -46,6 +46,8 @@ const es = {
   } satisfies Record<OrderStatus, string>,
   wineExpired: "Vencido",
   bottles: (n: number) => `${n} ${n === 1 ? "botella" : "botellas"}`,
+  shipping: "Envío",
+  shippingWithZone: (zone: string) => `Envío (${zone})`,
   orderedOn: (date: string) => `Pedido el ${date}`,
   viewWineOrder: "Ver pedido",
   // Datos
@@ -105,6 +107,8 @@ const en: typeof es = {
   },
   wineExpired: "Expired",
   bottles: (n: number) => `${n} ${n === 1 ? "bottle" : "bottles"}`,
+  shipping: "Delivery",
+  shippingWithZone: (zone: string) => `Delivery (${zone})`,
   orderedOn: (date: string) => `Ordered on ${date}`,
   viewWineOrder: "View order",
   profileTitle: "My details",
