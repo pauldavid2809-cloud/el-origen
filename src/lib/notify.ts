@@ -6,7 +6,7 @@ import { CONTACT } from "./contact";
 import { sendMail, type MailAttachment } from "./mailer";
 import { SITE_URL } from "./site";
 import { policiesEmailHtml, policiesPlainText } from "./policies";
-import { round2 } from "./wineSale";
+import { isShippingCoordinated, round2 } from "./wineSale";
 import { getWineStoreConfig } from "./wineStore";
 import {
   buildWinePolicies,
@@ -423,32 +423,34 @@ function clip(v: unknown, max: number): string {
   return `${last >= 0xd800 && last <= 0xdbff ? out.slice(0, -1) : out}…`;
 }
 
-/** Línea de envío de un pedido a domicilio: con costo ("Envío (Chacao)": $5) o, si eligió una zona sin costo, «sin costo». null = no hay nada que mostrar. */
+/**
+ * Línea de envío de un pedido a domicilio, según lo que el pedido guardó al crearse (`shippingMode` y `shippingUsd`;
+ * nunca la configuración de ahora): con costo ("Envío (Chacao): $5") o, si salió gratis, «Gratis». null = no hay línea que
+ * mostrar: retiro, o envío a coordinar (el costo no está en el total y lo explica `wineFulfillmentSentences`).
+ */
 function wineShippingLine(o: WineOrder): { label: string; amount: string } | null {
   if (o.fulfillment !== "delivery") return null;
   const zone = o.deliveryZone ? clip(o.deliveryZone, 60) : "";
   const label = zone ? `Envío (${zone})` : "Envío";
   if (o.shippingUsd > 0) return { label, amount: money(o.shippingUsd) };
-  // Sin zona y sin costo no se sabe si el envío salió gratis o se coordina aparte: no se afirma nada.
-  return zone ? { label, amount: "sin costo" } : null;
+  if (isShippingCoordinated(o)) return null;
+  return { label, amount: "Gratis" };
 }
 
-/** El costo del envío de este pedido se acuerda por WhatsApp y no va en el total (modo «coordinar»; lo cobrado al pedir no se pone en duda). */
-const wineShippingCoordinated = (o: WineOrder, store: WineStoreView) =>
-  o.fulfillment === "delivery" && o.shippingUsd <= 0 && !o.deliveryZone && store.delivery.mode === "coordinate";
-
 /**
- * Cómo sigue el pedido, en frases de texto plano: retiro (lugar, horario, indicaciones) o entrega (indicaciones y, en
- * modo «coordinar», que el costo del envío no está incluido). `here` es cómo se nombra el canal ("por WhatsApp" en el
- * correo, "por aquí" en el propio WhatsApp). Todo lo que viene de la configuración se acota; el correo lo escapa al pintarlo.
+ * Cómo sigue el pedido, en frases de texto plano: retiro (lugar, horario, indicaciones) o entrega (indicaciones y, si el
+ * envío quedó «a coordinar», que su costo no está incluido y se paga aparte). Si el envío se acuerda o salió gratis lo dice el
+ * propio pedido, no la configuración de ahora. `here` es cómo se nombra el canal ("por WhatsApp" en el correo, "por aquí" en
+ * el propio WhatsApp). Lo que viene de la configuración (lugar, horario, indicaciones) se acota; el correo lo escapa al pintarlo.
  */
 function wineFulfillmentSentences(o: WineOrder, store: WineStoreView, here: string): string[] {
   const out: string[] = [];
   if (o.fulfillment === "delivery") {
-    out.push(`Coordinamos la entrega ${here}`);
+    const coordinated = isShippingCoordinated(o);
+    out.push(coordinated ? `Coordinamos la entrega y el costo del envío ${here}` : `Coordinamos la entrega ${here}`);
     const instructions = clip(store.delivery.instructions, 240);
     if (instructions) out.push(instructions);
-    if (wineShippingCoordinated(o, store)) out.push("El costo del envío se acuerda aparte y no está incluido en el total");
+    if (coordinated) out.push("El costo del envío no está incluido en el total y se paga aparte");
   } else {
     const place = clip(store.pickup.place, 160);
     const hours = clip(store.pickup.hours, 160);

@@ -3,8 +3,10 @@ import { getAdminClient, getSetting, setSetting } from "./orders";
 import {
   buildWinePolicies,
   DEFAULT_WINE_STORE,
+  DELIVERY_MODES,
   normalizeWineStoreConfig,
   toPublicWineStore,
+  type DeliveryMode,
   type PolicyText,
   type PublicWineStore,
   type WineStoreConfig,
@@ -17,25 +19,78 @@ import {
 export const WINE_STORE_SETTING_KEY = "wine_store";
 
 /**
+ * Lo guardado en app_settings: null = no hay configuración guardada. Lanza si la lectura falla (getSetting ignora los
+ * errores y devolvería null, lo que se confundiría con «no hay nada guardado»: por eso la consulta propia).
+ */
+async function readStoredConfig(): Promise<unknown> {
+  const sb = getAdminClient();
+  if (!sb) return (await getSetting<unknown>(WINE_STORE_SETTING_KEY)) ?? null;
+  const { data, error } = await sb.from("app_settings").select("value").eq("key", WINE_STORE_SETTING_KEY).maybeSingle();
+  if (error) throw new Error(error.message);
+  return data?.value ?? null;
+}
+
+/**
  * Configuración vigente. Nunca lanza: ante un error de lectura o un JSON guardado que ya no es válido devuelve los
  * valores por defecto (la tienda sigue funcionando como en la versión 1) y lo deja en el registro.
+ * Es la que usan las páginas y los avisos. Lo que cobra dinero (el checkout) usa `getWineStoreConfigStrict`.
  */
 export async function getWineStoreConfig(): Promise<WineStoreConfig> {
   try {
-    const sb = getAdminClient();
-    let stored: unknown = null;
-    if (!sb) stored = await getSetting<unknown>(WINE_STORE_SETTING_KEY);
-    else {
-      // Consulta propia (getSetting ignora los errores): así un fallo de lectura queda en el registro.
-      const { data, error } = await sb.from("app_settings").select("value").eq("key", WINE_STORE_SETTING_KEY).maybeSingle();
-      if (error) throw new Error(error.message);
-      stored = data?.value ?? null;
-    }
+    const stored = await readStoredConfig();
     if (stored) return normalizeWineStoreConfig(stored);
   } catch (err) {
     console.error("[wineStore] Configuración de la tienda ilegible o inválida; se usan los valores por defecto:", err);
   }
   return normalizeWineStoreConfig(DEFAULT_WINE_STORE);
+}
+
+/**
+ * La configuración guardada no se pudo usar. `reason`: "read" = falló la lectura de la base de datos; "invalid" = lo
+ * guardado ya no es una configuración válida (editado a mano, o reglas que cambiaron).
+ */
+export class WineStoreUnavailableError extends Error {
+  constructor(message: string, readonly reason: "read" | "invalid") {
+    super(message);
+    this.name = "WineStoreUnavailableError";
+  }
+}
+
+/** Lo guardado tiene la forma de una configuración: un objeto, con el modo de envío y los interruptores bien escritos (si están). */
+function assertStoredShape(stored: unknown): void {
+  const asRecord = (v: unknown): Record<string, unknown> => (v && typeof v === "object" && !Array.isArray(v) ? (v as Record<string, unknown>) : {});
+  if (!stored || typeof stored !== "object" || Array.isArray(stored)) throw new Error("el valor guardado no es un objeto");
+  const c = asRecord(stored);
+  const d = asRecord(c.delivery);
+  const p = asRecord(c.pickup);
+  // `normalizeWineStoreConfig` es tolerante: un modo de envío raro pasaría a «coordinar» y un interruptor raro a «activo».
+  // Para cobrar eso no vale: si está escrito, debe estar bien escrito.
+  if (d.mode !== undefined && !DELIVERY_MODES.includes(d.mode as DeliveryMode)) throw new Error("el modo de envío guardado no es válido");
+  for (const [label, v] of [["enabled", c.enabled], ["pickup.enabled", p.enabled], ["delivery.enabled", d.enabled]] as const) {
+    if (v !== undefined && typeof v !== "boolean") throw new Error(`«${label}» guardado no es verdadero o falso`);
+  }
+}
+
+/**
+ * Configuración vigente para decidir dinero (el checkout): como `getWineStoreConfig`, pero NO falla abierto.
+ * Distingue «no hay configuración guardada» (devuelve los valores por defecto, la tienda de la v1) de «no se pudo leer»
+ * o «lo guardado ya no es válido» (lanza `WineStoreUnavailableError`): con una lectura rota no se debe cobrar un envío
+ * ni abrir una tienda cerrada a ciegas. El que llama responde 503 `store_unavailable`.
+ */
+export async function getWineStoreConfigStrict(): Promise<WineStoreConfig> {
+  let stored: unknown;
+  try {
+    stored = await readStoredConfig();
+  } catch (err) {
+    throw new WineStoreUnavailableError(`No se pudo leer la configuración de la tienda: ${(err as Error).message}`, "read");
+  }
+  if (stored === null || stored === undefined) return normalizeWineStoreConfig(DEFAULT_WINE_STORE);
+  try {
+    assertStoredShape(stored);
+    return normalizeWineStoreConfig(stored);
+  } catch (err) {
+    throw new WineStoreUnavailableError(`La configuración guardada de la tienda no es válida: ${(err as Error).message}`, "invalid");
+  }
 }
 
 /**

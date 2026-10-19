@@ -113,6 +113,7 @@ const es = {
   closedCheckoutTitle: "Compras en pausa",
   closedCheckoutText: "Guardamos tu carrito. Cuando la tienda abra de nuevo podrás completar tu pedido desde aquí.",
   storeClosedError: "La tienda cerró mientras completabas tu pedido. Guardamos tu carrito.",
+  storeUnavailableError: "La tienda no está disponible por ahora. Guardamos tu carrito: inténtalo de nuevo en unos minutos.",
 
   // Confirmar
   termsRequired: "Debes aceptar las condiciones de compra para continuar.",
@@ -236,6 +237,7 @@ const en: CartCopy = {
   closedCheckoutTitle: "Purchases paused",
   closedCheckoutText: "We saved your cart. When the shop opens again you can complete your order from here.",
   storeClosedError: "The shop closed while you were completing your order. We saved your cart.",
+  storeUnavailableError: "The shop is not available right now. We saved your cart: please try again in a few minutes.",
 
   termsRequired: "You must accept the purchase terms to continue.",
   payHint: "In the next step you choose how to pay: Pago Móvil, bank transfer, Zelle, Binance or cash.",

@@ -278,6 +278,11 @@ export default function WineCartPage() {
         setReload((x) => x + 1);
         return;
       }
+      // La tienda no pudo leer su configuración: no se cobra nada hasta que se resuelva.
+      if (res.status === 503 && data.code === "store_unavailable") {
+        setSubmitError({ text: t.storeUnavailableError });
+        return;
+      }
       if (data.code === "insufficient_stock") {
         // Otra persona se llevó botellas: se dice cuántas quedan y se refresca el carrito (las cantidades se ajustan solas).
         const name = view?.wines[String(data.wineId)]?.name;
@@ -666,7 +671,7 @@ export default function WineCartPage() {
                 {/* Condiciones de compra: las del administrador o, si no escribió, las generadas con su configuración */}
                 <section aria-labelledby="wc-terms-title" className="rounded-xl border border-outline-variant bg-surface-container-low p-4">
                   <h3 id="wc-terms-title" className="font-serif text-lg text-on-surface">{policies.title}</h3>
-                  <ul className="mt-3 space-y-2 list-disc pl-5 text-[13px] leading-relaxed text-on-surface-variant">
+                  <ul className="mt-3 space-y-2 list-disc pl-5 text-[13px] leading-relaxed text-on-surface-variant break-words">
                     {policies.items.map((item, i) => (
                       <li key={`${i}-${item}`}>{item}</li>
                     ))}

@@ -11,8 +11,8 @@ import {
   type FulfillmentMethod,
   type WineOrderItem,
 } from "@/lib/wineOrders";
-import { getWineStoreConfig } from "@/lib/wineStore";
-import { quoteShipping, type ShippingQuote } from "@/lib/wineStoreRules";
+import { getWineStoreConfigStrict } from "@/lib/wineStore";
+import { quoteShipping, type ShippingQuote, type WineStoreConfig } from "@/lib/wineStoreRules";
 import {
   availableOf,
   isWineForSale,
@@ -70,8 +70,9 @@ function shippingError(quote: Extract<ShippingQuote, { ok: false }>) {
  * Solo para miembros con sesión (Cuenta Origen): el pedido queda en su cuenta y usa el correo de la cuenta.
  * El cliente solo dice QUÉ vinos, CUÁNTAS botellas, cómo recibe el pedido y, si aplica, la zona (`deliveryZoneId`):
  * nombre, añada, precio, envío, existencias y totales los fija el servidor con la configuración de ahora.
- * Orden de las validaciones: tienda cerrada (403) → datos → entrega y zona → vinos, precios y tope → existencias (409)
- * → límite de pendientes → crear (subtotal + envío) → rechequeo de existencias por carreras (409).
+ * Orden de las validaciones: configuración de la tienda ilegible (503) → tienda cerrada (403) → datos → entrega y zona →
+ * vinos, precios y tope → existencias (409) → límite de pendientes → crear (subtotal + envío) → rechequeo de existencias
+ * por carreras (409). El pedido recuerda con qué regla se cobró el envío (`shippingMode`).
  */
 export async function POST(request: Request) {
   try {
@@ -83,8 +84,15 @@ export async function POST(request: Request) {
     if (!read.ok) return read.tooLarge ? bad("La solicitud es demasiado grande.", 413) : bad("Solicitud inválida.");
     const body = read.body;
 
-    // La configuración se lee una vez y se usa en toda la petición (así no cambia a mitad de camino).
-    const store = await getWineStoreConfig();
+    // La configuración se lee una vez y se usa en toda la petición (así no cambia a mitad de camino). Aquí se cobra dinero:
+    // si no se puede leer (o lo guardado ya no es válido) NO se asume la configuración por defecto, se responde 503.
+    let store: WineStoreConfig;
+    try {
+      store = await getWineStoreConfigStrict();
+    } catch (err) {
+      console.error("[wine-checkout] Configuración de la tienda no disponible:", err);
+      return bad("La tienda no está disponible por ahora. Inténtalo de nuevo en unos minutos.", 503, { code: "store_unavailable" });
+    }
     if (!store.enabled) {
       return bad("La tienda está cerrada por ahora. Tus pedidos ya hechos se pueden seguir pagando desde su enlace.", 403, { code: "store_closed" });
     }
@@ -220,6 +228,8 @@ export async function POST(request: Request) {
         subtotalUsd: subtotal,
         shippingUsd: quote.shippingUsd,
         deliveryZone: quote.zone?.name ?? null,
+        // Con qué regla se cobró el envío (para que el pedido, el panel y los avisos no lo deduzcan de la configuración de ahora).
+        shippingMode: fulfillment === "delivery" ? store.delivery.mode : null,
         totalUsd: round2(subtotal + quote.shippingUsd),
         acceptedTermsAt: new Date().toISOString(),
       });

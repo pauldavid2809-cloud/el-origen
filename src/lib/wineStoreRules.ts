@@ -1,4 +1,4 @@
-import { round2, WINE_DEFAULT_MAX_PER_ORDER, WINE_MAX_PER_ORDER_LIMIT, WINE_PENDING_TTL_HOURS } from "./wineSale";
+import { parseMoneyText, round2, WINE_DEFAULT_MAX_PER_ORDER, WINE_MAX_PER_ORDER_LIMIT, WINE_PENDING_TTL_HOURS } from "./wineSale";
 
 /* ─────────────────────────────────────────────────────────────
    Tienda de vinos configurable: reglas puras compartidas por el servidor y el navegador
@@ -75,7 +75,15 @@ export class WineStoreConfigError extends Error {}
 /* ─── Lectura tolerante de la configuración ─── */
 
 const INVISIBLE = /[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F-\u009F\u200B-\u200F\u2028\u2029\uFEFF]/g;
-const HTML_TAG = /<\/?[a-z!][^>]*>/gi;
+/**
+ * Una etiqueta HTML. `[^<>]*` (sin `<`) es lo que la hace lineal: un `<a` sin `>` se descarta al llegar al siguiente `<`
+ * en lugar de recorrer todo el resto del texto (con `[^>]*` cada `<a` repetido lo reexploraba: coste cuadrático).
+ */
+const HTML_TAG = /<\/?[a-z!][^<>]*>/gi;
+/** Lo mismo sin la bandera `g` (sin estado entre llamadas) para preguntar si queda alguna. */
+const HAS_TAG = /<\/?[a-z!][^<>]*>/i;
+/** Vueltas máximas quitando etiquetas anidadas (`<<b>b>` deja una nueva al quitar la de dentro). */
+const TAG_PASSES = 8;
 
 /** Recorta sin partir un par sustituto (emoji) por la mitad. */
 function cut(s: string, max: number): string {
@@ -88,28 +96,37 @@ function cut(s: string, max: number): string {
 /**
  * Texto de una sola línea: sin caracteres de control ni etiquetas HTML, con los espacios normalizados.
  * (Todo texto se muestra escapado —React, correo, WhatsApp—; esto es una segunda defensa y evita texto basura.)
+ * Lo recibido se corta a un largo razonable ANTES de quitar etiquetas, para que un texto enorme no cueste tiempo de más.
  */
 function line(v: unknown, max: number): string {
   if (typeof v !== "string") return "";
-  let s = v.replace(INVISIBLE, "");
-  for (let prev = ""; prev !== s; ) {
-    prev = s;
-    s = s.replace(HTML_TAG, "");
+  // Margen para lo que se quita (etiquetas, espacios repetidos) sin cortar de más lo que sí se queda.
+  let s = cut(v, max * 4 + 256).replace(INVISIBLE, "");
+  for (let pass = 0; pass < TAG_PASSES; pass++) {
+    const next = s.replace(HTML_TAG, "");
+    if (next === s) break;
+    s = next;
   }
+  // Si tras las vueltas permitidas aún queda una etiqueta (anidado exagerado), se descartan los corchetes que sobran.
+  if (HAS_TAG.test(s)) s = s.replace(/[<>]/g, "");
   return cut(s.replace(/\s+/g, " ").trim(), max);
 }
 
 const record = (v: unknown): Record<string, unknown> => (v && typeof v === "object" && !Array.isArray(v) ? (v as Record<string, unknown>) : {});
 const bool = (v: unknown, fallback: boolean): boolean => (typeof v === "boolean" ? v : fallback);
 
-/** Número escrito por una persona: acepta "12", "12.5", "12,5", "$12" y "12 USD". null = vacío; NaN = no es un número. */
+/**
+ * Número escrito por una persona. Los textos se interpretan con las MISMAS reglas que el precio de un vino
+ * (`parseMoneyText`): "12", "12.5", "12,5", "$12", "12 USD", "1.000" (= mil) o "1.234,56". null = vacío; NaN = no es un
+ * monto (por ejemplo "5.5.5" o ",").
+ */
 function readNumber(v: unknown): number | null {
   if (v === null || v === undefined) return null;
   if (typeof v === "number") return v;
   if (typeof v !== "string") return NaN;
   const s = v.replace(/usd|\$|\s/gi, "");
   if (!s) return null;
-  return /^-?\d+([.,]\d+)?$/.test(s) ? Number(s.replace(",", ".")) : NaN;
+  return parseMoneyText(s);
 }
 
 /** Monto en USD entre 0 y `max`, con 2 decimales. Vacío = `empty`; un valor que no es número o está fuera de rango es un error. */
@@ -181,18 +198,23 @@ function readZones(raw: unknown): DeliveryZone[] {
   });
 }
 
+/** Hasta cuántos caracteres de una condición se leen para medirla (más allá solo se sabe que es demasiado larga). */
+const TERM_READ_CAP = WINE_STORE_LIMITS.termLength * 4;
+
 /** Condiciones de compra: un arreglo de líneas (o un texto con una condición por línea). */
 function readTerms(raw: unknown, label: string): string[] {
   const rows = Array.isArray(raw) ? raw : typeof raw === "string" ? raw.split(/\r?\n/) : [];
   if (rows.length > 200) throw new WineStoreConfigError(`Condiciones de compra (${label}): máximo ${WINE_STORE_LIMITS.maxTermLines} líneas.`);
-  const lines = rows.map((r) => line(r, Infinity)).filter(Boolean);
+  const lines = rows.map((r) => line(r, TERM_READ_CAP)).filter(Boolean);
   if (lines.length > WINE_STORE_LIMITS.maxTermLines) {
     throw new WineStoreConfigError(`Condiciones de compra (${label}): máximo ${WINE_STORE_LIMITS.maxTermLines} líneas.`);
   }
   lines.forEach((l, i) => {
     if (l.length > WINE_STORE_LIMITS.termLength) {
       throw new WineStoreConfigError(
-        `Condiciones de compra (${label}), línea ${i + 1}: máximo ${WINE_STORE_LIMITS.termLength} caracteres (tiene ${l.length}).`
+        `Condiciones de compra (${label}), línea ${i + 1}: máximo ${WINE_STORE_LIMITS.termLength} caracteres (tiene ${
+          l.length >= TERM_READ_CAP ? `más de ${TERM_READ_CAP - 1}` : l.length
+        }).`
       );
     }
   });
@@ -271,12 +293,30 @@ export type PublicWineStore = {
   policies: { es: PolicyText; en: PolicyText };
 };
 
+/**
+ * Lo público de la configuración: del envío solo el costo y las zonas del modo ACTIVO (nada de montos de un modo que no se
+ * usa). El lugar, el horario y las indicaciones de retiro y entrega se conservan aunque el canal esté en pausa, porque los
+ * pedidos ya hechos por ese canal los siguen mostrando. La forma es la de `WineStoreConfig` (los campos que no aplican
+ * quedan vacíos), así `quoteShipping` sigue funcionando con lo público.
+ */
 export function toPublicWineStore(c: WineStoreConfig): PublicWineStore {
+  const p = c.pickup;
+  const d = c.delivery;
   return {
     enabled: c.enabled,
     closedMessage: c.closedMessage,
-    pickup: { ...c.pickup },
-    delivery: { ...c.delivery, zones: c.delivery.zones.map((z) => ({ ...z })) },
+    pickup: { ...p },
+    delivery: d.enabled
+      ? {
+          enabled: true,
+          mode: d.mode,
+          // Solo el costo del modo activo: el fijo si es «costo fijo», las zonas si es «por zonas»; «gratis desde» no aplica a «coordinar».
+          flatFeeUsd: d.mode === "flat" ? d.flatFeeUsd : 0,
+          zones: d.mode === "zones" ? d.zones.map((z) => ({ ...z })) : [],
+          freeFromUsd: d.mode !== "coordinate" ? d.freeFromUsd : null,
+          instructions: d.instructions,
+        }
+      : { enabled: false, mode: d.mode, flatFeeUsd: 0, zones: [], freeFromUsd: null, instructions: d.instructions },
     defaultMaxPerOrder: c.defaultMaxPerOrder,
     policies: { es: buildWinePolicies(c, "es"), en: buildWinePolicies(c, "en") },
   };
@@ -292,20 +332,48 @@ function usd(n: number, lang: "es" | "en"): string {
 }
 
 /** Cierra con punto (sin duplicarlo si el texto ya termina en puntuación). */
-const sentence = (s: string) => (/[.!?]$/.test(s) ? s : `${s}.`);
+const sentence = (s: string) => (/[.!?…]$/.test(s) ? s : `${s}.`);
+
+/** Recorta a `max` caracteres con «…» al final (sin partir un emoji por la mitad). */
+function ellipsize(s: string, max: number): string {
+  if (s.length <= max) return s;
+  return `${cut(s, Math.max(0, max - 1)).trimEnd()}…`;
+}
+
+/**
+ * Reparte `room` caracteres entre el lugar y el horario: lo que ya cabe no se toca; si no caben los dos, cada uno puede
+ * usar la mitad y el que sobra le cede lo suyo al otro.
+ */
+function shareRoom(place: string, hours: string, room: number): [string, string] {
+  if (place.length + hours.length <= room) return [place, hours];
+  const half = Math.floor(room / 2);
+  const placeRoom = place.length <= half ? place.length : hours.length <= half ? room - hours.length : half;
+  return [ellipsize(place, placeRoom), ellipsize(hours, room - Math.min(place.length, placeRoom))];
+}
 
 function pickupLine(c: WineStoreConfig, lang: "es" | "en"): string {
+  const es = lang === "es";
+  const build = (place: string, hours: string): string => {
+    if (es) {
+      if (place && hours) return `${sentence(`Retiro en ${place}`)} ${sentence(`Horario: ${hours}`)}`;
+      if (place) return `${sentence(`Retiro en ${place}`)} Coordinamos el horario por WhatsApp una vez confirmado el pago.`;
+      if (hours) return `${sentence(`Horario de retiro: ${hours}`)} Coordinamos el punto por WhatsApp una vez confirmado el pago.`;
+      return "El retiro se coordina por WhatsApp una vez confirmado el pago.";
+    }
+    if (place && hours) return `${sentence(`Pickup at ${place}`)} ${sentence(`Hours: ${hours}`)}`;
+    if (place) return `${sentence(`Pickup at ${place}`)} We arrange the time on WhatsApp once your payment is confirmed.`;
+    if (hours) return `${sentence(`Pickup hours: ${hours}`)} We arrange the pickup point on WhatsApp once your payment is confirmed.`;
+    return "Pickup is arranged on WhatsApp once your payment is confirmed.";
+  };
   const { place, hours } = c.pickup;
-  if (lang === "es") {
-    if (place && hours) return `${sentence(`Retiro en ${place}`)} ${sentence(`Horario: ${hours}`)}`;
-    if (place) return `${sentence(`Retiro en ${place}`)} Coordinamos el horario por WhatsApp una vez confirmado el pago.`;
-    if (hours) return `${sentence(`Horario de retiro: ${hours}`)} Coordinamos el punto por WhatsApp una vez confirmado el pago.`;
-    return "El retiro se coordina por WhatsApp una vez confirmado el pago.";
-  }
-  if (place && hours) return `${sentence(`Pickup at ${place}`)} ${sentence(`Hours: ${hours}`)}`;
-  if (place) return `${sentence(`Pickup at ${place}`)} We arrange the time on WhatsApp once your payment is confirmed.`;
-  if (hours) return `${sentence(`Pickup hours: ${hours}`)} We arrange the pickup point on WhatsApp once your payment is confirmed.`;
-  return "Pickup is arranged on WhatsApp once your payment is confirmed.";
+  const full = build(place, hours);
+  if (full.length <= WINE_STORE_LIMITS.termLength) return full;
+  // Lugar (160) + horario (160) + las frases fijas pasan de 300: no se podría editar en el panel (cada condición admite 300).
+  // Se acortan el lugar y el horario, que son lo único variable, para que la línea quepa.
+  const marks = (place ? 1 : 0) + (hours ? 1 : 0);
+  const room = Math.max(marks, WINE_STORE_LIMITS.termLength - (build(place ? "x" : "", hours ? "x" : "").length - marks));
+  const [p, h] = place && hours ? shareRoom(place, hours, room) : [ellipsize(place, room), ellipsize(hours, room)];
+  return ellipsize(build(p, h), WINE_STORE_LIMITS.termLength);
 }
 
 function deliveryLine(c: WineStoreConfig, lang: "es" | "en"): string {
@@ -371,7 +439,8 @@ export function buildWinePolicies(c: WineStoreConfig, lang: "es" | "en"): Policy
       : "If you receive a damaged product or one different from what you ordered, message us on WhatsApp so we can sort it out.",
     es ? "La venta de bebidas alcohólicas es solo para mayores de 18 años." : "Alcoholic beverages are sold only to people over 18."
   );
-  return { title, items, accept };
+  // Cada condición generada cabe en lo que admite el panel (WINE_STORE_LIMITS.termLength): así se puede cargar y editar.
+  return { title, items: items.map((i) => ellipsize(i, WINE_STORE_LIMITS.termLength)), accept };
 }
 
 /* ─── Envío ─── */

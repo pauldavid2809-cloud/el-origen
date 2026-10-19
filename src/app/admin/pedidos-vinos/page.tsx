@@ -3,7 +3,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import type { WineOrder } from "@/lib/wineOrders";
 import type { StockWarning } from "@/lib/wines";
-import { round2, WINE_PENDING_TTL_HOURS } from "@/lib/wineSale";
+import { isShippingCoordinated, round2, WINE_PENDING_TTL_HOURS } from "@/lib/wineSale";
 
 /* Pedidos de vinos: revisión de pagos, aprobación (con confirmación por correo y WhatsApp) y entrega.
    Mismo recorrido que Reservas y pagos, con sus propios textos: aquí no hay cupos, entradas ni QR.
@@ -618,13 +618,17 @@ function WhatsAppStatus({ wa }: { wa: DeliveryInfo }) {
 }
 
 /**
- * Líneas del pedido: cantidad × vino, precio unitario y subtotal. Al pie, el total; si hubo entrega a domicilio o se
- * cobró envío, el desglose subtotal + envío (con la zona elegida) = total.
+ * Líneas del pedido: cantidad × vino, precio unitario y subtotal. Al pie, el total; en una entrega a domicilio (o si se
+ * cobró envío), el desglose subtotal + envío (con la zona elegida) = total. El envío se lee de lo que el pedido guardó al
+ * crearse (`shippingMode` y `shippingUsd`), no de la configuración de ahora: con costo se muestra el monto; si era «a
+ * coordinar» (también los pedidos anteriores a la configuración de la tienda) no está en el total y se paga aparte; y con
+ * costo fijo o por zonas y envío en cero salió gratis.
  */
 function ItemsList({ o }: { o: AdminWineOrder }) {
   const shipping = o.shippingUsd ?? 0;
   const delivery = o.fulfillment === "delivery";
   const breakdown = delivery || shipping > 0;
+  const coordinated = isShippingCoordinated({ fulfillment: o.fulfillment, shippingMode: o.shippingMode ?? null, shippingUsd: shipping });
   const subtotal = o.subtotalUsd ?? round2(o.totalUsd - shipping);
   return (
     <div className="rounded-lg border border-outline-variant">
@@ -649,11 +653,11 @@ function ItemsList({ o }: { o: AdminWineOrder }) {
             <div className="flex items-baseline justify-between gap-3">
               <span className="text-on-surface-variant min-w-0">
                 Envío{o.deliveryZone ? ` · ${o.deliveryZone}` : ""}
-                {shipping === 0 && !o.deliveryZone && (
-                  <span className="block text-[12px]">Si hay un costo de envío, se acuerda con el cliente por WhatsApp y se paga aparte.</span>
+                {coordinated && (
+                  <span className="block text-[12px]">El costo se acuerda con el cliente por WhatsApp y se paga aparte.</span>
                 )}
               </span>
-              <span className="tabular-nums whitespace-nowrap">{shipping > 0 ? price(shipping) : o.deliveryZone ? "Gratis" : "No incluido"}</span>
+              <span className="tabular-nums whitespace-nowrap">{shipping > 0 ? price(shipping) : coordinated ? "No incluido" : "Gratis"}</span>
             </div>
           </>
         )}

@@ -12,7 +12,8 @@ const MAX_IDS = 20;
 /**
  * Datos actuales de los vinos del carrito: `?ids=a,b,c` (hasta 20). Público y sin sesión: solo devuelve vinos
  * publicados (los mismos que ya se ven en el catálogo), con su precio de ahora, si se pueden comprar y cuántas
- * botellas quedan (`available`: null = ilimitado; `soldOut`). Además la configuración pública de la tienda (`store`):
+ * botellas quedan (`available`: null = ilimitado; `soldOut`; es lo que se muestra, calculado con la caché corta de reservas
+ * de ~10 s: el checkout vuelve a comprobar con datos frescos). Además la configuración pública de la tienda (`store`):
  * si está abierta, retiro y entrega con sus costos, tope por defecto y condiciones de compra.
  * Los ids que no existen, no están publicados o no tienen forma de UUID simplemente no aparecen.
  */

@@ -48,6 +48,8 @@ const es = {
   bottles: (n: number) => `${n} ${n === 1 ? "botella" : "botellas"}`,
   shipping: "Envío",
   shippingWithZone: (zone: string) => `Envío (${zone})`,
+  shippingFree: "Gratis",
+  shippingCoordinated: "Se acuerda por WhatsApp y se paga aparte",
   orderedOn: (date: string) => `Pedido el ${date}`,
   viewWineOrder: "Ver pedido",
   // Datos
@@ -109,6 +111,8 @@ const en: typeof es = {
   bottles: (n: number) => `${n} ${n === 1 ? "bottle" : "bottles"}`,
   shipping: "Delivery",
   shippingWithZone: (zone: string) => `Delivery (${zone})`,
+  shippingFree: "Free",
+  shippingCoordinated: "Agreed on WhatsApp and paid separately",
   orderedOn: (date: string) => `Ordered on ${date}`,
   viewWineOrder: "View order",
   profileTitle: "My details",

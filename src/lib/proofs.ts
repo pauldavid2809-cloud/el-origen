@@ -44,20 +44,10 @@ export function sniffProofType(data: Buffer): string | null {
 
 /**
  * Monto escrito por el cliente: acepta "1.234,56", "1234,56", "1,234.56" o "25.5".
- * Con un solo punto seguido de exactamente 3 dígitos ("1.234") se interpreta como separador de miles (uso local).
+ * La función vive en wineSale.ts (sin `server-only`, para que también la use Tienda de vinos en el navegador) y se
+ * reexporta aquí: los reportes de pago la siguen importando de este archivo con el mismo comportamiento de siempre.
  */
-export function parseAmount(raw: string): number {
-  const s = raw.replace(/[^\d.,]/g, "");
-  if (!s) return NaN;
-  const lastComma = s.lastIndexOf(",");
-  const lastDot = s.lastIndexOf(".");
-  let decimal = -1;
-  if (lastComma >= 0 && lastDot >= 0) decimal = Math.max(lastComma, lastDot);
-  else if (lastComma >= 0) decimal = lastComma;
-  else if (lastDot >= 0 && s.indexOf(".") === lastDot && s.length - lastDot - 1 !== 3) decimal = lastDot;
-  if (decimal < 0) return Number(s.replace(/[.,]/g, ""));
-  return Number(`${s.slice(0, decimal).replace(/[.,]/g, "") || "0"}.${s.slice(decimal + 1).replace(/[.,]/g, "")}`);
-}
+export { parseAmount } from "./wineSale";
 
 /**
  * ¿Otra reserva de catas O pedido de vinos, en revisión o aprobado, ya usa esta referencia bancaria?

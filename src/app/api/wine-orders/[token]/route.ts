@@ -30,7 +30,10 @@ export async function GET(_req: Request, { params }: { params: { token: string }
       {
         success: true,
         order: toPublicWineOrder(order),
-        /** Configuración pública de la tienda de ahora (entrega, retiro, condiciones): el pedido muestra «el envío se coordina por WhatsApp» según `store.delivery.mode`. */
+        /**
+         * Configuración pública de la tienda de ahora (lugar y horario de retiro, indicaciones, condiciones). El envío NO se
+         * deduce de ella: el pedido recuerda con qué regla se cobró (`order.shippingMode`, `order.shippingUsd`; ver `isShippingCoordinated`).
+         */
         store,
         rate: rate ? { currency: "USD", rate: rate.rate, updatedAt: rate.updatedAt, amountBs: usdToBs(order.totalUsd, rate.rate) } : null,
         payment: { ...payment, zelle: zelle ? [zelle] : [] },

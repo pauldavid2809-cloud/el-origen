@@ -9,7 +9,7 @@ import { PayAndReport, Panel, type RateInfo } from "@/components/PayAndReport";
 import { formatBs, formatUsd } from "@/components/PaymentDetails";
 import { CONTACT, whatsappLink } from "@/lib/contact";
 import { useLang } from "@/lib/useLang";
-import { round2 } from "@/lib/wineSale";
+import { isShippingCoordinated, round2 } from "@/lib/wineSale";
 import type { PublicWineStore } from "@/lib/wineStoreRules";
 import type { Language } from "@/lib/i18n";
 import type { PublicWineOrder } from "@/lib/wineOrders";
@@ -162,24 +162,20 @@ export default function WineOrderPage() {
 /* ─── Resumen ─── */
 
 /**
- * Cómo se muestra el envío de un pedido con entrega: con costo, gratis, o por coordinar. `store` es la configuración de
- * ahora: con cero de costo se dice «gratis» solo si la configuración lo explica (envío gratis por el monto, costo cero);
- * si no, es un pedido hecho cuando el costo se coordinaba por WhatsApp y se mantiene esa nota.
+ * Cómo se muestra el envío de un pedido con entrega: con costo, gratis, o por coordinar. Sale de lo que el pedido guardó
+ * al crearse (`shippingMode` y `shippingUsd`), nunca de la configuración de ahora: si el administrador cambia luego el
+ * modo de envío, los pedidos ya hechos siguen diciendo lo que se le cobró (o se le dijo) a ese cliente. Los pedidos
+ * anteriores a la configuración de la tienda (sin modo) eran todos «a coordinar».
  */
-function shippingState(order: PublicWineOrder, store: PublicWineStore | null): "none" | "paid" | "free" | "coordinated" {
+function shippingState(order: PublicWineOrder): "none" | "paid" | "free" | "coordinated" {
   if (order.fulfillment !== "delivery") return "none";
   if (order.shippingUsd > 0) return "paid";
-  const d = store?.delivery;
-  if (!d || d.mode === "coordinate") return "coordinated";
-  if (d.freeFromUsd !== null && order.subtotalUsd >= d.freeFromUsd) return "free";
-  if (d.mode === "flat") return d.flatFeeUsd === 0 ? "free" : "coordinated";
-  const zone = d.zones.find((z) => z.name === order.deliveryZone);
-  return zone && zone.feeUsd === 0 ? "free" : "coordinated";
+  return isShippingCoordinated(order) ? "coordinated" : "free";
 }
 
 function Summary({ order, store, lang }: { order: PublicWineOrder; store: PublicWineStore | null; lang: Language }) {
   const t = PEDIDO_COPY[lang];
-  const ship = shippingState(order, store);
+  const ship = shippingState(order);
   const rows: [string, string][] = [
     [t.holder, order.customerName],
     [t.fulfillment, order.fulfillment === "delivery" ? t.delivery : t.pickup],
@@ -247,7 +243,7 @@ function Policies({ store, lang }: { store: PublicWineStore; lang: Language }) {
   return (
     <section aria-label={policies.title} className="rounded-2xl border border-outline-variant bg-surface-container-lowest p-5 sm:p-6">
       <h2 className="font-serif text-xl text-on-surface">{policies.title}</h2>
-      <ul className="mt-4 space-y-2.5 list-disc pl-5 text-[13.5px] leading-relaxed text-on-surface-variant">
+      <ul className="mt-4 space-y-2.5 list-disc pl-5 text-[13.5px] leading-relaxed text-on-surface-variant break-words">
         {policies.items.map((item, i) => (
           <li key={`${i}-${item}`}>{item}</li>
         ))}

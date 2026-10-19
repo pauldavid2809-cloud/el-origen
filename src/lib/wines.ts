@@ -3,11 +3,10 @@ import crypto from "crypto";
 import { revalidatePath, revalidateTag, unstable_noStore as noStore } from "next/cache";
 import { WINE_TYPES, type PublicWine, type Wine, type WineSpec, type WineStatus, type WineType } from "@/types";
 import { getAdminClient } from "./orders";
-import { availableOf, isWineForSale, WINE_MAX_PER_ORDER_LIMIT } from "./wineSale";
-import { getWineHolds, wineHasOrders } from "./wineOrders";
+import { availableOf, isWineForSale, parseMoneyText, WINE_MAX_PER_ORDER_LIMIT } from "./wineSale";
+import { getWineHolds, getWineHoldsCached, wineHasOrders } from "./wineOrders";
 import { getWineStoreConfig } from "./wineStore";
 import { normalizeWineStoreConfig } from "./wineStoreRules";
-import { parseAmount } from "./proofs";
 
 /* ─────────────────────────────────────────────────────────────
    Vinos (tabla public.wines): catálogo de los productos degustados en las catas,
@@ -48,7 +47,7 @@ function imageUrl(v: unknown): string {
 
 /**
  * Precio en USD: número o texto escrito por una persona ("12,5", "12.50", "$1.234,50"); vacío o null = sin precio.
- * El texto se interpreta con las mismas reglas que los montos de los comprobantes (`parseAmount`).
+ * El texto se interpreta con `parseMoneyText` (estricto: "5.5.5" o "," no son un precio).
  */
 function parsePriceUsd(v: unknown): number | null {
   if (v === null || v === undefined) return null;
@@ -56,10 +55,7 @@ function parsePriceUsd(v: unknown): number | null {
   if (typeof v === "number") n = v;
   else if (typeof v === "string") {
     if (!v.trim()) return null;
-    // parseAmount descarta cualquier carácter que no sea dígito, punto o coma ("1e9" sería 19, "-5" sería 5):
-    // solo se admiten números con separadores, con "$" o "USD" opcionales.
-    const clean = v.replace(/usd|\$|\s/gi, "");
-    n = /^[\d.,]+$/.test(clean) ? parseAmount(clean) : NaN;
+    n = parseMoneyText(v);
   } else n = NaN;
   if (!Number.isFinite(n) || n < 0 || n > 100_000) throw new WineInputError("El precio no es válido.");
   return Math.round(n * 100) / 100;
@@ -354,12 +350,16 @@ export function toPublicWine({ id, slug, name, winery, region, type, vintage, im
   return { id, slug, name, winery, region, type, vintage, imageUrl, status, priceUsd, saleActive, maxPerOrder };
 }
 
-/** Reservadas por vino de los que controlan existencias; si la consulta falla se sigue sin ellas (el checkout vuelve a comprobar). */
+/**
+ * Reservadas por vino de los que controlan existencias, SOLO para mostrar (agotado, «quedan N»): usa la caché corta de
+ * reservas (`getWineHoldsCached`, ~10 s, vaciada al crear o cambiar un pedido en esta instancia) para no releer todos los
+ * pedidos en cada visita. Si la consulta falla se sigue sin ellas (el checkout vuelve a comprobar con datos frescos).
+ */
 async function holdsOf(wines: Wine[]): Promise<Map<string, number>> {
   const controlled = wines.filter((w) => w.stock !== null).map((w) => w.id);
   if (!controlled.length) return new Map();
   try {
-    return await getWineHolds(controlled);
+    return await getWineHoldsCached(controlled);
   } catch (err) {
     console.error("[wines] No se pudieron leer las botellas reservadas:", err);
     return new Map();
@@ -392,7 +392,10 @@ export async function toPublicWineDetail(wine: Wine): Promise<PublicWineDetail> 
 /** Un vino que quedó sobrevendido (más reservadas que existencias): se avisa al administrador al aprobar un pedido. */
 export type StockWarning = { wineId: string; name: string; stock: number; reserved: number };
 
-/** Vinos de `wineIds` con control de existencias cuyas reservadas superan lo puesto a la venta. Nunca lanza (ante un error, []). */
+/**
+ * Vinos de `wineIds` con control de existencias cuyas reservadas superan lo puesto a la venta. Nunca lanza (ante un error, []).
+ * Es un aviso para el administrador al aprobar un pedido: lee las reservas SIEMPRE frescas (`getWineHolds`), sin caché.
+ */
 export async function getStockWarnings(wineIds: string[]): Promise<StockWarning[]> {
   try {
     const wines = (await Promise.all(Array.from(new Set(wineIds)).map((id) => getWine(id)))).filter(

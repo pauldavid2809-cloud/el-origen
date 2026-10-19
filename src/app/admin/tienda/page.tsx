@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
-import { round2, WINE_MAX_PER_ORDER_LIMIT } from "@/lib/wineSale";
+import { parseMoneyText, round2, WINE_MAX_PER_ORDER_LIMIT } from "@/lib/wineSale";
 import {
   buildWinePolicies,
   normalizeWineStoreConfig,
@@ -15,6 +15,13 @@ import {
 /* Tienda de vinos: todo lo que antes estaba fijo en el código y ahora define el administrador: si la tienda está abierta,
    retiro, entrega (costo fijo o por zonas), tope de botellas y condiciones de compra. Se guarda con PUT en
    /api/admin/settings/wine-store (el cuerpo es la configuración completa, igual que en Configuración de pagos). */
+
+/** Largo máximo de lo que se escribe en un campo de monto: los dígitos del mayor valor permitido más separadores, centavos, «$» y «USD». */
+const MONEY_INPUT_MAX = String(WINE_STORE_LIMITS.maxFreeFromUsd).length + 10;
+/** Largo máximo del máximo de botellas por vino (un entero de 1 a WINE_MAX_PER_ORDER_LIMIT). */
+const MAX_PER_ORDER_DIGITS = String(WINE_MAX_PER_ORDER_LIMIT).length;
+/** Desde cuántos caracteres el nombre de una zona muestra su contador (dos tercios del máximo). */
+const ZONE_COUNTER_FROM = Math.round((WINE_STORE_LIMITS.zoneName * 2) / 3);
 
 let keySeq = 0;
 /** Fila de zona del formulario: `id` es el que ya tiene la zona guardada (se reenvía para que no cambie al renombrarla). */
@@ -46,11 +53,15 @@ type GeneratedTerms = { es: PolicyText; en: PolicyText };
 
 /* ─── Números y textos ─── */
 
-/** "5,5", "$7" o "7 USD" → número; "" → null; lo que no es un monto → NaN (mismas reglas que el servidor). */
+/**
+ * "5,5", "$7", "7 USD" o "1.234,50" → número; "" → null; lo que no es un monto → NaN. Se interpreta con `parseMoneyText`, la misma
+ * función que usan el servidor (precio de los vinos y montos de la tienda): no hay un monto que el formulario lea de una forma
+ * y el servidor de otra, y un descuido como "5.5.5" se rechaza en vez de guardarse como 555.
+ */
 function parseMoney(text: string): number | null {
   const s = text.replace(/usd|\$|\s/gi, "");
   if (!s) return null;
-  return /^\d+([.,]\d+)?$/.test(s) ? Number(s.replace(",", ".")) : NaN;
+  return parseMoneyText(s);
 }
 
 /** El monto si es un número entre 0 y `max`; si no (vacío, inválido o fuera de rango), null. */
@@ -212,21 +223,34 @@ const MODES: { id: DeliveryMode; label: string; hint: string }[] = [
   { id: "zones", label: "Por zonas", hint: "El cliente elige su zona al comprar y paga el costo de esa zona." },
 ];
 
+/** Texto de la tarjeta «Entrega a domicilio»: lo que pasa con el costo depende del modo elegido. */
+function deliveryHint(d: FormState["delivery"]): string {
+  if (!d.enabled) return "Active la entrega si quiere que el cliente pueda pedir que le lleven el pedido a su dirección.";
+  if (d.mode === "coordinate") {
+    return "El costo del envío no se suma al total: usted lo acuerda con el cliente por WhatsApp y se paga aparte.";
+  }
+  return "El costo del envío se suma al total del pedido, y el cliente lo paga junto con las botellas.";
+}
+
 export default function AdminWineStorePage() {
   const [form, setForm] = useState<FormState | null>(null);
   const [defaults, setDefaults] = useState<WineStoreConfig | null>(null);
   /** Condiciones automáticas según lo último guardado (respaldo cuando el formulario aún tiene errores). */
   const [savedTerms, setSavedTerms] = useState<GeneratedTerms | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  /** Aviso de error del formulario; cada aviso es un objeto nuevo (aunque el texto se repita) y `reveal` pide llevarlo a la vista. */
+  const [error, setError] = useState<{ text: string; reveal: boolean } | null>(null);
   const [saving, setSaving] = useState(false);
   const [dirty, setDirty] = useState(false);
+  /** La configuración guardada ya no es válida (editada a mano o de una versión vieja): se muestran los valores por defecto. */
+  const [invalidStored, setInvalidStored] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   /** Subtotal de ejemplo para la vista del costo de envío. */
   const [example, setExample] = useState("40");
   const savingRef = useRef(false);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const focusRef = useRef<string | null>(null);
+  const errorRef = useRef<HTMLDivElement>(null);
   const uid = useId();
   const id = (name: string) => `${uid}-${name}`;
 
@@ -239,7 +263,9 @@ export default function AdminWineStorePage() {
       setForm(toForm(data.config));
       setDefaults(data.defaults);
       setSavedTerms(data.generatedTerms ?? null);
-      setDirty(false);
+      // Con la configuración guardada dañada el formulario parte de los valores por defecto: se deja listo para guardar y reparar.
+      setInvalidStored(data.invalidStored === true);
+      setDirty(data.invalidStored === true);
     } catch (err) {
       setLoadError((err as Error).message || "No se pudo cargar la configuración de la tienda.");
     }
@@ -266,6 +292,19 @@ export default function AdminWineStorePage() {
     document.getElementById(focusRef.current)?.focus();
     focusRef.current = null;
   });
+
+  // Lleva el aviso de error a la vista. En escritorio el desplazamiento es el de <main> (no el de la ventana), así que
+  // `window.scrollTo` no lo alcanza: `scrollIntoView` sube por el contenedor que corresponda. El foco hace que se lea.
+  useEffect(() => {
+    if (!error?.reveal) return;
+    const el = errorRef.current;
+    if (!el) return;
+    const reduce = typeof window.matchMedia === "function" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    el.scrollIntoView({ behavior: reduce ? "auto" : "smooth", block: "center" });
+    el.focus({ preventScroll: true });
+  }, [error]);
+
+  const showError = (text: string, reveal = true) => setError({ text, reveal });
 
   const update = (fn: (f: FormState) => FormState) => {
     setForm((f) => (f ? fn(f) : f));
@@ -305,14 +344,10 @@ export default function AdminWineStorePage() {
     if (!form || savingRef.current) return;
     setError(null);
     if (errorCount > 0) {
-      setError(
-        errors.channels
-          ? errors.channels
-          : "Hay campos por corregir. Revise los mensajes en rojo y vuelva a guardar."
-      );
-      const bad = document.querySelector<HTMLElement>('[aria-invalid="true"]');
-      if (bad && !errors.channels) bad.focus();
-      else window.scrollTo({ top: 0, behavior: "smooth" });
+      // Con un campo marcado el foco va al campo (el navegador lo desplaza a la vista); si no, al aviso de arriba.
+      const bad = errors.channels ? null : document.querySelector<HTMLElement>('[aria-invalid="true"]');
+      showError(errors.channels ? errors.channels : "Hay campos por corregir. Revise los mensajes en rojo y vuelva a guardar.", !bad);
+      bad?.focus();
       return;
     }
     savingRef.current = true;
@@ -327,6 +362,7 @@ export default function AdminWineStorePage() {
       if (!data?.success) throw new Error(data?.message);
       setForm(toForm(data.config));
       setSavedTerms(data.generatedTerms ?? null);
+      setInvalidStored(false);
       setDirty(false);
       notify(
         data.config.enabled
@@ -334,8 +370,7 @@ export default function AdminWineStorePage() {
           : "Configuración guardada. La tienda está cerrada: los clientes ven el aviso y no pueden comprar."
       );
     } catch (err) {
-      setError((err as Error).message || "No se pudo guardar la configuración de la tienda.");
-      window.scrollTo({ top: 0, behavior: "smooth" });
+      showError((err as Error).message || "No se pudo guardar la configuración de la tienda.");
     } finally {
       savingRef.current = false;
       setSaving(false);
@@ -404,9 +439,20 @@ export default function AdminWineStorePage() {
         </div>
       ) : (
         <form onSubmit={save} noValidate className="space-y-6">
-          {error && (
+          {invalidStored && (
             <div role="alert" className="rounded-lg border border-error/40 bg-error-container/60 p-3 text-[14px] text-on-error-container">
-              {error}
+              La configuración guardada no es válida, por eso los clientes no pueden comprar ahora. Se muestran los valores por defecto:
+              revíselos, ajústelos y pulse «Guardar» para repararla.
+            </div>
+          )}
+          {error && (
+            <div
+              ref={errorRef}
+              tabIndex={-1}
+              role="alert"
+              className="rounded-lg border border-error/40 bg-error-container/60 p-3 text-[14px] text-on-error-container scroll-mt-6 focus:outline-none"
+            >
+              {error.text}
             </div>
           )}
 
@@ -484,7 +530,7 @@ export default function AdminWineStorePage() {
           </Card>
 
           {/* 3. Entrega */}
-          <Card title="Entrega a domicilio" hint="Elija cómo se cobra el envío. El costo se suma al total del pedido, y el cliente lo paga junto con las botellas.">
+          <Card title="Entrega a domicilio" hint={deliveryHint(form.delivery)}>
             <Toggle
               checked={form.delivery.enabled}
               onChange={(v) => setDelivery({ enabled: v })}
@@ -517,6 +563,9 @@ export default function AdminWineStorePage() {
                       </label>
                     ))}
                   </div>
+                  <p className={`${hintCls} mt-2`}>
+                    El cambio de modo vale para los pedidos nuevos: cada pedido conserva la forma en que se cobró su envío.
+                  </p>
                 </fieldset>
 
                 {form.delivery.mode === "flat" && (
@@ -556,10 +605,10 @@ export default function AdminWineStorePage() {
                                 onChange={(e) => updateZone(z._k, { name: e.target.value })}
                                 placeholder="Ej.: Chacao"
                                 aria-invalid={nameErr ? true : undefined}
-                                aria-describedby={[nameErr ? id(`z${z._k}-name-err`) : "", z.name.length >= 40 ? id(`z${z._k}-name-n`) : ""].filter(Boolean).join(" ") || undefined}
+                                aria-describedby={[nameErr ? id(`z${z._k}-name-err`) : "", z.name.length >= ZONE_COUNTER_FROM ? id(`z${z._k}-name-n`) : ""].filter(Boolean).join(" ") || undefined}
                                 className={inputCls}
                               />
-                              {z.name.length >= 40 && (
+                              {z.name.length >= ZONE_COUNTER_FROM && (
                                 <p id={id(`z${z._k}-name-n`)} className={`${hintCls} mt-1 tabular-nums text-right`}>
                                   {z.name.length} / {WINE_STORE_LIMITS.zoneName}
                                 </p>
@@ -571,7 +620,7 @@ export default function AdminWineStorePage() {
                               <input
                                 id={id(`z${z._k}-fee`)}
                                 inputMode="decimal"
-                                maxLength={12}
+                                maxLength={MONEY_INPUT_MAX}
                                 value={z.fee}
                                 onChange={(e) => updateZone(z._k, { fee: e.target.value })}
                                 placeholder="Ej.: 3,50"
@@ -645,7 +694,7 @@ export default function AdminWineStorePage() {
                 onChange={(v) => update((f) => ({ ...f, defaultMax: v }))}
                 error={errors.defaultMax}
                 inputMode="numeric"
-                maxLength={2}
+                maxLength={MAX_PER_ORDER_DIGITS}
               />
             </div>
           </Card>
@@ -813,7 +862,7 @@ function MoneyField({
 }) {
   return (
     <div className="max-w-xs">
-      <Field id={id} label={label} hint={hint} value={value} onChange={onChange} error={error} placeholder={placeholder} inputMode="decimal" maxLength={12} />
+      <Field id={id} label={label} hint={hint} value={value} onChange={onChange} error={error} placeholder={placeholder} inputMode="decimal" maxLength={MONEY_INPUT_MAX} />
     </div>
   );
 }
@@ -857,7 +906,7 @@ function ShippingExample({
       <ul className="divide-y divide-outline-variant rounded-lg border border-outline-variant bg-surface-container-lowest">
         {rows.map((r) => (
           <li key={r.key} className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-0.5 px-3.5 py-2.5 text-[14px]">
-            <span className="font-semibold min-w-0">{r.name}</span>
+            <span className="font-semibold min-w-0 break-words">{r.name}</span>
             <span className="text-on-surface-variant">
               Envío: {r.free ? "gratis (llega al mínimo)" : r.shipping === 0 ? "sin costo" : usd(r.shipping)}
             </span>
@@ -878,7 +927,7 @@ function ShippingExample({
       </div>
       <div className="max-w-xs">
         <label htmlFor={id} className={labelCls}>Total de las botellas de ejemplo (USD)</label>
-        <input id={id} inputMode="decimal" maxLength={12} value={example} onChange={(e) => onExample(e.target.value)} className={`${inputCls} tabular-nums`} />
+        <input id={id} inputMode="decimal" maxLength={MONEY_INPUT_MAX} value={example} onChange={(e) => onExample(e.target.value)} className={`${inputCls} tabular-nums`} />
       </div>
       {body}
     </div>
@@ -956,7 +1005,7 @@ function TermsEditor({
       {empty && generated && (
         <details className="rounded-lg border border-outline-variant bg-surface-container-low/50 px-3.5 py-2.5 text-[13px]">
           <summary className="cursor-pointer font-semibold">Así se mostrarán las condiciones automáticas</summary>
-          <ul className="list-disc pl-5 mt-2 space-y-1 text-on-surface-variant">
+          <ul className="list-disc pl-5 mt-2 space-y-1 text-on-surface-variant break-words">
             {generated.items.map((item, i) => (
               <li key={i}>{item}</li>
             ))}

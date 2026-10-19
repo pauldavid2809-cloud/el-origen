@@ -56,3 +56,62 @@ export function availableOf(stock: number | null, held: number): number | null {
 export function round2(n: number): number {
   return Math.round(n * 100) / 100;
 }
+
+/* ─── Envío: la regla con que se cobró un pedido ─── */
+
+/** Modo de envío con el que se cobró un pedido (el mismo vocabulario que `DeliveryMode` de la configuración de la tienda). */
+export type WineShippingMode = "coordinate" | "flat" | "zones";
+export const WINE_SHIPPING_MODES: readonly WineShippingMode[] = ["coordinate", "flat", "zones"];
+
+/**
+ * ¿El envío de este pedido «se coordina por WhatsApp y se paga aparte»? Es la regla ÚNICA que usan la página del pedido,
+ * «Mi cuenta», el panel y los avisos; se decide con lo que el pedido recordó al crearse (`shippingMode`), nunca con la
+ * configuración de ahora: entrega, sin costo cobrado y modo «coordinar». Un pedido de entrega anterior a v7 (modo null) era
+ * siempre «a coordinar». Con modo «costo fijo» o «por zonas» y costo 0, el envío salió GRATIS (no se acuerda nada aparte).
+ */
+export function isShippingCoordinated(o: {
+  fulfillment: "pickup" | "delivery";
+  shippingMode: WineShippingMode | null;
+  shippingUsd: number;
+  /** Con zona elegida el envío no pudo ser «a coordinar» (ese modo nunca guarda zona). */
+  deliveryZone?: string | null;
+}): boolean {
+  return (
+    o.fulfillment === "delivery" && o.shippingUsd === 0 && !o.deliveryZone && (o.shippingMode === "coordinate" || o.shippingMode === null)
+  );
+}
+
+/**
+ * Monto escrito por una persona: acepta "1.234,56", "1234,56", "1,234.56" o "25.5".
+ * Con un solo punto seguido de exactamente 3 dígitos ("1.234") se interpreta como separador de miles (uso local).
+ * Vive aquí (sin `server-only`) para que lo compartan los comprobantes de pago, el precio del vino y los montos que el
+ * administrador escribe en Tienda de vinos: todos se interpretan con las mismas reglas.
+ */
+export function parseAmount(raw: string): number {
+  const s = raw.replace(/[^\d.,]/g, "");
+  if (!s) return NaN;
+  const lastComma = s.lastIndexOf(",");
+  const lastDot = s.lastIndexOf(".");
+  let decimal = -1;
+  if (lastComma >= 0 && lastDot >= 0) decimal = Math.max(lastComma, lastDot);
+  else if (lastComma >= 0) decimal = lastComma;
+  else if (lastDot >= 0 && s.indexOf(".") === lastDot && s.length - lastDot - 1 !== 3) decimal = lastDot;
+  if (decimal < 0) return Number(s.replace(/[.,]/g, ""));
+  return Number(`${s.slice(0, decimal).replace(/[.,]/g, "") || "0"}.${s.slice(decimal + 1).replace(/[.,]/g, "")}`);
+}
+
+/**
+ * Monto en USD escrito por una persona (precio de un vino, costo de envío…). Estricto con la forma, para que un descuido no
+ * cambie el valor en silencio: con `parseAmount` (tolerante a propósito, para los comprobantes) "5.5.5" sería 555 y "," sería 0.
+ * Acepta "12", "12.5", "12,50", "$12", "12 USD", "1.000" (mil), "1.234,56" y "1,234.56". "1,000" es ambiguo (en Venezuela la
+ * coma es el decimal) y, como todo lo demás que no tenga esa forma, da NaN.
+ */
+export function parseMoneyText(raw: string): number {
+  const s = raw.replace(/usd|\$|\s/gi, "");
+  if (/^\d+$/.test(s)) return Number(s);
+  if (/^\d+[.,]\d{1,2}$/.test(s)) return Number(s.replace(",", "."));
+  if (/^[1-9]\d{0,2}(?:\.\d{3})+$/.test(s)) return Number(s.replace(/\./g, ""));
+  if (/^[1-9]\d{0,2}(?:\.\d{3})+,\d{1,2}$/.test(s)) return Number(s.replace(/\./g, "").replace(",", "."));
+  if (/^[1-9]\d{0,2}(?:,\d{3})+\.\d{1,2}$/.test(s)) return Number(s.replace(/,/g, ""));
+  return NaN;
+}
