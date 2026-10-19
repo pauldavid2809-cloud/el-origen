@@ -63,10 +63,17 @@ function assertStoredShape(stored: unknown): void {
   const c = asRecord(stored);
   const d = asRecord(c.delivery);
   const p = asRecord(c.pickup);
+  const sch = asRecord(d.scheduling);
   // `normalizeWineStoreConfig` es tolerante: un modo de envío raro pasaría a «coordinar» y un interruptor raro a «activo».
   // Para cobrar eso no vale: si está escrito, debe estar bien escrito.
   if (d.mode !== undefined && !DELIVERY_MODES.includes(d.mode as DeliveryMode)) throw new Error("el modo de envío guardado no es válido");
-  for (const [label, v] of [["enabled", c.enabled], ["pickup.enabled", p.enabled], ["delivery.enabled", d.enabled]] as const) {
+  // (La programación de la entrega ausente es lo normal en una configuración anterior a existir: valores por defecto.)
+  for (const [label, v] of [
+    ["enabled", c.enabled],
+    ["pickup.enabled", p.enabled],
+    ["delivery.enabled", d.enabled],
+    ["delivery.scheduling.enabled", sch.enabled],
+  ] as const) {
     if (v !== undefined && typeof v !== "boolean") throw new Error(`«${label}» guardado no es verdadero o falso`);
   }
 }

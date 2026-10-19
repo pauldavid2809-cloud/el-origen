@@ -1,14 +1,19 @@
 "use client";
 
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import type { DeliveryStatus } from "@/lib/orders";
 import type { WineOrder } from "@/lib/wineOrders";
 import type { StockWarning } from "@/lib/wines";
 import { isShippingCoordinated, round2, WINE_PENDING_TTL_HOURS } from "@/lib/wineSale";
+import { caracasToday, formatDeliveryDate } from "@/lib/wineStoreRules";
 
-/* Pedidos de vinos: revisión de pagos, aprobación (con confirmación por correo y WhatsApp) y entrega.
+/* Pedidos de vinos: revisión de pagos, aprobación (con confirmación por correo y WhatsApp), «en camino» y entrega.
    Mismo recorrido que Reservas y pagos, con sus propios textos: aquí no hay cupos, entradas ni QR.
    El detalle muestra subtotal, envío (y zona) y total; al aprobar, si algún vino con existencias controladas quedó
-   sobrevendido, la respuesta trae `stockWarning` y se avisa (la aprobación nunca se bloquea: el cliente ya pagó). */
+   sobrevendido, la respuesta trae `stockWarning` y se avisa (la aprobación nunca se bloquea: el cliente ya pagó).
+   En las entregas a domicilio muestra el día y la franja que eligió el cliente (una preferencia que se confirma por WhatsApp),
+   resalta las de hoy y las de un día ya pasado, y permite marcar el pedido «en camino» (avisa al cliente por correo y WhatsApp)
+   y reenviar ese aviso. «En camino» = aprobado, con `dispatchedAt` y sin `deliveredAt`: sigue dentro de «Por entregar». */
 
 type AdminWineOrder = WineOrder & {
   proofUrl: string | null;
@@ -17,7 +22,9 @@ type AdminWineOrder = WineOrder & {
 };
 /** Las aprobadas se reparten en «Por entregar» y «Entregados» según tengan fecha de entrega. */
 type Tab = "in_review" | "pending_payment" | "to_deliver" | "delivered" | "rejected" | "cancelled";
-type Action = "approve" | "reject" | "resend" | "cancel" | "fulfill";
+type Action = "approve" | "reject" | "resend" | "cancel" | "fulfill" | "dispatch" | "resend_dispatch";
+/** Dentro de «Por entregar»: todos, los pedidos a domicilio que aún no salieron, o los que ya van en camino. */
+type Route = "all" | "pending" | "ontheway";
 
 const TABS: { id: Tab; label: string }[] = [
   { id: "in_review", label: "Por revisar" },
@@ -29,6 +36,11 @@ const TABS: { id: Tab; label: string }[] = [
 ];
 
 const tabOf = (o: AdminWineOrder): Tab => (o.status === "approved" ? (o.deliveredAt ? "delivered" : "to_deliver") : o.status);
+
+/** Pedido que ya salió y todavía no se entregó. */
+const isOnTheWay = (o: AdminWineOrder) => o.status === "approved" && Boolean(o.dispatchedAt) && !o.deliveredAt;
+/** Se puede marcar «en camino»: aprobado, a domicilio, sin entregar y que no salió antes. */
+const canDispatch = (o: AdminWineOrder) => o.status === "approved" && o.fulfillment === "delivery" && !o.deliveredAt && !o.dispatchedAt;
 
 const REJECT_REASONS = [
   "La referencia no aparece en la cuenta",
@@ -58,12 +70,59 @@ const DELIVERY: Record<string, { label: string; cls: string }> = {
   not_sent: { label: "pendiente", cls: "bg-surface-container-high text-on-surface-variant" },
 };
 
+/** Estado de un envío con su texto (un valor desconocido se lee como pendiente). */
+const deliveryInfo = (s: DeliveryStatus | undefined) => DELIVERY[s ?? "not_sent"] ?? DELIVERY.not_sent;
+
 const bs = (n: number) => n.toLocaleString("es-VE", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const usd = (n: number) => `$${Number.isInteger(n) ? n : n.toFixed(2)} USD`;
 const price = (n: number) => `$${Number.isInteger(n) ? n : n.toFixed(2)}`;
 const when = (iso: string | null) =>
   iso ? new Date(iso).toLocaleString("es-VE", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" }) : "—";
 const bottles = (n: number) => `${n} ${n === 1 ? "botella" : "botellas"}`;
+
+/** «Miércoles 21 de octubre» (el día de entrega es una fecha de Caracas 'YYYY-MM-DD'; no depende de la zona horaria del navegador). */
+function dayText(ymd: string): string {
+  const s = formatDeliveryDate(ymd, "es");
+  return s.charAt(0).toUpperCase() + s.slice(1);
+}
+
+/** Días entre dos fechas 'YYYY-MM-DD' (b − a), con aritmética de calendario en UTC. */
+function ymdDiff(a: string, b: string): number {
+  const t = (v: string) => {
+    const [y, m, d] = v.split("-").map(Number);
+    return Date.UTC(y, m - 1, d);
+  };
+  return Math.round((t(b) - t(a)) / 86_400_000);
+}
+
+/** Cuánto apremia la entrega elegida: sin entregar y el día ya pasó (late), es hoy sin haber salido (today) o es mañana sin haber salido (tomorrow). */
+type Urgency = "late" | "today" | "tomorrow" | null;
+function urgencyOf(o: AdminWineOrder, today: string): Urgency {
+  if (o.status !== "approved" || o.fulfillment !== "delivery" || o.deliveredAt || !o.deliveryDate) return null;
+  const diff = ymdDiff(today, o.deliveryDate);
+  if (diff < 0) return "late";
+  if (o.dispatchedAt) return null;
+  return diff === 0 ? "today" : diff === 1 ? "tomorrow" : null;
+}
+
+const URGENCY: Record<Exclude<Urgency, null>, { label: string; title: string; cls: string }> = {
+  late: {
+    label: "Día pasado",
+    title: "El día que eligió el cliente ya pasó y el pedido no está marcado como entregado.",
+    cls: "bg-error-container text-on-error-container",
+  },
+  today: { label: "Hoy", title: "El cliente eligió el día de hoy y el pedido aún no salió.", cls: "bg-tertiary-fixed text-on-tertiary-fixed-variant" },
+  tomorrow: { label: "Mañana", title: "El cliente eligió el día de mañana.", cls: "bg-surface-container-high text-on-surface-variant" },
+};
+
+/** En «Por entregar»: primero los que tienen día elegido (el más próximo arriba, y a igual día el pedido más antiguo); luego los demás. */
+function byDeliveryDay(a: AdminWineOrder, b: AdminWineOrder): number {
+  if (a.deliveryDate && b.deliveryDate) {
+    if (a.deliveryDate !== b.deliveryDate) return a.deliveryDate < b.deliveryDate ? -1 : 1;
+    return a.createdAt < b.createdAt ? -1 : a.createdAt > b.createdAt ? 1 : 0;
+  }
+  return a.deliveryDate ? -1 : b.deliveryDate ? 1 : 0;
+}
 
 /** 0414-123.45.67 → 584141234567 (para el enlace de WhatsApp con el cliente). */
 function waDigits(phone: string): string {
@@ -92,6 +151,20 @@ export default function AdminWineOrdersPage() {
   const [reason, setReason] = useState(REJECT_REASONS[0]);
   const [toast, setToast] = useState<{ text: string; ok: boolean } | null>(null);
   const [wa, setWa] = useState<DeliveryInfo | null>(null);
+  /** Sub-filtro de «Por entregar». */
+  const [route, setRoute] = useState<Route>("all");
+  /** Error largo que no cabe en un aviso de 4 s (por ejemplo, falta ejecutar supabase/v8.sql): queda a la vista hasta cerrarlo. */
+  const [actionError, setActionError] = useState<string | null>(null);
+  /** Aviso persistente cuando el aviso de «en camino» no llegó completo al cliente (el correo no se guarda: solo se ve aquí). */
+  const [dispatchAlert, setDispatchAlert] = useState<{
+    code: string;
+    name: string;
+    phone: string;
+    email: DeliveryStatus;
+    whatsapp: DeliveryStatus;
+    notified: boolean;
+  } | null>(null);
+  const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   /** Aviso persistente de vinos sobrevendidos tras aprobar un pedido (el toast dura 4 s y esto no debe pasar inadvertido). */
   const [stockAlert, setStockAlert] = useState<{ code: string; items: StockWarning[] } | null>(null);
 
@@ -117,9 +190,14 @@ export default function AdminWineOrdersPage() {
     load();
   }, [load]);
 
-  const notify = (text: string, ok = true) => {
+  useEffect(() => () => {
+    if (toastTimer.current) clearTimeout(toastTimer.current);
+  }, []);
+
+  const notify = (text: string, ok = true, ms = 4000) => {
     setToast({ text, ok });
-    setTimeout(() => setToast(null), 4000);
+    if (toastTimer.current) clearTimeout(toastTimer.current);
+    toastTimer.current = setTimeout(() => setToast(null), ms);
   };
 
   const act = async (o: AdminWineOrder, action: Action, why?: string) => {
@@ -133,8 +211,29 @@ export default function AdminWineOrdersPage() {
       const data = await res.json();
       if (!data.success) throw new Error(data.message);
       const u: WineOrder = data.order;
-      const sent = `Correo: ${DELIVERY[u.emailStatus].label} · WhatsApp: ${DELIVERY[u.whatsappStatus].label}.`;
-      const msg: Record<Action, string> = {
+      setActionError(null);
+
+      if (action === "dispatch" || action === "resend_dispatch") {
+        // El aviso de «en camino»: la respuesta trae cómo salió el correo (no se guarda) y el WhatsApp (se guarda en el pedido).
+        const email: DeliveryStatus = data.dispatchEmailStatus;
+        const whatsapp: DeliveryStatus = data.dispatchWhatsappStatus;
+        const result = `Correo: ${deliveryInfo(email).label} · WhatsApp: ${deliveryInfo(whatsapp).label}.`;
+        // El cliente se enteró si el correo salió o el WhatsApp salió o quedó en la cola del bot.
+        const notified = email === "sent" || whatsapp === "sent" || whatsapp === "queued";
+        const head = action === "dispatch" ? `${u.code} marcado «en camino».` : `Aviso de salida de ${u.code} reenviado.`;
+        if (notified && email !== "failed" && whatsapp !== "failed") {
+          notify(`${head} ${result}`, true, 7000);
+          setDispatchAlert(null);
+        } else {
+          notify(`${head} ${notified ? "Revise el aviso: no salió completo." : "No se pudo avisar al cliente."} ${result}`, notified, 9000);
+          setDispatchAlert({ code: u.code, name: u.customerName, phone: u.customerPhone, email, whatsapp, notified });
+        }
+        await load();
+        return;
+      }
+
+      const sent = `Correo: ${deliveryInfo(u.emailStatus).label} · WhatsApp: ${deliveryInfo(u.whatsappStatus).label}.`;
+      const msg: Record<Exclude<Action, "dispatch" | "resend_dispatch">, string> = {
         approve: `Aprobado ${u.code}. ${sent}`,
         reject:
           data.emailStatus === "sent"
@@ -152,7 +251,10 @@ export default function AdminWineOrdersPage() {
       setRejecting(null);
       await load();
     } catch (err) {
-      notify((err as Error).message || "No se pudo completar la acción.", false);
+      const message = (err as Error).message || "No se pudo completar la acción.";
+      // Falta ejecutar supabase/v8.sql: el texto trae la instrucción completa y un aviso de 4 s no alcanza para leerla.
+      if (/supabase\/v8\.sql/.test(message)) setActionError(message);
+      else notify(message, false);
     } finally {
       setBusy(null);
     }
@@ -173,15 +275,53 @@ export default function AdminWineOrdersPage() {
     return c;
   }, [filtered]);
 
+  /** «Hoy» en Caracas (el día de entrega es una fecha de Caracas). */
+  const today = caracasToday();
+
+  /** Cuántos de «Por entregar» salieron y cuántos a domicilio aún no (los retiros no se marcan «en camino»). */
+  const routeCounts = useMemo(() => {
+    const toDeliver = filtered.filter((o) => tabOf(o) === "to_deliver");
+    return {
+      all: toDeliver.length,
+      pending: toDeliver.filter((o) => canDispatch(o)).length,
+      ontheway: toDeliver.filter((o) => isOnTheWay(o)).length,
+    };
+  }, [filtered]);
+
   const list = filtered
     .filter((o) => tabOf(o) === tab)
+    .filter((o) => tab !== "to_deliver" || route === "all" || (route === "ontheway" ? isOnTheWay(o) : canDispatch(o)))
     .filter((o) => {
       const s = q.trim().toLowerCase();
       if (!s) return true;
-      return [o.code, o.customerName, o.customerDocId, o.customerEmail, o.customerPhone, o.paymentReference ?? "", o.deliveryZone ?? "", ...o.items.map((i) => i.name)].some((v) =>
-        v.toLowerCase().includes(s)
-      );
+      return [
+        o.code,
+        o.customerName,
+        o.customerDocId,
+        o.customerEmail,
+        o.customerPhone,
+        o.paymentReference ?? "",
+        o.deliveryZone ?? "",
+        o.deliveryDate ?? "",
+        o.deliveryDate ? formatDeliveryDate(o.deliveryDate, "es") : "",
+        o.deliverySlot ?? "",
+        ...o.items.map((i) => i.name),
+      ].some((v) => v.toLowerCase().includes(s));
     });
+  // En «Por entregar» van primero las de entrega más próxima.
+  if (tab === "to_deliver") list.sort(byDeliveryDay);
+
+  /** Entregas a domicilio sin entregar que apremian: de hoy sin haber salido, o con el día elegido ya pasado. */
+  const attention = useMemo(() => {
+    let todayN = 0;
+    let lateN = 0;
+    for (const o of orders) {
+      const u = urgencyOf(o, today);
+      if (u === "today") todayN++;
+      else if (u === "late") lateN++;
+    }
+    return { today: todayN, late: lateN };
+  }, [orders, today]);
 
   const approved = orders.filter((o) => o.status === "approved");
   const approvedUsd = approved.reduce((s, o) => s + o.totalUsd, 0);
@@ -204,7 +344,8 @@ export default function AdminWineOrdersPage() {
           <p className="eyebrow mb-2">Panel</p>
           <h1 className="font-serif text-3xl sm:text-4xl">Pedidos de vinos</h1>
           <p className="text-[14px] text-on-surface-variant mt-1">
-            {counts.in_review ?? 0} pagos por revisar · {counts.to_deliver ?? 0} por entregar · {approved.length}{" "}
+            {counts.in_review ?? 0} pagos por revisar · {counts.to_deliver ?? 0} por entregar
+            {routeCounts.ontheway > 0 && ` (${routeCounts.ontheway} en camino)`} · {approved.length}{" "}
             {approved.length === 1 ? "pedido aprobado" : "pedidos aprobados"} por {usd(Math.round(approvedUsd * 100) / 100)}
           </p>
         </div>
@@ -225,8 +366,8 @@ export default function AdminWineOrdersPage() {
       {!persistent && (
         <div className="rounded-lg border border-tertiary/40 bg-tertiary-fixed/60 p-4 text-[14px] text-on-tertiary-fixed-variant">
           <strong>Modo de prueba:</strong> Supabase no está configurado, los pedidos se guardan en memoria y se pierden al reiniciar.
-          Configure <code>NEXT_PUBLIC_SUPABASE_URL</code> y <code>SUPABASE_SERVICE_ROLE_KEY</code> y ejecute <code>supabase/v6.sql</code> y{" "}
-          <code>supabase/v7.sql</code>.
+          Configure <code>NEXT_PUBLIC_SUPABASE_URL</code> y <code>SUPABASE_SERVICE_ROLE_KEY</code> y ejecute <code>supabase/v6.sql</code>,{" "}
+          <code>supabase/v7.sql</code> y <code>supabase/v8.sql</code>.
         </div>
       )}
 
@@ -262,6 +403,77 @@ export default function AdminWineOrdersPage() {
         </div>
       )}
 
+      {actionError && (
+        <div role="alert" className="rounded-lg border border-error/40 bg-error-container/50 p-4 text-[14px] text-on-error-container flex gap-3">
+          <span className="material-symbols-outlined flex-shrink-0" aria-hidden="true">error</span>
+          <div className="space-y-2 min-w-0">
+            <p className="break-words">{actionError}</p>
+            <button type="button" onClick={() => setActionError(null)} className="h-10 px-3 -ml-3 rounded text-[13px] font-semibold underline">
+              Entendido
+            </button>
+          </div>
+        </div>
+      )}
+
+      {dispatchAlert && (
+        <div role="alert" className="rounded-lg border border-tertiary/50 bg-tertiary-fixed/70 p-4 text-[14px] text-on-tertiary-fixed-variant flex gap-3">
+          <span className="material-symbols-outlined flex-shrink-0" aria-hidden="true">warning</span>
+          <div className="space-y-2 min-w-0">
+            <p>
+              <strong>
+                {dispatchAlert.notified
+                  ? `El aviso de «en camino» del pedido ${dispatchAlert.code} no salió completo.`
+                  : `No se pudo avisar a ${dispatchAlert.name} que el pedido ${dispatchAlert.code} va en camino.`}
+              </strong>
+            </p>
+            <ul className="list-disc pl-5 space-y-0.5">
+              <li>Correo: {deliveryInfo(dispatchAlert.email).label}.</li>
+              <li>WhatsApp: {deliveryInfo(dispatchAlert.whatsapp).label}.</li>
+            </ul>
+            <p>Escríbale por WhatsApp para avisarle que su pedido salió. Puede usar «Reenviar aviso de salida» cuando el envío vuelva a funcionar.</p>
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
+              <a
+                href={`https://wa.me/${waDigits(dispatchAlert.phone)}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="h-10 inline-flex items-center gap-1.5 text-[13px] font-semibold underline"
+              >
+                <span className="material-symbols-outlined text-[18px]" aria-hidden="true">chat</span>
+                Escribir al cliente
+              </a>
+              <button type="button" onClick={() => setDispatchAlert(null)} className="h-10 px-3 rounded text-[13px] font-semibold underline">
+                Entendido
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {(attention.today > 0 || attention.late > 0) && (
+        <div className="rounded-lg border border-tertiary/40 bg-tertiary-fixed/50 p-4 text-[14px] text-on-tertiary-fixed-variant flex flex-wrap items-center gap-x-4 gap-y-2">
+          <span className="material-symbols-outlined flex-shrink-0" aria-hidden="true">event_upcoming</span>
+          <p className="flex-1 min-w-[12rem]">
+            <strong>Entregas que requieren atención:</strong>
+            {attention.today > 0 && (
+              <> {attention.today} {attention.today === 1 ? "pedido es para hoy y aún no sale" : "pedidos son para hoy y aún no salen"}.</>
+            )}
+            {attention.late > 0 && (
+              <> {attention.late} {attention.late === 1 ? "pedido tiene el día elegido ya pasado" : "pedidos tienen el día elegido ya pasado"} y no se marcó como entregado.</>
+            )}
+          </p>
+          <button
+            type="button"
+            onClick={() => {
+              setTab("to_deliver");
+              setRoute("all");
+            }}
+            className="h-10 px-4 rounded border border-tertiary/50 text-[13px] font-semibold hover:bg-tertiary-fixed"
+          >
+            Ver por entregar
+          </button>
+        </div>
+      )}
+
       <div className="flex flex-col gap-3">
         <div className="flex gap-1.5 overflow-x-auto -mx-5 px-5 sm:mx-0 sm:px-0 sm:flex-wrap" role="tablist">
           {TABS.map((t) => (
@@ -280,6 +492,30 @@ export default function AdminWineOrdersPage() {
             </button>
           ))}
         </div>
+        {tab === "to_deliver" && routeCounts.all > 0 && (
+          <div role="group" aria-label="Filtrar los pedidos por entregar" className="flex flex-wrap gap-1.5">
+            {(
+              [
+                { id: "all", label: "Todos" },
+                { id: "pending", label: "Por salir (a domicilio)" },
+                { id: "ontheway", label: "En camino" },
+              ] as { id: Route; label: string }[]
+            ).map((r) => (
+              <button
+                key={r.id}
+                type="button"
+                aria-pressed={route === r.id}
+                onClick={() => setRoute(r.id)}
+                className={`h-10 px-3.5 rounded-full border text-[13px] font-semibold ${
+                  route === r.id ? "bg-ink border-ink text-paper" : "border-outline-variant text-on-surface-variant hover:border-primary-container"
+                }`}
+              >
+                {r.label}
+                <span className="ml-1.5 tabular-nums opacity-80">{routeCounts[r.id]}</span>
+              </button>
+            ))}
+          </div>
+        )}
         <div className="flex flex-col sm:flex-row gap-2">
           <select value={method} onChange={(e) => setMethod(e.target.value)} aria-label="Filtrar por método de pago" className="h-11 rounded border border-outline-variant bg-surface-container-lowest px-3 text-[14px] sm:w-52">
             <option value="">Todos los métodos</option>
@@ -319,6 +555,8 @@ export default function AdminWineOrdersPage() {
             const isPdf = o.proofPath?.endsWith(".pdf");
             const expired = isExpired(o);
             const cash = o.paymentMethod === "efectivo";
+            const onTheWay = isOnTheWay(o);
+            const urgency = urgencyOf(o, today);
             return (
               <li key={o.id} className="rounded-xl border border-outline-variant bg-surface-container-lowest overflow-hidden">
                 <div className="grid grid-cols-1 md:grid-cols-[1fr_auto] gap-5 p-5">
@@ -328,6 +566,11 @@ export default function AdminWineOrdersPage() {
                       <span className="text-[13px] font-semibold tracking-wider text-primary-container">{o.code}</span>
                       <span className="text-[12px] text-on-surface-variant">creado {when(o.createdAt)}</span>
                       {o.memberId && <span className="text-[11px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-full bg-surface-container-high text-on-surface-variant">Miembro</span>}
+                      {onTheWay && (
+                        <span className="text-[11px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-full bg-primary-fixed text-on-primary-fixed-variant">
+                          En camino
+                        </span>
+                      )}
                       {expired && (
                         <span
                           title={`Pasaron más de ${WINE_PENDING_TTL_HOURS} horas sin que se reportara el pago. Si el cliente pagó, puede aprobarlo; si no, anúlelo.`}
@@ -357,6 +600,36 @@ export default function AdminWineOrdersPage() {
                       </p>
                     </div>
 
+                    {o.fulfillment === "delivery" && o.deliveryDate && (
+                      <div className="rounded-lg border border-outline-variant bg-surface-container-low px-3.5 py-2.5 text-[14px] flex items-start gap-2">
+                        <span className="material-symbols-outlined text-[20px] mt-0.5 text-primary-container flex-shrink-0" aria-hidden="true">event</span>
+                        <div className="min-w-0">
+                          <p className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                            <span className="text-on-surface-variant">Día elegido:</span>
+                            <strong className="font-semibold">{dayText(o.deliveryDate)}</strong>
+                            {urgency && (
+                              <span
+                                title={URGENCY[urgency].title}
+                                className={`text-[11px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-full ${URGENCY[urgency].cls}`}
+                              >
+                                {URGENCY[urgency].label}
+                              </span>
+                            )}
+                          </p>
+                          {o.deliverySlot && (
+                            <p className="break-words">
+                              <span className="text-on-surface-variant">Franja:</span> <strong className="font-semibold">{o.deliverySlot}</strong>
+                            </p>
+                          )}
+                          {(o.status === "in_review" || o.status === "pending_payment" || (o.status === "approved" && !o.deliveredAt)) && (
+                            <p className="text-[12px] text-on-surface-variant mt-0.5">
+                              Es la preferencia del cliente: confírmela con él por WhatsApp antes de salir.
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    )}
+
                     {o.paymentMethod ? <PaymentSummary o={o} /> : (
                       <p className="text-[13px] text-on-surface-variant">Todavía no reportó el pago. Total del pedido: <strong className="text-on-surface">{usd(o.totalUsd)}</strong>.</p>
                     )}
@@ -367,10 +640,26 @@ export default function AdminWineOrdersPage() {
 
                     {o.status === "approved" && (
                       <div className="flex flex-wrap gap-2 text-[12px]">
-                        <span className={`px-2.5 py-1 rounded-full ${DELIVERY[o.emailStatus].cls}`}>Correo {DELIVERY[o.emailStatus].label}</span>
-                        <span className={`px-2.5 py-1 rounded-full ${DELIVERY[o.whatsappStatus].cls}`}>WhatsApp {DELIVERY[o.whatsappStatus].label}</span>
-                        <span className={`px-2.5 py-1 rounded-full ${o.deliveredAt ? "bg-emerald-100 text-emerald-900" : "bg-tertiary-fixed text-on-tertiary-fixed-variant"}`}>
-                          {o.deliveredAt ? `Entregado el ${when(o.deliveredAt)}` : "Por entregar"}
+                        <span className={`px-2.5 py-1 rounded-full ${deliveryInfo(o.emailStatus).cls}`}>Correo {deliveryInfo(o.emailStatus).label}</span>
+                        <span className={`px-2.5 py-1 rounded-full ${deliveryInfo(o.whatsappStatus).cls}`}>WhatsApp {deliveryInfo(o.whatsappStatus).label}</span>
+                        {o.dispatchedAt && (
+                          <span className={`px-2.5 py-1 rounded-full ${deliveryInfo(o.dispatchWhatsappStatus).cls}`}>
+                            Aviso de salida por WhatsApp {deliveryInfo(o.dispatchWhatsappStatus).label}
+                          </span>
+                        )}
+                        {o.dispatchedAt && o.deliveredAt && (
+                          <span className="px-2.5 py-1 rounded-full bg-surface-container-high text-on-surface-variant">Salió el {when(o.dispatchedAt)}</span>
+                        )}
+                        <span
+                          className={`px-2.5 py-1 rounded-full ${
+                            o.deliveredAt
+                              ? "bg-emerald-100 text-emerald-900"
+                              : onTheWay
+                                ? "bg-primary-fixed text-on-primary-fixed-variant"
+                                : "bg-tertiary-fixed text-on-tertiary-fixed-variant"
+                          }`}
+                        >
+                          {o.deliveredAt ? `Entregado el ${when(o.deliveredAt)}` : onTheWay ? `En camino desde el ${when(o.dispatchedAt)}` : "Por entregar"}
                         </span>
                       </div>
                     )}
@@ -431,6 +720,17 @@ export default function AdminWineOrdersPage() {
                   )}
                   {o.status === "approved" && (
                     <>
+                      {canDispatch(o) && (
+                        <button
+                          type="button"
+                          disabled={busy === o.id}
+                          onClick={() => confirm(dispatchConfirm(o, today)) && act(o, "dispatch")}
+                          className="h-10 px-4 rounded bg-emerald-700 hover:bg-emerald-800 text-white text-[13px] font-semibold inline-flex items-center gap-1.5 disabled:opacity-60"
+                        >
+                          <span className="material-symbols-outlined text-[18px]" aria-hidden="true">local_shipping</span>
+                          Marcar en camino
+                        </button>
+                      )}
                       {!o.deliveredAt && (
                         <button
                           type="button"
@@ -453,6 +753,17 @@ export default function AdminWineOrdersPage() {
                         <span className="material-symbols-outlined text-[18px]" aria-hidden="true">forward_to_inbox</span>
                         Reenviar confirmación
                       </button>
+                      {onTheWay && (
+                        <button
+                          type="button"
+                          disabled={busy === o.id}
+                          onClick={() => act(o, "resend_dispatch")}
+                          className="h-10 px-4 rounded border border-outline-variant text-[13px] font-semibold inline-flex items-center gap-1.5 hover:border-primary-container disabled:opacity-60"
+                        >
+                          <span className="material-symbols-outlined text-[18px]" aria-hidden="true">outgoing_mail</span>
+                          Reenviar aviso de salida
+                        </button>
+                      )}
                     </>
                   )}
                   <a
@@ -477,7 +788,9 @@ export default function AdminWineOrdersPage() {
                     <button
                       type="button"
                       disabled={busy === o.id}
-                      onClick={() => confirm(`¿Anular el pedido ${o.code}? Esta acción no avisa al cliente.`) && act(o, "cancel")}
+                      onClick={() =>
+                        confirm(`¿Anular el pedido ${o.code}?${onTheWay ? " Ya está marcado «en camino»." : ""} Esta acción no avisa al cliente.`) && act(o, "cancel")
+                      }
                       className="h-10 px-3 rounded text-[13px] font-semibold text-on-surface-variant hover:text-error ml-auto"
                     >
                       Anular
@@ -531,6 +844,17 @@ export default function AdminWineOrdersPage() {
       )}
     </div>
   );
+}
+
+/** Texto de la confirmación de «Marcar en camino»: a quién se avisa, el día elegido y, si es posterior a hoy, una advertencia. */
+function dispatchConfirm(o: AdminWineOrder, today: string): string {
+  const parts = [`¿Marcar ${o.code} como «en camino»?`, `Se avisará a ${o.customerName} por correo y por WhatsApp que su pedido salió, con el aviso de que debe recibirlo una persona mayor de 18 años.`];
+  if (o.deliveryDate) {
+    parts.push(`Día elegido por el cliente: ${dayText(o.deliveryDate)}${o.deliverySlot ? ` · ${o.deliverySlot}` : ""}.`);
+    if (o.deliveryDate > today) parts.push(`Atención: hoy es ${dayText(today)} y el cliente eligió un día posterior.`);
+  }
+  parts.push("Esta acción no se puede deshacer; después podrá reenviar el aviso.");
+  return parts.join("\n\n");
 }
 
 type DeliveryInfo = {

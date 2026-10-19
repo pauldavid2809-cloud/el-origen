@@ -1,9 +1,10 @@
 import { NextResponse } from "next/server";
 import { safeEqual } from "@/lib/auth";
 import { ensureTickets, getOrderById, listWhatsAppQueue, setSetting, updateOrder, type Order } from "@/lib/orders";
-import { getWineOrderById, listWineWhatsAppQueue, updateWineOrder, type WineOrder } from "@/lib/wineOrders";
+import { getWineOrderById, listWineDispatchQueue, listWineWhatsAppQueue, updateWineOrder, type WineOrder } from "@/lib/wineOrders";
 import {
   buildTicketWhatsAppMessage,
+  buildWineDispatchMessage,
   buildWineWhatsAppMessage,
   normalizeVePhone,
   ticketCheckinUrl,
@@ -40,8 +41,14 @@ function botCaps(request: Request): string[] {
     .slice(0, 10);
 }
 
-/** Entrada de la cola: una orden de catas (imágenes con QR) o un pedido de vinos (texto). */
-type QueueEntry = { kind: "tickets"; order: Order } | { kind: "text"; order: WineOrder };
+/**
+ * Entrada de la cola: una orden de catas (imágenes con QR), la confirmación de un pedido de vinos (texto) o el aviso de «en camino»
+ * de un pedido de vinos (texto; al bot le llega también como `kind: "text"`, con `orderId` = "<id>:dispatch").
+ */
+type QueueEntry = { kind: "tickets"; order: Order } | { kind: "text"; order: WineOrder } | { kind: "dispatch"; order: WineOrder };
+
+/** Sufijo del `orderId` de los avisos de «en camino»: el bot trata el id como texto opaco y lo devuelve tal cual en el acuse. */
+const DISPATCH_SUFFIX = ":dispatch";
 
 const timeOf = (iso: string) => Date.parse(iso) || 0;
 
@@ -52,6 +59,9 @@ const timeOf = (iso: string) => Date.parse(iso) || 0;
  *    antiguos que envían una sola imagen.
  *  - "text" (pedidos de vinos): solo `message`, sin imágenes (`tickets: []`, `qrData: null`). Un bot antiguo
  *    no sabe enviarlos, así que solo se incluyen si el bot declara `x-bot-caps: text`; sin él quedan en cola.
+ *    Los avisos de «en camino» (pedidos aprobados con `dispatchWhatsappStatus` en cola) salen igual, como "text", pero con
+ *    `orderId: "<id>:dispatch"`; el acuse de ese id actualiza el estado del aviso de salida, no el de la confirmación.
+ *  Todo se mezcla por antigüedad (updatedAt) con el límite de QUEUE_LIMIT en total.
  */
 export async function GET(request: Request) {
   if (!authorized(request)) return unauthorized();
@@ -64,30 +74,41 @@ export async function GET(request: Request) {
   await setSetting("whatsapp_bot", { ...bot, caps, lastSeen: new Date().toISOString() });
 
   // Las dos colas se fusionan por antigüedad ANTES de recortar: 10 en total, no 10 + 10. La de vinos nunca lanza.
-  const [orders, wineOrders] = await Promise.all([
+  const [orders, wineOrders, dispatchOrders] = await Promise.all([
     listWhatsAppQueue(QUEUE_LIMIT),
     caps.includes("text") ? listWineWhatsAppQueue(QUEUE_LIMIT).catch(() => [] as WineOrder[]) : ([] as WineOrder[]),
+    caps.includes("text") ? listWineDispatchQueue(QUEUE_LIMIT).catch(() => [] as WineOrder[]) : ([] as WineOrder[]),
   ]);
+  // El orden de este arreglo importa en los empates de updatedAt (la ordenación es estable): la confirmación de un pedido sale
+  // antes que su aviso de «en camino».
   const entries: QueueEntry[] = [
     ...orders.map((order): QueueEntry => ({ kind: "tickets", order })),
     ...wineOrders.map((order): QueueEntry => ({ kind: "text", order })),
+    ...dispatchOrders.map((order): QueueEntry => ({ kind: "dispatch", order })),
   ]
     .sort((a, b) => timeOf(a.order.updatedAt) - timeOf(b.order.updatedAt))
     .slice(0, QUEUE_LIMIT);
 
   // Retiro y entrega de los pedidos de vinos salen de la configuración de la tienda: se lee una sola vez por consulta
   // (y solo si hay pedidos de vinos en esta tanda). Nunca lanza: ante un error usa los valores por defecto.
-  const wineStore = entries.some((e) => e.kind === "text") ? await wineStoreForNotices() : undefined;
+  const wineStore = entries.some((e) => e.kind !== "tickets") ? await wineStoreForNotices() : undefined;
 
   // Un elemento que falla (p. ej. al crear sus entradas) se marca como fallido y la cola sigue: no tumba a los demás.
   const queue = (
     await Promise.all(
       entries.map(async (entry) => {
         try {
-          return entry.kind === "text" ? wineItem(entry.order, wineStore) : await ticketsItem(entry.order);
+          if (entry.kind === "text") return wineItem(entry.order, wineStore);
+          if (entry.kind === "dispatch") return dispatchItem(entry.order, wineStore);
+          return await ticketsItem(entry.order);
         } catch (err) {
           console.error(`[whatsapp-queue] ${entry.order.code} no se pudo preparar:`, err);
-          const mark = entry.kind === "text" ? updateWineOrder(entry.order.id, { whatsappStatus: "failed" }) : updateOrder(entry.order.id, { whatsappStatus: "failed" });
+          const mark =
+            entry.kind === "text"
+              ? updateWineOrder(entry.order.id, { whatsappStatus: "failed" })
+              : entry.kind === "dispatch"
+                ? updateWineOrder(entry.order.id, { dispatchWhatsappStatus: "failed" })
+                : updateOrder(entry.order.id, { whatsappStatus: "failed" });
           await mark.catch(() => undefined);
           return null;
         }
@@ -132,7 +153,15 @@ function wineItem(o: WineOrder, store?: PublicWineStore) {
   };
 }
 
-/** Acuse del bot: { orderId, status: "sent" | "failed", error? }. El id puede ser de una orden de catas o de un pedido de vinos. */
+/** Aviso de «en camino»: llega al bot como texto; su `orderId` lleva el sufijo ":dispatch" para que el acuse llegue al estado del aviso de salida. */
+function dispatchItem(o: WineOrder, store?: PublicWineStore) {
+  return { ...wineItem(o, store), orderId: `${o.id}${DISPATCH_SUFFIX}`, message: buildWineDispatchMessage(o, store) };
+}
+
+/**
+ * Acuse del bot: { orderId, status: "sent" | "failed", error? }. El id puede ser de una orden de catas, de un pedido de vinos
+ * o, con el sufijo ":dispatch", del aviso de «en camino» de un pedido de vinos (actualiza `dispatch_whatsapp_status`, no `whatsapp_status`).
+ */
 export async function POST(request: Request) {
   if (!authorized(request)) return unauthorized();
 
@@ -141,6 +170,20 @@ export async function POST(request: Request) {
     return NextResponse.json({ success: false, message: "orderId y status (sent|failed) son obligatorios." }, { status: 400 });
   }
   const id = String(orderId);
+
+  // Aviso de «en camino»: el id es "<id del pedido>:dispatch". Se resuelve antes de buscar entre las órdenes de catas.
+  if (id.endsWith(DISPATCH_SUFFIX)) {
+    const dispatchOrder = await getWineOrderById(id.slice(0, -DISPATCH_SUFFIX.length)).catch(() => null);
+    if (!dispatchOrder) return NextResponse.json({ success: false, message: "Orden no encontrada." }, { status: 404 });
+    try {
+      await updateWineOrder(dispatchOrder.id, { dispatchWhatsappStatus: status });
+    } catch (err) {
+      console.error(`[whatsapp-bot] ${dispatchOrder.code} no se pudo guardar el acuse del aviso de «en camino»:`, err);
+      return NextResponse.json({ success: false, message: "No se pudo guardar el acuse." }, { status: 500 });
+    }
+    if (status === "failed") console.warn(`[whatsapp-bot] ${dispatchOrder.code} (aviso de salida) falló: ${String(error ?? "").slice(0, 200)}`);
+    return NextResponse.json({ success: true });
+  }
 
   // Los ids son UUID aleatorios: no chocan entre las dos tablas.
   const order = await getOrderById(id);

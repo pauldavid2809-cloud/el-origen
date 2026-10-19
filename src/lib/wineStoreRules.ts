@@ -17,6 +17,25 @@ export interface DeliveryZone {
   feeUsd: number;
 }
 
+/**
+ * Programación de la entrega a domicilio: el cliente elige día y franja al comprar (es una PREFERENCIA que el equipo confirma
+ * por WhatsApp). Solo aplica a la entrega a domicilio; el retiro no la usa.
+ */
+export interface DeliveryScheduling {
+  /** El cliente elige día (y franja, si hay) al comprar con entrega a domicilio. */
+  enabled: boolean;
+  /** Franjas horarias, ej. "9:00 am – 12:00 m" (≤ 6, cada una ≤ 40, sin repetir). [] = el cliente solo elige el día. */
+  slots: string[];
+  /** Días atendidos: 0 = domingo … 6 = sábado (con la programación activa, al menos uno). */
+  weekdays: number[];
+  /** Antelación mínima en días: el primer día elegible es «hoy en Caracas» + N (0..14). */
+  minLeadDays: number;
+  /** Hasta cuántos días hacia adelante se puede elegir (1..60); debe superar la antelación en al menos 6. */
+  horizonDays: number;
+}
+/** Nombre corto con el que los contratos y las pantallas se refieren a la programación. */
+export type Scheduling = DeliveryScheduling;
+
 export interface WineStoreConfig {
   /** Tienda abierta; false = no se compra (los precios pueden verse). */
   enabled: boolean;
@@ -32,6 +51,8 @@ export interface WineStoreConfig {
     /** Envío gratis si el subtotal ≥ este monto (flat y zones); null = nunca. */
     freeFromUsd: number | null;
     instructions: string;
+    /** Día y franja de entrega que elige el cliente al comprar (configuraciones guardadas antes de existir: valores por defecto). */
+    scheduling: DeliveryScheduling;
   };
   /** Tope de botellas por vino y pedido cuando el vino no define el suyo (1..24). */
   defaultMaxPerOrder: number;
@@ -53,14 +74,55 @@ export const WINE_STORE_LIMITS = {
   maxFreeFromUsd: 100_000,
   maxTermLines: 12,
   termLength: 300,
+  /** Franjas horarias de la programación de la entrega y largo de cada una. */
+  maxSlots: 6,
+  slotLength: 40,
+  /** Antelación mínima (0..14 días) y días hacia adelante (1..60) de la programación. */
+  maxLeadDays: 14,
+  maxHorizonDays: 60,
+  /** Con ≥ 7 días de ventana (horizonte − antelación ≥ 6) cada día de la semana aparece al menos una vez: siempre hay una fecha. */
+  minWindowSpanDays: 6,
 } as const;
+
+/** Zonas de Caracas que el panel ofrece como sugerencia al definir las zonas de entrega (el costo lo llena el administrador). */
+export const CARACAS_ZONE_SUGGESTIONS: readonly string[] = [
+  "Chacao",
+  "Altamira",
+  "La Castellana",
+  "Las Mercedes",
+  "Los Palos Grandes",
+  "El Rosal",
+  "Sabana Grande",
+  "Los Dos Caminos",
+  "La Trinidad",
+  "Prados del Este",
+  "El Cafetal",
+  "Los Chorros",
+  "Santa Fe",
+  "El Hatillo",
+];
+
+function defaultScheduling(): DeliveryScheduling {
+  return { enabled: false, slots: [], weekdays: [1, 2, 3, 4, 5, 6], minLeadDays: 1, horizonDays: 14 };
+}
+
+/** Programación por defecto (apagada; de lunes a sábado, desde mañana y hasta 14 días). Devuelve una copia nueva. */
+export const defaultDeliveryScheduling = defaultScheduling;
 
 function defaultWineStore(): WineStoreConfig {
   return {
     enabled: true,
     closedMessage: "",
     pickup: { enabled: true, place: "", hours: "", instructions: "" },
-    delivery: { enabled: true, mode: "coordinate", flatFeeUsd: 0, zones: [], freeFromUsd: null, instructions: "" },
+    delivery: {
+      enabled: true,
+      mode: "coordinate",
+      flatFeeUsd: 0,
+      zones: [],
+      freeFromUsd: null,
+      instructions: "",
+      scheduling: defaultScheduling(),
+    },
     defaultMaxPerOrder: WINE_DEFAULT_MAX_PER_ORDER,
     terms: { es: [], en: [] },
   };
@@ -221,6 +283,86 @@ function readTerms(raw: unknown, label: string): string[] {
   return lines;
 }
 
+/** Hasta cuántos caracteres de una franja se leen para medirla (más allá solo se sabe que es demasiado larga). */
+const SLOT_READ_CAP = WINE_STORE_LIMITS.slotLength * 4;
+
+/** Franjas horarias: un arreglo de textos (o un texto con una franja por línea). Se descartan las vacías. */
+function readSlots(raw: unknown): string[] {
+  const rows = Array.isArray(raw) ? raw : typeof raw === "string" ? raw.split(/\r?\n/) : [];
+  const label = "Día y franja de entrega";
+  if (rows.length > 200) throw new WineStoreConfigError(`${label}: puede definir hasta ${WINE_STORE_LIMITS.maxSlots} franjas horarias.`);
+  const slots = rows.map((r) => line(r, SLOT_READ_CAP)).filter(Boolean);
+  if (slots.length > WINE_STORE_LIMITS.maxSlots) {
+    throw new WineStoreConfigError(`${label}: puede definir hasta ${WINE_STORE_LIMITS.maxSlots} franjas horarias.`);
+  }
+  const seen = new Set<string>();
+  slots.forEach((slot, i) => {
+    if (slot.length > WINE_STORE_LIMITS.slotLength) {
+      throw new WineStoreConfigError(
+        `${label}, franja ${i + 1}: máximo ${WINE_STORE_LIMITS.slotLength} caracteres (tiene ${slot.length >= SLOT_READ_CAP ? `más de ${SLOT_READ_CAP - 1}` : slot.length}).`
+      );
+    }
+    const key = nameKey(slot);
+    if (seen.has(key)) throw new WineStoreConfigError(`${label}: la franja «${slot}» está repetida. Use franjas distintas.`);
+    seen.add(key);
+  });
+  return slots;
+}
+
+/** Días de la semana atendidos (0 = domingo … 6 = sábado), sin repetir y en orden. Ausente = lunes a sábado. */
+function readWeekdays(raw: unknown, fallback: number[]): number[] {
+  if (raw === undefined || raw === null) return [...fallback];
+  const rows = Array.isArray(raw) ? raw : [];
+  if (rows.length > 100) throw new WineStoreConfigError("Día y franja de entrega: los días de la semana no son válidos.");
+  const days = new Set<number>();
+  for (const r of rows) {
+    const n = typeof r === "string" && /^\d$/.test(r.trim()) ? Number(r.trim()) : r;
+    if (typeof n !== "number" || !Number.isInteger(n) || n < 0 || n > 6) {
+      throw new WineStoreConfigError("Día y franja de entrega: los días de la semana no son válidos.");
+    }
+    days.add(n);
+  }
+  return Array.from(days).sort((a, b) => a - b);
+}
+
+/** Número entero de días entre `min` y `max`. Vacío = `fallback`; cualquier otra cosa es un error. */
+function readDays(v: unknown, label: string, min: number, max: number, fallback: number): number {
+  const n = readNumber(v);
+  if (n === null) return fallback;
+  if (!Number.isInteger(n) || n < min || n > max) {
+    throw new WineStoreConfigError(`Día y franja de entrega, ${label}: debe ser un número entero de ${min} a ${max}.`);
+  }
+  return n;
+}
+
+/**
+ * Programación de la entrega. Tolerante con lo que falta (una configuración guardada antes de existir este bloque toma los
+ * valores por defecto) y estricta con lo escrito. Con la programación activa exige al menos un día de la semana y una ventana
+ * de al menos 7 días (horizonte − antelación ≥ 6): así cada día de la semana aparece una vez y siempre hay una fecha que ofrecer.
+ */
+function readScheduling(raw: unknown): DeliveryScheduling {
+  const s = record(raw);
+  const def = defaultScheduling();
+  const out: DeliveryScheduling = {
+    enabled: bool(s.enabled, def.enabled),
+    slots: readSlots(s.slots),
+    weekdays: readWeekdays(s.weekdays, def.weekdays),
+    minLeadDays: readDays(s.minLeadDays, "antelación mínima", 0, WINE_STORE_LIMITS.maxLeadDays, def.minLeadDays),
+    horizonDays: readDays(s.horizonDays, "días hacia adelante", 1, WINE_STORE_LIMITS.maxHorizonDays, def.horizonDays),
+  };
+  if (out.enabled) {
+    if (!out.weekdays.length) {
+      throw new WineStoreConfigError("Día y franja de entrega: elija al menos un día de la semana en que entrega.");
+    }
+    if (out.horizonDays - out.minLeadDays < WINE_STORE_LIMITS.minWindowSpanDays) {
+      throw new WineStoreConfigError(
+        `Día y franja de entrega: los días hacia adelante deben superar la antelación mínima en al menos ${WINE_STORE_LIMITS.minWindowSpanDays} (por ejemplo, antelación de 1 día y hasta 14 días), para que siempre haya una fecha disponible.`
+      );
+    }
+  }
+  return out;
+}
+
 /**
  * Normaliza una configuración recibida del panel o leída de la base. Tolerante: lo que falta o viene con otro tipo
  * toma el valor por defecto. Lanza `WineStoreConfigError` (mensaje para el panel) si un valor escrito no es válido
@@ -263,6 +405,7 @@ export function normalizeWineStoreConfig(input: unknown): WineStoreConfig {
       zones: readZones(d.zones),
       freeFromUsd: freeFrom !== null && freeFrom > 0 ? freeFrom : null,
       instructions: line(d.instructions, WINE_STORE_LIMITS.deliveryInstructions),
+      scheduling: readScheduling(d.scheduling),
     },
     defaultMaxPerOrder: defaultMax,
     terms: { es: readTerms(t.es, "español"), en: readTerms(t.en, "inglés") },
@@ -297,7 +440,8 @@ export type PublicWineStore = {
  * Lo público de la configuración: del envío solo el costo y las zonas del modo ACTIVO (nada de montos de un modo que no se
  * usa). El lugar, el horario y las indicaciones de retiro y entrega se conservan aunque el canal esté en pausa, porque los
  * pedidos ya hechos por ese canal los siguen mostrando. La forma es la de `WineStoreConfig` (los campos que no aplican
- * quedan vacíos), así `quoteShipping` sigue funcionando con lo público.
+ * quedan vacíos), así `quoteShipping` sigue funcionando con lo público. `delivery.scheduling` solo trae la programación real si
+ * hay entrega a domicilio Y la programación está activa; si no, la forma por defecto con `enabled: false`.
  */
 export function toPublicWineStore(c: WineStoreConfig): PublicWineStore {
   const p = c.pickup;
@@ -315,8 +459,20 @@ export function toPublicWineStore(c: WineStoreConfig): PublicWineStore {
           zones: d.mode === "zones" ? d.zones.map((z) => ({ ...z })) : [],
           freeFromUsd: d.mode !== "coordinate" ? d.freeFromUsd : null,
           instructions: d.instructions,
+          // La programación solo se publica si está activa y hay entrega a domicilio; si no, la forma por defecto apagada.
+          scheduling: d.scheduling?.enabled
+            ? { ...d.scheduling, slots: [...d.scheduling.slots], weekdays: [...d.scheduling.weekdays] }
+            : defaultScheduling(),
         }
-      : { enabled: false, mode: d.mode, flatFeeUsd: 0, zones: [], freeFromUsd: null, instructions: d.instructions },
+      : {
+          enabled: false,
+          mode: d.mode,
+          flatFeeUsd: 0,
+          zones: [],
+          freeFromUsd: null,
+          instructions: d.instructions,
+          scheduling: defaultScheduling(),
+        },
     defaultMaxPerOrder: c.defaultMaxPerOrder,
     policies: { es: buildWinePolicies(c, "es"), en: buildWinePolicies(c, "en") },
   };
@@ -405,6 +561,42 @@ function deliveryLine(c: WineStoreConfig, lang: "es" | "en"): string {
   return text + (es ? " La entrega se coordina por WhatsApp una vez confirmado el pago." : " Delivery is arranged on WhatsApp once your payment is confirmed.");
 }
 
+/** «Entregamos solo en las zonas indicadas en la tienda: A, B, C.» (toda la línea ≤ 300 caracteres; si no caben todas, termina en «…»). */
+function zonesLine(c: WineStoreConfig, lang: "es" | "en"): string | null {
+  const d = c.delivery;
+  if (d.mode !== "zones" || !d.zones.length) return null;
+  const head = lang === "es" ? "Entregamos solo en las zonas indicadas en la tienda: " : "We deliver only to the zones listed in the store: ";
+  const max = WINE_STORE_LIMITS.termLength;
+  let list = "";
+  let shown = 0;
+  for (const z of d.zones) {
+    const next = list ? `${list}, ${z.name}` : z.name;
+    // Se reserva un carácter para el cierre (punto o «…»).
+    if (head.length + next.length + 1 > max) break;
+    list = next;
+    shown++;
+  }
+  return `${head}${list}${shown < d.zones.length ? "…" : "."}`;
+}
+
+/** La entrega la recibe una persona adulta (se repite en los avisos de pedidos a domicilio aunque las condiciones sean personalizadas). */
+function deliveryAgeLine(lang: "es" | "en"): string {
+  return lang === "es" ? "La entrega se hace a una persona mayor de 18 años." : "Delivery is made to a person over 18 years old.";
+}
+
+/** El día (y la franja) que elige el cliente es una preferencia que se confirma por WhatsApp. */
+function schedulingLine(c: WineStoreConfig, lang: "es" | "en"): string {
+  const withSlots = (c.delivery.scheduling?.slots?.length ?? 0) > 0;
+  if (lang === "es") {
+    return withSlots
+      ? "El día y la franja que eliges son una preferencia: los confirmamos contigo por WhatsApp."
+      : "El día que eliges es una preferencia: lo confirmamos contigo por WhatsApp.";
+  }
+  return withSlots
+    ? "The day and time slot you choose are a preference: we confirm them with you on WhatsApp."
+    : "The day you choose is a preference: we confirm it with you on WhatsApp.";
+}
+
 /**
  * Condiciones de compra (casilla del checkout, pie del pedido y del correo). Si el administrador escribió las suyas
  * para este idioma se usan tal cual; si no, se generan a partir de la configuración (retiro, entrega, costos).
@@ -432,7 +624,13 @@ export function buildWinePolicies(c: WineStoreConfig, lang: "es" | "en"): Policy
         "Wines are subject to availability: if one sells out before your payment is confirmed, we will let you know on WhatsApp to agree on a solution.",
       ];
   if (c.pickup.enabled) items.push(pickupLine(c, lang));
-  if (c.delivery.enabled) items.push(deliveryLine(c, lang));
+  if (c.delivery.enabled) {
+    items.push(deliveryLine(c, lang));
+    const zones = zonesLine(c, lang);
+    if (zones) items.push(zones);
+    items.push(deliveryAgeLine(lang));
+    if (c.delivery.scheduling?.enabled) items.push(schedulingLine(c, lang));
+  }
   items.push(
     es
       ? "Si recibes un producto dañado o distinto al que pediste, escríbenos por WhatsApp para resolverlo."
@@ -479,4 +677,148 @@ export function quoteShipping(
   const zone = d.zones.find((z) => z.id === zoneId);
   if (!zone) return { ok: false, code: "zone_invalid", message: "La zona de entrega elegida ya no está disponible. Elige otra." };
   return { ok: true, shippingUsd: free ? 0 : round2(zone.feeUsd), zone: { ...zone }, coordinated: false };
+}
+
+/* ─── Programación de la entrega: día y franja (funciones puras; no dependen de la zona horaria del servidor ni del navegador) ─── */
+
+/** Caracas está en UTC−4 todo el año (sin horario de verano desde 2016). */
+const CARACAS_OFFSET_MS = -4 * 3_600_000;
+const DAY_MS = 86_400_000;
+
+const pad2 = (n: number) => String(n).padStart(2, "0");
+const ymdOf = (d: Date) => `${String(d.getUTCFullYear()).padStart(4, "0")}-${pad2(d.getUTCMonth() + 1)}-${pad2(d.getUTCDate())}`;
+
+/**
+ * «Hoy» en Caracas como 'YYYY-MM-DD' (UTC−4 fijo). `now` en milisegundos (por defecto `Date.now()`, así que respeta un reloj
+ * parcheado en las pruebas). Cerca de la medianoche de Caracas el día de Caracas y el del servidor (UTC) no coinciden: este es el que vale.
+ */
+export function caracasToday(now: number = Date.now()): string {
+  const d = new Date((Number.isFinite(now) ? now : Date.now()) + CARACAS_OFFSET_MS);
+  return ymdOf(Number.isNaN(d.getTime()) ? new Date(Date.now() + CARACAS_OFFSET_MS) : d);
+}
+
+/** 'YYYY-MM-DD' que existe en el calendario → milisegundos UTC de ese día a las 00:00; si no, null. */
+function ymdToUtc(v: unknown): number | null {
+  if (typeof v !== "string") return null;
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(v);
+  if (!m) return null;
+  const y = Number(m[1]);
+  const mo = Number(m[2]);
+  const d = Number(m[3]);
+  const t = Date.UTC(y, mo - 1, d);
+  const back = new Date(t);
+  // Date.UTC "arregla" fechas imposibles (30 de febrero → 2 de marzo) y los años 0..99: se rechazan comparando de vuelta.
+  return back.getUTCFullYear() === y && back.getUTCMonth() === mo - 1 && back.getUTCDate() === d ? t : null;
+}
+
+/** ¿Es 'YYYY-MM-DD' y una fecha real del calendario? */
+export const isYmd = (v: unknown): v is string => ymdToUtc(v) !== null;
+
+/** Entero acotado a [min, max]; si no es un número usa `fallback`. */
+function intIn(v: unknown, min: number, max: number, fallback: number): number {
+  return typeof v === "number" && Number.isFinite(v) ? Math.min(max, Math.max(min, Math.floor(v))) : fallback;
+}
+
+/**
+ * Fechas ('YYYY-MM-DD') que el cliente puede elegir: de `hoy + minLeadDays` a `hoy + horizonDays` (ambos incluidos),
+ * solo en los días de la semana atendidos. `today` es la fecha de Caracas (`caracasToday()`); si no es una fecha válida
+ * devuelve []. No mira `enabled` (el panel la usa también para la vista previa con la programación apagada).
+ */
+export function deliveryDates(s: DeliveryScheduling, today: string): string[] {
+  const base = ymdToUtc(today);
+  if (base === null) return [];
+  const days = new Set((Array.isArray(s?.weekdays) ? s.weekdays : []).filter((n) => Number.isInteger(n) && n >= 0 && n <= 6));
+  // Un número que falta o no es número toma el valor por defecto (la vista previa del panel puede pasar un borrador a medio escribir).
+  const def = defaultScheduling();
+  const lead = intIn(s?.minLeadDays, 0, WINE_STORE_LIMITS.maxLeadDays, def.minLeadDays);
+  const horizon = intIn(s?.horizonDays, 0, WINE_STORE_LIMITS.maxHorizonDays, def.horizonDays);
+  const out: string[] = [];
+  for (let i = lead; i <= horizon; i++) {
+    const d = new Date(base + i * DAY_MS);
+    if (days.has(d.getUTCDay())) out.push(ymdOf(d));
+  }
+  return out;
+}
+
+/** ¿Hay entrega a domicilio con día y franja para elegir? (Sirve con la configuración completa y con la pública.) */
+export function isSchedulingActive(c: { delivery: { enabled: boolean; scheduling?: DeliveryScheduling } }): boolean {
+  return Boolean(c?.delivery?.enabled && c.delivery.scheduling?.enabled);
+}
+
+export type SchedulingCheck =
+  | {
+      ok: true;
+      /** null solo cuando la programación no está activa: no hay nada que guardar (lo que el cliente haya enviado se ignora). */
+      date: string | null;
+      /** null si la programación no tiene franjas (solo día) o no está activa. */
+      slot: string | null;
+    }
+  | {
+      ok: false;
+      /** schedule_required: falta elegir (400). schedule_invalid: lo elegido ya no es válido, p. ej. cambió la configuración (409). */
+      code: "schedule_required" | "schedule_invalid";
+      /** Qué campo del cuerpo del checkout corregir. */
+      field: "deliveryDate" | "deliverySlot";
+      message: string;
+    };
+
+/**
+ * Valida el día y la franja que eligió el cliente contra la configuración de AHORA. `today` = `caracasToday()` (el servidor
+ * lo calcula siempre; nunca se confía en la fecha del cliente). Con la programación apagada devuelve `{ ok: true, date: null,
+ * slot: null }`. Con franjas configuradas la franja es obligatoria y debe ser una de ellas; sin franjas se ignora.
+ */
+export function schedulingCheck(
+  c: { delivery: { enabled: boolean; scheduling?: DeliveryScheduling } },
+  input: { date?: unknown; slot?: unknown },
+  today: string
+): SchedulingCheck {
+  if (!isSchedulingActive(c)) return { ok: true, date: null, slot: null };
+  const s = c.delivery.scheduling as DeliveryScheduling;
+
+  const rawDate = typeof input?.date === "string" ? input.date.trim() : input?.date;
+  if (rawDate === undefined || rawDate === null || rawDate === "") {
+    return { ok: false, code: "schedule_required", field: "deliveryDate", message: "Elige el día de entrega." };
+  }
+  if (typeof rawDate !== "string" || !deliveryDates(s, today).includes(rawDate)) {
+    return {
+      ok: false,
+      code: "schedule_invalid",
+      field: "deliveryDate",
+      message: "El día de entrega que elegiste ya no está disponible. Elige otro.",
+    };
+  }
+  if (!s.slots.length) return { ok: true, date: rawDate, slot: null };
+
+  const rawSlot = typeof input?.slot === "string" ? input.slot.replace(/\s+/g, " ").trim() : input?.slot;
+  if (rawSlot === undefined || rawSlot === null || rawSlot === "") {
+    return { ok: false, code: "schedule_required", field: "deliverySlot", message: "Elige la franja horaria de entrega." };
+  }
+  if (typeof rawSlot !== "string" || !s.slots.includes(rawSlot)) {
+    return {
+      ok: false,
+      code: "schedule_invalid",
+      field: "deliverySlot",
+      message: "La franja horaria que elegiste ya no está disponible. Elige otra.",
+    };
+  }
+  return { ok: true, date: rawDate, slot: rawSlot };
+}
+
+const WEEKDAYS_ES = ["domingo", "lunes", "martes", "miércoles", "jueves", "viernes", "sábado"];
+const WEEKDAYS_EN = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+const MONTHS_ES = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"];
+const MONTHS_EN = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+
+/**
+ * 'YYYY-MM-DD' → «martes 21 de octubre» (es) / «Tuesday, October 21» (en). Calcula el día de la semana con aritmética de
+ * calendario en UTC: no depende de la zona horaria del servidor ni del navegador. Una fecha que no existe devuelve "".
+ */
+export function formatDeliveryDate(ymd: string, lang: "es" | "en"): string {
+  const t = ymdToUtc(ymd);
+  if (t === null) return "";
+  const d = new Date(t);
+  const day = d.getUTCDate();
+  const wd = d.getUTCDay();
+  const mo = d.getUTCMonth();
+  return lang === "es" ? `${WEEKDAYS_ES[wd]} ${day} de ${MONTHS_ES[mo]}` : `${WEEKDAYS_EN[wd]}, ${MONTHS_EN[mo]} ${day}`;
 }

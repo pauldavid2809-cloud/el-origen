@@ -19,6 +19,8 @@ const es = {
   orderLabel: (code: string) => `Pedido ${code}`,
   titlePending: "Tu pedido de vinos",
   titleApproved: "Tu pedido está confirmado",
+  titleDispatched: "Tu pedido va en camino",
+  titleDelivered: "Tu pedido fue entregado",
   /** Título de la pestaña del navegador (el layout trae el de ES para buscadores). */
   docTitle: "Tu pedido de vinos",
   status: {
@@ -46,6 +48,11 @@ const es = {
   shippingNoteCoordinated: "El costo del envío no está incluido en el total: lo acordamos contigo por WhatsApp y se paga aparte.",
   pickupPlace: "Lugar de retiro",
   pickupHours: "Horario de retiro",
+  // Día y franja que eligió el cliente (una preferencia: se confirma por WhatsApp) y aviso de mayor de 18 años
+  preferredDate: "Fecha preferida",
+  preferredSlot: "Franja",
+  scheduleNote: "La confirmamos contigo por WhatsApp.",
+  adultNotice: "Debe recibir el pedido una persona mayor de 18 años.",
 
   // Pago (textos propios de los vinos para PayAndReport)
   holdExpired: `Este pedido venció: pasaron más de ${WINE_PENDING_TTL_HOURS} horas sin reportar el pago. Aún puedes reportar tu pago y lo confirmaremos si el pedido sigue disponible, o hacer un pedido nuevo.`,
@@ -86,6 +93,18 @@ const es = {
         ? `${dot(`Retira tu pedido en ${place}`)} Coordinaremos contigo el horario por WhatsApp.`
         : `${dot(`Horario de retiro: ${hours}`)} Coordinaremos contigo el punto de retiro por WhatsApp.`,
   toDeliverDelivery: "Coordinaremos contigo la hora de entrega por WhatsApp.",
+  /** Entrega programada: el día (y la franja, si hay) que eligió; el equipo los confirma por WhatsApp. */
+  toDeliverScheduled: (date: string, slot: string | null) =>
+    `Fecha preferida: ${date}${slot ? ` · ${slot}` : ""}. La confirmamos contigo por WhatsApp.`,
+  // En camino (el pedido ya salió): entre «Confirmado» y «Entregado»
+  dispatchedBadge: "En camino",
+  deliveredBadge: "Entregado",
+  dispatched: "En camino",
+  dispatchedText: (date: string) => `Tu pedido salió el ${date} y va hacia tu dirección.`,
+  dispatchedChosen: (date: string, slot: string | null) =>
+    slot ? `Fecha y franja que elegiste: ${date} · ${slot}.` : `Día que elegiste: ${date}.`,
+  stepsLabel: "Progreso del pedido",
+  steps: ["Confirmado", "En camino", "Entregado"] as readonly string[],
   moreWines: "Ver más vinos",
   keepLink: "Guarda este enlace: aquí puedes consultar el estado de tu pedido.",
 
@@ -105,6 +124,8 @@ const en: OrderCopy = {
   orderLabel: (code) => `Order ${code}`,
   titlePending: "Your wine order",
   titleApproved: "Your order is confirmed",
+  titleDispatched: "Your order is on its way",
+  titleDelivered: "Your order was delivered",
   docTitle: "Your wine order",
   status: {
     pending_payment: "Awaiting payment",
@@ -130,6 +151,10 @@ const en: OrderCopy = {
   shippingNoteCoordinated: "The delivery cost is not included in the total: we'll agree it with you on WhatsApp and it is paid separately.",
   pickupPlace: "Pickup place",
   pickupHours: "Pickup hours",
+  preferredDate: "Preferred date",
+  preferredSlot: "Time slot",
+  scheduleNote: "We'll confirm it with you on WhatsApp.",
+  adultNotice: "The order must be received by a person over 18 years old.",
 
   holdExpired: `This order has expired: more than ${WINE_PENDING_TTL_HOURS} hours passed without a payment report. You can still report your payment and we'll confirm it if the order is still available, or place a new order.`,
   heldUntil: "Order held until",
@@ -166,6 +191,14 @@ const en: OrderCopy = {
         ? `${dot(`Pick up your order at ${place}`)} We'll arrange the time with you on WhatsApp.`
         : `${dot(`Pickup hours: ${hours}`)} We'll arrange the pickup place with you on WhatsApp.`,
   toDeliverDelivery: "We'll arrange the delivery time with you on WhatsApp.",
+  toDeliverScheduled: (date, slot) => `Preferred date: ${date}${slot ? ` · ${slot}` : ""}. We'll confirm it with you on WhatsApp.`,
+  dispatchedBadge: "On its way",
+  deliveredBadge: "Delivered",
+  dispatched: "On its way",
+  dispatchedText: (date) => `Your order left on ${date} and is on its way to your address.`,
+  dispatchedChosen: (date, slot) => (slot ? `Date and time slot you chose: ${date} · ${slot}.` : `Day you chose: ${date}.`),
+  stepsLabel: "Order progress",
+  steps: ["Confirmed", "On its way", "Delivered"],
   moreWines: "See more wines",
   keepLink: "Keep this link: you can check the status of your order here.",
 

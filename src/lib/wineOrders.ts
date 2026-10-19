@@ -3,9 +3,11 @@ import crypto from "crypto";
 import { RATE_CURRENCIES, type PaymentMethodId, type RateCurrency } from "@/types";
 import { fetchAllRows, generateToken, getAdminClient, type DeliveryStatus, type OrderStatus } from "./orders";
 import { round2, WINE_PENDING_TTL_HOURS, WINE_SHIPPING_MODES, type WineShippingMode } from "./wineSale";
+import { isYmd } from "./wineStoreRules";
 
 /* ─────────────────────────────────────────────────────────────
-   Pedidos de vinos con pago verificado (tabla public.wine_orders, supabase/v6.sql; envío, zona y modo de envío en supabase/v7.sql).
+   Pedidos de vinos con pago verificado (tabla public.wine_orders, supabase/v6.sql; envío, zona y modo de envío en supabase/v7.sql;
+   día y franja de entrega y aviso de «en camino» en supabase/v8.sql).
    Misma máquina de estados que las reservas (orders.ts): pending_payment → in_review → approved | rejected ;
    cancelled. No genera entradas ni QR. Reservan existencias de los vinos que las controlan (ver `getWineHolds`)
    mientras estén en revisión, aprobados o pendientes de pago vigentes. Sin Supabase guarda en memoria
@@ -77,8 +79,19 @@ export interface WineOrder {
   reviewedBy: string | null;
   /** Cuándo se entregó o retiró (solo pedidos aprobados). */
   deliveredAt: string | null;
+  /**
+   * Día de entrega que eligió el cliente ('YYYY-MM-DD', fecha de Caracas). Es una PREFERENCIA que el equipo confirma por
+   * WhatsApp. Solo en pedidos a domicilio hechos con la programación activa; null en retiro, sin programación y pedidos anteriores a v8.
+   */
+  deliveryDate: string | null;
+  /** Franja elegida (copia del texto de entonces); null si la programación no tenía franjas o no aplica. */
+  deliverySlot: string | null;
+  /** Cuándo se marcó «en camino» (solo pedidos aprobados a domicilio); null = aún no salió. */
+  dispatchedAt: string | null;
   emailStatus: DeliveryStatus;
   whatsappStatus: DeliveryStatus;
+  /** Estado del WhatsApp del aviso de «en camino» (aparte del de la confirmación). 'not_sent' en pedidos anteriores a v8. */
+  dispatchWhatsappStatus: DeliveryStatus;
   acceptedTermsAt: string | null;
   createdAt: string;
   updatedAt: string;
@@ -90,7 +103,13 @@ export type NewWineOrder = Pick<
   | "customerName" | "customerEmail" | "customerPhone" | "customerDocId"
   | "items" | "bottlesCount" | "fulfillment" | "subtotalUsd" | "totalUsd"
 > &
-  Partial<Pick<WineOrder, "memberId" | "deliveryAddress" | "deliveryNote" | "acceptedTermsAt" | "shippingUsd" | "deliveryZone" | "shippingMode">>;
+  Partial<
+    Pick<
+      WineOrder,
+      | "memberId" | "deliveryAddress" | "deliveryNote" | "acceptedTermsAt" | "shippingUsd" | "deliveryZone" | "shippingMode"
+      | "deliveryDate" | "deliverySlot"
+    >
+  >;
 
 /** Lo que puede ver el cliente con el enlace de su pedido: lista de inclusión (sin id, token, correo, miembro ni comprobante). */
 export type PublicWineOrder = Pick<
@@ -98,6 +117,7 @@ export type PublicWineOrder = Pick<
   | "code" | "status" | "customerName" | "customerPhone" | "customerDocId" | "items" | "bottlesCount"
   | "fulfillment" | "deliveryAddress" | "deliveryNote" | "subtotalUsd" | "shippingUsd" | "deliveryZone" | "shippingMode" | "totalUsd" | "rateCurrency"
   | "paymentMethod" | "paymentReference" | "paymentAmountBs" | "rejectionReason" | "deliveredAt"
+  | "deliveryDate" | "deliverySlot" | "dispatchedAt"
   | "createdAt" | "updatedAt"
 >;
 
@@ -124,6 +144,9 @@ export function toPublicWineOrder(o: WineOrder): PublicWineOrder {
     paymentAmountBs: o.paymentAmountBs,
     rejectionReason: o.rejectionReason,
     deliveredAt: o.deliveredAt,
+    deliveryDate: o.deliveryDate,
+    deliverySlot: o.deliverySlot,
+    dispatchedAt: o.dispatchedAt,
     createdAt: o.createdAt,
     updatedAt: o.updatedAt,
   };
@@ -145,7 +168,9 @@ const FIELDS: [keyof WineOrder, string][] = [
   ["payerPhone", "payer_phone"], ["paymentNote", "payment_note"], ["proofPath", "proof_path"],
   ["proofSubmittedAt", "proof_submitted_at"], ["status", "status"], ["rejectionReason", "rejection_reason"],
   ["reviewedAt", "reviewed_at"], ["reviewedBy", "reviewed_by"], ["deliveredAt", "delivered_at"],
-  ["emailStatus", "email_status"], ["whatsappStatus", "whatsapp_status"], ["acceptedTermsAt", "accepted_terms_at"],
+  ["deliveryDate", "delivery_date"], ["deliverySlot", "delivery_slot"], ["dispatchedAt", "dispatched_at"],
+  ["emailStatus", "email_status"], ["whatsappStatus", "whatsapp_status"], ["dispatchWhatsappStatus", "dispatch_whatsapp_status"],
+  ["acceptedTermsAt", "accepted_terms_at"],
   ["createdAt", "created_at"], ["updatedAt", "updated_at"],
 ];
 
@@ -169,6 +194,15 @@ function itemsFromRow(v: unknown): WineOrderItem[] {
 
 const isShippingMode = (v: unknown): v is WineShippingMode => WINE_SHIPPING_MODES.includes(v as WineShippingMode);
 
+const DELIVERY_STATUSES: readonly DeliveryStatus[] = ["not_sent", "queued", "sent", "failed", "disabled"];
+const isDeliveryStatus = (v: unknown): v is DeliveryStatus => DELIVERY_STATUSES.includes(v as DeliveryStatus);
+
+/** Día de entrega de una fila: 'YYYY-MM-DD' (una columna `date` llega así; si trajera hora se toman los 10 primeros caracteres). */
+function deliveryDateFromRow(v: unknown): string | null {
+  const day = typeof v === "string" ? v.slice(0, 10) : "";
+  return isYmd(day) ? day : null;
+}
+
 function fromRow(row: Row): WineOrder {
   const o = {} as Record<string, unknown>;
   for (const [k, col] of FIELDS) {
@@ -181,6 +215,11 @@ function fromRow(row: Row): WineOrder {
   o.shippingUsd = Number(row.shipping_usd) || 0;
   o.deliveryZone = typeof row.delivery_zone === "string" && row.delivery_zone ? row.delivery_zone : null;
   o.shippingMode = isShippingMode(row.shipping_mode) ? row.shipping_mode : null;
+  // Pedidos anteriores a v8.sql (o base sin migrar): sin día ni franja, sin marca de salida y con el aviso de salida sin enviar.
+  o.deliveryDate = deliveryDateFromRow(row.delivery_date);
+  o.deliverySlot = typeof row.delivery_slot === "string" && row.delivery_slot ? row.delivery_slot : null;
+  o.dispatchedAt = typeof row.dispatched_at === "string" && row.dispatched_at ? row.dispatched_at : null;
+  o.dispatchWhatsappStatus = isDeliveryStatus(row.dispatch_whatsapp_status) ? row.dispatch_whatsapp_status : "not_sent";
   o.fulfillment = row.fulfillment === "delivery" ? "delivery" : "pickup";
   o.rateCurrency = RATE_CURRENCIES.includes(row.rate_currency as RateCurrency) ? row.rate_currency : "USD";
   o.emailStatus = row.email_status ?? "not_sent";
@@ -264,7 +303,12 @@ export function buildWineOrder(input: NewWineOrder): WineOrder {
     paymentMethod: null, paymentBank: null, paymentReference: null, paymentAmountBs: null,
     payerBank: null, payerDocId: null, payerPhone: null, paymentNote: null, proofPath: null, proofSubmittedAt: null,
     status: "pending_payment", rejectionReason: null, reviewedAt: null, reviewedBy: null, deliveredAt: null,
-    emailStatus: "not_sent", whatsappStatus: "not_sent",
+    // El día y la franja solo existen en una entrega a domicilio; la franja no tiene sentido sin día.
+    deliveryDate: input.fulfillment === "delivery" && input.deliveryDate && isYmd(input.deliveryDate) ? input.deliveryDate : null,
+    deliverySlot:
+      input.fulfillment === "delivery" && input.deliveryDate && isYmd(input.deliveryDate) && input.deliverySlot ? input.deliverySlot : null,
+    dispatchedAt: null,
+    emailStatus: "not_sent", whatsappStatus: "not_sent", dispatchWhatsappStatus: "not_sent",
     acceptedTermsAt: input.acceptedTermsAt ?? null,
     createdAt: now, updatedAt: now,
   };
@@ -274,6 +318,23 @@ export function buildWineOrder(input: NewWineOrder): WineOrder {
 function isMissingV7Column(error: { code?: string; message: string }): boolean {
   return (error.code === "PGRST204" || error.code === "42703") && /shipping_usd|delivery_zone|shipping_mode/.test(error.message);
 }
+
+/** La base no tiene las columnas de pedidos de supabase/v8.sql (día y franja de entrega, aviso de «en camino»). */
+function isMissingV8Column(error: { code?: string; message: string }): boolean {
+  return (
+    (error.code === "PGRST204" || error.code === "42703") && /delivery_date|delivery_slot|dispatched_at|dispatch_whatsapp_status/.test(error.message)
+  );
+}
+
+/** Mensaje cuando falta ejecutar v8.sql y se intenta guardar el día y la franja de un pedido. */
+export const V8_MISSING_SCHEDULE_MESSAGE =
+  "Falta ejecutar supabase/v8.sql en Supabase: la tabla wine_orders no tiene las columnas del día y la franja de entrega.";
+/** Mensaje cuando falta ejecutar v8.sql y se intenta marcar «en camino» o guardar el estado de ese aviso. */
+export const V8_MISSING_DISPATCH_MESSAGE =
+  "Falta ejecutar supabase/v8.sql en Supabase: la tabla wine_orders no tiene las columnas del aviso de «en camino».";
+
+/** ¿Es el error de «falta ejecutar v8.sql» que lanzan las operaciones de este archivo? (para que las rutas respondan con claridad) */
+export const isMissingV8Error = (err: unknown): boolean => err instanceof Error && /supabase\/v8\.sql/.test(err.message);
 
 /** Crea el pedido. Los precios y el total los calcula el servidor antes de llamar aquí (nunca el cliente). */
 export async function createWineOrder(input: NewWineOrder): Promise<WineOrder> {
@@ -291,9 +352,19 @@ export async function createWineOrder(input: NewWineOrder): Promise<WineOrder> {
   // «a coordinar»). Uno con costo, con zona o con envío gratis de costo fijo / por zonas no puede guardarse sin perder
   // esa información (sin el modo se leería como «a coordinar»), y falla con un mensaje claro.
   const needsV7 = base.shippingUsd > 0 || base.deliveryZone !== null || base.shippingMode === "flat" || base.shippingMode === "zones";
+  // Lo mismo con v8.sql: un pedido nuevo no ha salido (esas columnas tienen valor por defecto) y uno SIN programación no escribe
+  // el día ni la franja, así que se guarda con normalidad aunque falte v8. Con programación no se puede perder el día elegido:
+  // falla con un mensaje claro.
+  const scheduled = base.deliveryDate !== null || base.deliverySlot !== null;
   let withShippingColumns = true;
   for (let attempt = 0; ; attempt++) {
     const row = toRow(base);
+    delete row.dispatched_at;
+    delete row.dispatch_whatsapp_status;
+    if (!scheduled) {
+      delete row.delivery_date;
+      delete row.delivery_slot;
+    }
     if (!withShippingColumns) {
       delete row.shipping_usd;
       delete row.delivery_zone;
@@ -304,6 +375,7 @@ export async function createWineOrder(input: NewWineOrder): Promise<WineOrder> {
       invalidateHoldsCache();
       return fromRow(data);
     }
+    if (scheduled && isMissingV8Column(error)) throw new Error(V8_MISSING_SCHEDULE_MESSAGE);
     if (withShippingColumns && isMissingV7Column(error)) {
       if (needsV7) {
         throw new Error("Falta ejecutar supabase/v7.sql en Supabase: la tabla wine_orders no tiene las columnas de envío.");
@@ -403,6 +475,7 @@ export async function updateWineOrder(id: string, patch: Partial<WineOrder>): Pr
     const { data, error } = await sb.from("wine_orders").update(row).eq("id", id).select().maybeSingle();
     if (error) {
       if (error.code === "23505") throw new Error(DUPLICATE_REFERENCE);
+      if (isMissingV8Column(error)) throw new Error(V8_MISSING_DISPATCH_MESSAGE);
       throw new Error(error.message);
     }
     return data ? fromRow(data) : null;
@@ -436,6 +509,7 @@ export async function transitionWineOrder(
     const { data, error } = await sb.from("wine_orders").update(toRow(patch)).eq("id", id).in("status", from).select().maybeSingle();
     if (error) {
       if (error.code === "23505") throw new Error(DUPLICATE_REFERENCE);
+      if (isMissingV8Column(error)) throw new Error(V8_MISSING_DISPATCH_MESSAGE);
       throw new Error(error.message);
     }
     return data ? fromRow(data) : null;
@@ -443,6 +517,39 @@ export async function transitionWineOrder(
     // Después de escribir (aunque falle: pudo aplicarse): una lectura que empezó antes no debe quedar guardada.
     invalidateHoldsCache();
   }
+}
+
+/**
+ * Marca el pedido «en camino» (compare-and-set): solo si SIGUE aprobado, es una entrega a domicilio y no se ha entregado ni
+ * marcado antes. Devuelve null si no se cumple (otra petición ganó, o el pedido cambió): el llamador responde 409 y NO envía
+ * ningún aviso, así un doble clic nunca avisa dos veces. Lanza si falta ejecutar v8.sql o falla la base de datos.
+ */
+export async function markWineOrderDispatched(id: string, dispatchedAt: string): Promise<WineOrder | null> {
+  const sb = getAdminClient();
+  if (!sb) {
+    // Sin `await` entre la comprobación y el guardado: dos peticiones simultáneas no pasan las dos.
+    const current = memWineOrders.get(id);
+    if (!current || current.status !== "approved" || current.fulfillment !== "delivery" || current.deliveredAt || current.dispatchedAt) return null;
+    const next: WineOrder = { ...current, dispatchedAt, dispatchWhatsappStatus: "not_sent", updatedAt: new Date().toISOString() };
+    memWineOrders.set(id, next);
+    return next;
+  }
+  if (!UUID_RE.test(id)) return null;
+  const { data, error } = await sb
+    .from("wine_orders")
+    .update({ dispatched_at: dispatchedAt })
+    .eq("id", id)
+    .eq("status", "approved")
+    .eq("fulfillment", "delivery")
+    .is("delivered_at", null)
+    .is("dispatched_at", null)
+    .select()
+    .maybeSingle();
+  if (error) {
+    if (isMissingV8Column(error)) throw new Error(V8_MISSING_DISPATCH_MESSAGE);
+    throw new Error(error.message);
+  }
+  return data ? fromRow(data) : null;
 }
 
 /** ¿Otro pedido de vinos en revisión o aprobado usa esta referencia de pago? (ver `referenceInUseAnywhere` en proofs.ts). */
@@ -693,9 +800,53 @@ export async function listWineWhatsAppQueue(limit = 10): Promise<WineOrder[]> {
   return (data ?? []).map(fromRow);
 }
 
+/** Se avisa una sola vez por proceso que falta v8.sql en la cola de «en camino» (el bot consulta cada pocos segundos: no inundar el registro). */
+let warnedDispatchQueueV8 = false;
+
+/**
+ * Pedidos aprobados con el WhatsApp del aviso de «en camino» en cola, los más antiguos primero. Nunca lanza: antes de ejecutar
+ * v8.sql (o ante un error) queda vacía y no tumba la cola del resto.
+ */
+export async function listWineDispatchQueue(limit = 10): Promise<WineOrder[]> {
+  const sb = getAdminClient();
+  if (!sb) {
+    return Array.from(memWineOrders.values())
+      .filter((o) => o.status === "approved" && !o.deliveredAt && o.dispatchWhatsappStatus === "queued")
+      .sort((a, b) => a.updatedAt.localeCompare(b.updatedAt))
+      .slice(0, limit);
+  }
+  const { data, error } = await sb
+    .from("wine_orders")
+    .select("*")
+    .eq("status", "approved")
+    // Un aviso de salida que quedó en cola y cuyo pedido ya se entregó no debe llegar tarde diciendo «va en camino».
+    .is("delivered_at", null)
+    .eq("dispatch_whatsapp_status", "queued")
+    .order("updated_at", { ascending: true })
+    .limit(limit);
+  if (error) {
+    if (isMissingV8Column(error)) {
+      if (!warnedDispatchQueueV8) {
+        warnedDispatchQueueV8 = true;
+        console.warn("[wineOrders] Falta ejecutar supabase/v8.sql: la cola de avisos de «en camino» está vacía hasta entonces.");
+      }
+    } else {
+      console.error("[wineOrders] No se pudo leer la cola de avisos de «en camino»:", error.message);
+    }
+    return [];
+  }
+  return (data ?? []).map(fromRow);
+}
+
+/** Mensajes de pedidos de vinos por enviar: confirmaciones y avisos de «en camino» en cola. Nunca lanza. */
 export async function countWineWhatsAppQueue(): Promise<number> {
   const sb = getAdminClient();
-  if (!sb) return Array.from(memWineOrders.values()).filter((o) => o.status === "approved" && o.whatsappStatus === "queued").length;
+  if (!sb) {
+    // Se cuentan mensajes, no pedidos: uno aprobado y ya «en camino» puede tener los dos avisos en cola.
+    return Array.from(memWineOrders.values())
+      .filter((o) => o.status === "approved")
+      .reduce((n, o) => n + (o.whatsappStatus === "queued" ? 1 : 0) + (!o.deliveredAt && o.dispatchWhatsappStatus === "queued" ? 1 : 0), 0);
+  }
   const { count, error } = await sb
     .from("wine_orders")
     .select("id", { count: "exact", head: true })
@@ -705,5 +856,16 @@ export async function countWineWhatsAppQueue(): Promise<number> {
     console.error("[wineOrders] No se pudo contar la cola de WhatsApp:", error.message);
     return 0;
   }
-  return count ?? 0;
+  // Los avisos de «en camino» (columna de v8.sql): antes de ejecutarla simplemente no hay ninguno.
+  const { count: dispatchCount, error: dispatchError } = await sb
+    .from("wine_orders")
+    .select("id", { count: "exact", head: true })
+    .eq("status", "approved")
+    .is("delivered_at", null)
+    .eq("dispatch_whatsapp_status", "queued");
+  if (dispatchError) {
+    if (!isMissingV8Column(dispatchError)) console.error("[wineOrders] No se pudo contar la cola de avisos de «en camino»:", dispatchError.message);
+    return count ?? 0;
+  }
+  return (count ?? 0) + (dispatchCount ?? 0);
 }

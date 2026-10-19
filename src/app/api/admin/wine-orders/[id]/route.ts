@@ -1,9 +1,15 @@
 import { NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/auth";
 import type { DeliveryStatus } from "@/lib/orders";
-import { getWineOrderById, transitionWineOrder, updateWineOrder, type WineOrder } from "@/lib/wineOrders";
+import { getWineOrderById, isMissingV8Error, markWineOrderDispatched, transitionWineOrder, updateWineOrder, type WineOrder } from "@/lib/wineOrders";
 import { getStockWarnings } from "@/lib/wines";
-import { sendWineOrderEmail, sendWineRejectionEmail, sendWineWhatsApp } from "@/lib/notify";
+import {
+  sendWineDispatchEmail,
+  sendWineDispatchWhatsApp,
+  sendWineOrderEmail,
+  sendWineRejectionEmail,
+  sendWineWhatsApp,
+} from "@/lib/notify";
 
 export const dynamic = "force-dynamic";
 
@@ -22,6 +28,24 @@ async function deliverWineOrder(order: WineOrder): Promise<WineOrder> {
 }
 
 /**
+ * Envía el aviso de «en camino» por correo y WhatsApp y guarda cómo salió el de WhatsApp (`dispatchWhatsappStatus`; el del correo
+ * solo se devuelve). Los envíos nunca lanzan, y si no se puede guardar el estado se registra y se responde con lo que pasó:
+ * el pedido ya quedó marcado «en camino».
+ */
+async function deliverDispatch(order: WineOrder) {
+  const failed = (): DeliveryStatus => "failed";
+  const [dispatchEmailStatus, dispatchWhatsappStatus] = await Promise.all([
+    sendWineDispatchEmail(order).catch(failed),
+    sendWineDispatchWhatsApp(order).catch(failed),
+  ]);
+  const saved = await updateWineOrder(order.id, { dispatchWhatsappStatus }).catch((error) => {
+    console.error("[admin/wine-orders] No se pudo guardar el estado del aviso de «en camino»:", error);
+    return null;
+  });
+  return { order: saved ?? { ...order, dispatchWhatsappStatus }, dispatchEmailStatus, dispatchWhatsappStatus };
+}
+
+/**
  * Acciones del admin sobre un pedido de vinos:
  *  approve → aprueba el pago y envía la confirmación por correo + WhatsApp. Nunca se bloquea por existencias (el cliente
  *            ya pagó): la respuesta trae `stockWarning` con los vinos que quedaron sobrevendidos (puede ser [])
@@ -29,6 +53,10 @@ async function deliverWineOrder(order: WineOrder): Promise<WineOrder> {
  *  cancel  → anula el pedido (no se avisa al cliente, igual que en las reservas)
  *  fulfill → marca el pedido aprobado como entregado o retirado
  *  resend  → reenvía la confirmación de un pedido aprobado
+ *  dispatch        → marca «en camino» un pedido aprobado A DOMICILIO que no se ha entregado ni marcado antes (un retiro no
+ *                    admite esta acción) y avisa al cliente por correo + WhatsApp. Responde `order`, `dispatchEmailStatus` y
+ *                    `dispatchWhatsappStatus`. Compare-and-set: un doble clic recibe 409 y NO envía un segundo aviso
+ *  resend_dispatch → reenvía el aviso de «en camino» (solo si el pedido ya está marcado, aprobado y sin entregar)
  */
 export async function PATCH(request: Request, { params }: { params: { id: string } }) {
   const denied = requireAdmin();
@@ -101,9 +129,34 @@ export async function PATCH(request: Request, { params }: { params: { id: string
       return NextResponse.json({ success: true, order: await deliverWineOrder(order) });
     }
 
+    if (action === "dispatch") {
+      if (order.status !== "approved") return fail("Solo se marcan «en camino» los pedidos aprobados.", 409);
+      if (order.fulfillment !== "delivery") {
+        return fail("Un retiro no se marca «en camino»: márquelo como retirado cuando el cliente lo recoja.", 409);
+      }
+      if (order.deliveredAt) return fail("El pedido ya fue entregado.", 409);
+      if (order.dispatchedAt) return fail("El pedido ya estaba marcado «en camino».", 409);
+      const dispatched = await markWineOrderDispatched(order.id, new Date().toISOString());
+      if (!dispatched) {
+        // Otra petición (un doble clic) llegó primero, o el pedido cambió: no se envía nada.
+        const fresh = await getWineOrderById(order.id).catch(() => null);
+        return fresh?.dispatchedAt ? fail("El pedido ya estaba marcado «en camino».", 409) : changed();
+      }
+      return NextResponse.json({ success: true, ...(await deliverDispatch(dispatched)) });
+    }
+
+    if (action === "resend_dispatch") {
+      if (order.status !== "approved") return fail("Solo se reenvía el aviso de pedidos aprobados.", 409);
+      if (!order.dispatchedAt) return fail("El pedido aún no se marcó «en camino».", 409);
+      if (order.deliveredAt) return fail("El pedido ya fue entregado.", 409);
+      return NextResponse.json({ success: true, ...(await deliverDispatch(order)) });
+    }
+
     return fail("Acción no válida.", 400);
   } catch (error) {
     console.error("[admin/wine-orders]", error);
+    // Falta ejecutar supabase/v8.sql: se dice con claridad (es el administrador quien lo lee).
+    if (isMissingV8Error(error)) return fail((error as Error).message, 500);
     // Aprobar un pedido cuya referencia ya la usa otro pago en revisión o aprobado (índice único de la base).
     if (/referencia de pago/i.test((error as Error).message)) {
       return fail("Esa referencia de pago ya está registrada en otra reserva o pedido en revisión o aprobado. Revise cuál es el pago real antes de aprobar.", 409);

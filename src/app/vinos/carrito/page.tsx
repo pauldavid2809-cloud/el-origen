@@ -12,7 +12,7 @@ import { useLang } from "@/lib/useLang";
 import { useDocumentTitle } from "@/lib/useDocumentTitle";
 import { useWineCart } from "@/lib/useWineCart";
 import { WINE_ORDER_MAX_BOTTLES, round2, wineMaxQty } from "@/lib/wineSale";
-import { quoteShipping, type PublicWineStore, type ShippingQuote, type WineStoreConfig } from "@/lib/wineStoreRules";
+import { caracasToday, deliveryDates, formatDeliveryDate, isYmd, quoteShipping, type PublicWineStore, type ShippingQuote, type WineStoreConfig } from "@/lib/wineStoreRules";
 import type { SaleWine } from "@/lib/wines";
 import { QtyStepper } from "../QtyStepper";
 import { StoreClosedNotice } from "../StoreClosedNotice";
@@ -20,9 +20,22 @@ import { WINE_TYPE_LABEL } from "../copy";
 import { CART_COPY } from "./copy";
 
 type Fulfillment = "pickup" | "delivery";
-type FieldKey = "name" | "docId" | "phone" | "address" | "zone";
+type FieldKey = "name" | "docId" | "phone" | "address" | "zone" | "date" | "slot";
 /** Cómo se muestra el envío en la vista previa: sin envío (retiro), a coordinar, falta elegir la zona, con costo o gratis. */
 type ShipKind = "none" | "coordinated" | "pickZone" | "paid" | "free";
+
+/**
+ * Opciones de día y franja que mandó el servidor al rechazar el pedido (`schedule_required` / `schedule_invalid`): `today` es su
+ * «hoy» de Caracas. `clientDay` es el día del navegador cuando llegó (la corrección vale mientras ese día no cambie) y `base` la
+ * lectura de la tienda vigente entonces: `dates` y `slots` valen hasta que se vuelve a leer la tienda.
+ */
+interface ScheduleHint {
+  today: string;
+  dates: string[];
+  slots: string[];
+  clientDay: string;
+  base: object | null;
+}
 
 /** Una línea del carrito con los datos actuales del servidor (`wine` es null si el vino ya no existe o no está publicado). */
 interface CartLine {
@@ -57,6 +70,8 @@ const configOf = (s: PublicWineStore): WineStoreConfig => ({
 });
 
 const digits = (v: string) => v.replace(/\D/g, "");
+/** Primera letra en mayúscula («miércoles 21 de octubre» → «Miércoles 21 de octubre») para las opciones del selector. */
+const cap = (v: string) => v.charAt(0).toUpperCase() + v.slice(1);
 
 const inputClass =
   "w-full h-12 bg-surface-container-lowest border rounded px-3.5 text-[15px] text-on-surface placeholder:text-on-surface-variant/60 focus:border-primary-container focus:outline-none transition-colors";
@@ -151,6 +166,23 @@ export default function WineCartPage() {
   const [zoneChoice, setZoneChoice] = useState("");
   /** La zona elegida solo vale mientras siga existiendo (el administrador pudo quitarla). */
   const zoneId = zones.some((z) => z.id === zoneChoice) ? zoneChoice : "";
+
+  /* ─── Día y franja de entrega: una preferencia que se confirma por WhatsApp (el servidor valida contra la configuración de ahora) ─── */
+  const [dateChoice, setDateChoice] = useState("");
+  const [slotChoice, setSlotChoice] = useState("");
+  const [scheduleHint, setScheduleHint] = useState<ScheduleHint | null>(null);
+  const schedule = store?.delivery.scheduling ?? null;
+  const clientDay = caracasToday();
+  // Si el servidor corrigió las opciones (la configuración cambió o el reloj de este equipo no coincide con Caracas), su «hoy» manda
+  // mientras el día del navegador sea el mismo; y sus fechas y franjas, hasta que se vuelva a leer la tienda.
+  const hint = scheduleHint && scheduleHint.clientDay === clientDay ? scheduleHint : null;
+  const freshHint = hint && hint.base === view ? hint : null;
+  const schedulingOn = deliveryOn && (schedule?.enabled === true || freshHint !== null);
+  const dates = !schedulingOn ? [] : freshHint ? freshHint.dates : schedule ? deliveryDates(schedule, hint?.today ?? clientDay) : [];
+  const slots = !schedulingOn ? [] : freshHint ? freshHint.slots : schedule?.slots ?? [];
+  /** Lo elegido solo vale mientras siga entre las opciones de ahora. */
+  const dateValue = dates.includes(dateChoice) ? dateChoice : "";
+  const slotValue = slots.includes(slotChoice) ? slotChoice : "";
   const quote: ShippingQuote | null = store ? quoteShipping(configOf(store), { fulfillment, subtotalUsd: subtotal, zoneId }) : null;
   const shippingUsd = quote?.ok ? quote.shippingUsd : 0;
   const total = round2(subtotal + shippingUsd);
@@ -213,6 +245,12 @@ export default function WineCartPage() {
   if (digits(form.phone).length < 10) errors.phone = form.phone.trim() ? t.errPhone : t.errRequired;
   if (fulfillment === "delivery" && form.address.trim().length < 8) errors.address = form.address.trim() ? t.errAddress : t.errRequired;
   if (fulfillment === "delivery" && zonesMode && !zoneId) errors.zone = t.errZone;
+  /** Con entrega a domicilio y programación activa: el día (y la franja, si hay) son obligatorios. */
+  const scheduled = fulfillment === "delivery" && schedulingOn;
+  /** La programación está activa pero no queda ningún día para elegir: no se puede pedir entrega (queda el retiro). */
+  const noDates = scheduled && dates.length === 0;
+  if (scheduled && dates.length > 0 && !dateValue) errors.date = t.errDate;
+  if (scheduled && slots.length > 0 && !slotValue) errors.slot = t.errSlot;
   const dataValid = Object.keys(errors).length === 0;
 
   const update = (key: keyof typeof form, value: string) => setForm((f) => ({ ...f, [key]: value }));
@@ -237,7 +275,7 @@ export default function WineCartPage() {
       termsRef.current?.focus();
       return;
     }
-    if (!store || !store.enabled || options.length === 0 || sale.length === 0 || overBottles) return;
+    if (!store || !store.enabled || options.length === 0 || sale.length === 0 || overBottles || noDates) return;
     setSubmitting(true);
     try {
       const res = await fetch("/api/wine-checkout", {
@@ -251,6 +289,9 @@ export default function WineCartPage() {
           fulfillment,
           deliveryAddress: fulfillment === "delivery" ? form.address.trim() : undefined,
           deliveryZoneId: fulfillment === "delivery" && zonesMode ? zoneId : undefined,
+          // Con retiro, o sin programación, no se envían (y aunque se enviaran, el servidor los ignora).
+          deliveryDate: scheduled ? dateValue : undefined,
+          deliverySlot: scheduled && slots.length > 0 ? slotValue : undefined,
           deliveryNote: form.note.trim() || undefined,
           acceptedTerms: true,
         }),
@@ -296,6 +337,28 @@ export default function WineCartPage() {
         if (data.code === "zone_invalid" || data.code === "zone_required") setZoneChoice("");
         setSubmitError({ text: t.configChanged });
         setReload((x) => x + 1);
+        return;
+      }
+      // Falta el día o la franja de entrega, o ya no valen (cambió la configuración o pasó la fecha): el servidor manda las opciones
+      // de ahora (`today`, `dates`, `slots`); se actualizan sin otra consulta, se vuelve a leer la tienda y se marca lo que falta.
+      if (data.code === "schedule_required" || data.code === "schedule_invalid") {
+        const strings = (v: unknown) => (Array.isArray(v) ? v.filter((x): x is string => typeof x === "string") : null);
+        const newDates = strings(data.dates);
+        const newSlots = strings(data.slots);
+        if (isYmd(data.today) && newDates && newSlots) {
+          setScheduleHint({ today: data.today, dates: newDates, slots: newSlots, clientDay: caracasToday(), base: view });
+        }
+        if (data.field === "deliverySlot") setSlotChoice("");
+        else setDateChoice("");
+        setShowErrors(true);
+        setErrorFocus((n) => n + 1);
+        setSubmitError({ text: data.code === "schedule_required" ? t.scheduleRequiredError : t.scheduleChanged });
+        setReload((x) => x + 1);
+        return;
+      }
+      // Falta ejecutar la migración de la entrega programada y el pedido lleva día y franja: se ofrece el retiro.
+      if (res.status === 503 && data.code === "schedule_unavailable") {
+        setSubmitError({ text: t.scheduleUnavailable });
         return;
       }
       if (data.code === "wine_unavailable") {
@@ -440,6 +503,18 @@ export default function WineCartPage() {
                     <div className="flex justify-between gap-4 text-on-surface-variant">
                       <dt className="min-w-0 break-words">{shipZoneName ? t.shippingWithZone(shipZoneName) : t.shipping}</dt>
                       <dd className="font-medium tabular-nums text-right">{shipValue}</dd>
+                    </div>
+                  )}
+                  {scheduled && !noDates && (
+                    <div className="flex justify-between gap-4 text-on-surface-variant">
+                      <dt className="flex-shrink-0">{t.preferredDelivery}</dt>
+                      <dd className="min-w-0 break-words text-right font-medium">
+                        {dateValue
+                          ? [cap(formatDeliveryDate(dateValue, lang)), slotValue].filter(Boolean).join(" · ")
+                          : slots.length > 0
+                            ? t.schedulePickBoth
+                            : t.schedulePickDay}
+                      </dd>
                     </div>
                   )}
                   <div className="flex justify-between items-baseline gap-4 pt-2">
@@ -618,7 +693,7 @@ export default function WineCartPage() {
                       </p>
                     )}
                     {zonesMode && (
-                      <ZoneField
+                      <SelectField
                         id="wc-zone"
                         label={t.zoneLabel}
                         placeholder={t.zonePlaceholder}
@@ -657,6 +732,46 @@ export default function WineCartPage() {
                       maxLength={300}
                       error={showErrors ? errors.address : undefined}
                     />
+                    {/* La entrega se hace a una persona mayor de 18 años: aviso visible antes de elegir día y franja. */}
+                    <p className="flex items-start gap-2.5 rounded-lg border border-tertiary/30 bg-tertiary-fixed/40 px-4 py-3 text-[13px] leading-relaxed text-on-tertiary-fixed-variant">
+                      <span className="material-symbols-outlined text-[20px] flex-shrink-0" aria-hidden="true">badge</span>
+                      <span className="min-w-0 break-words font-medium">{t.adultNotice}</span>
+                    </p>
+                    {schedulingOn &&
+                      (noDates ? (
+                        <p role="alert" className="rounded-lg border border-outline-variant bg-surface-container-low px-4 py-3 text-[13px] leading-relaxed text-on-surface break-words">
+                          {t.noDates}
+                        </p>
+                      ) : (
+                        <div className="rounded-lg border border-outline-variant bg-surface-container-low p-4 space-y-4">
+                          <SelectField
+                            id="wc-date"
+                            label={t.dateLabel}
+                            placeholder={t.datePlaceholder}
+                            value={dateValue}
+                            onChange={setDateChoice}
+                            options={dates.map((d) => ({ id: d, label: cap(formatDeliveryDate(d, lang)) }))}
+                            describedBy="wc-schedule-hint"
+                            error={showErrors ? errors.date : undefined}
+                          />
+                          {slots.length > 0 && (
+                            <SelectField
+                              id="wc-slot"
+                              label={t.slotLabel}
+                              placeholder={t.slotPlaceholder}
+                              value={slotValue}
+                              onChange={setSlotChoice}
+                              options={slots.map((s) => ({ id: s, label: s }))}
+                              describedBy="wc-schedule-hint"
+                              error={showErrors ? errors.slot : undefined}
+                            />
+                          )}
+                          <p id="wc-schedule-hint" className="flex items-start gap-2 text-[12px] leading-relaxed text-on-surface-variant">
+                            <span className="material-symbols-outlined text-[18px] flex-shrink-0 text-primary-container" aria-hidden="true">event_available</span>
+                            <span className="min-w-0 break-words">{t.scheduleHint}</span>
+                          </p>
+                        </div>
+                      ))}
                   </>
                 )}
                 <TextField
@@ -736,7 +851,7 @@ export default function WineCartPage() {
 
                 <button
                   type="submit"
-                  disabled={submitting || overBottles}
+                  disabled={submitting || overBottles || noDates}
                   className="w-full h-[52px] inline-flex items-center justify-center gap-2 rounded bg-primary-container hover:bg-primary text-white text-[15px] font-semibold transition-colors disabled:opacity-60"
                 >
                   {submitting ? (
@@ -858,7 +973,8 @@ function LineRow({ line, lang, onQty, onRemove }: { line: CartLine; lang: Langua
 
 /* ─── Piezas del formulario ─── */
 
-function ZoneField({
+/** Lista desplegable con su etiqueta y su error (la zona, el día y la franja de entrega). `describedBy`: id de un texto de ayuda. */
+function SelectField({
   id,
   label,
   placeholder,
@@ -866,6 +982,7 @@ function ZoneField({
   onChange,
   options,
   error,
+  describedBy,
 }: {
   id: string;
   label: string;
@@ -874,7 +991,9 @@ function ZoneField({
   onChange: (v: string) => void;
   options: { id: string; label: string }[];
   error?: string;
+  describedBy?: string;
 }) {
+  const described = [describedBy, error && `${id}-error`].filter(Boolean).join(" ") || undefined;
   return (
     <div>
       <label htmlFor={id} className={labelClass}>{label}</label>
@@ -884,7 +1003,7 @@ function ZoneField({
           value={value}
           onChange={(e) => onChange(e.target.value)}
           aria-invalid={Boolean(error)}
-          aria-describedby={error ? `${id}-error` : undefined}
+          aria-describedby={described}
           className={`${inputClass} appearance-none pr-10 text-ellipsis ${error ? "border-error" : "border-outline-variant"}`}
         >
           <option value="">{placeholder}</option>

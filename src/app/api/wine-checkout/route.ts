@@ -7,12 +7,21 @@ import {
   createWineOrder,
   findStockConflict,
   getWineHolds,
+  isMissingV8Error,
   transitionWineOrder,
   type FulfillmentMethod,
   type WineOrderItem,
 } from "@/lib/wineOrders";
 import { getWineStoreConfigStrict } from "@/lib/wineStore";
-import { quoteShipping, type ShippingQuote, type WineStoreConfig } from "@/lib/wineStoreRules";
+import {
+  caracasToday,
+  deliveryDates,
+  quoteShipping,
+  schedulingCheck,
+  type SchedulingCheck,
+  type ShippingQuote,
+  type WineStoreConfig,
+} from "@/lib/wineStoreRules";
 import {
   availableOf,
   isWineForSale,
@@ -66,13 +75,32 @@ function shippingError(quote: Extract<ShippingQuote, { ok: false }>) {
 }
 
 /**
+ * Respuesta cuando el día o la franja de entrega no sirven: falta elegir (400 `schedule_required`) o lo elegido ya no es válido con la
+ * configuración de ahora (409 `schedule_invalid`: otro día, otra franja, un día sin atender, una fecha pasada…). Trae las opciones
+ * vigentes (`today`, `dates`, `slots`) para que el carrito se actualice sin otra consulta.
+ */
+function scheduleError(check: Extract<SchedulingCheck, { ok: false }>, store: WineStoreConfig, today: string) {
+  const s = store.delivery.scheduling;
+  return bad(check.message, check.code === "schedule_required" ? 400 : 409, {
+    code: check.code,
+    field: check.field,
+    today,
+    dates: deliveryDates(s, today),
+    slots: s.slots,
+  });
+}
+
+/**
  * Abre el pedido de vinos (pendiente de pago) y devuelve el enlace privado para pagar y seguirlo.
  * Solo para miembros con sesión (Cuenta Origen): el pedido queda en su cuenta y usa el correo de la cuenta.
  * El cliente solo dice QUÉ vinos, CUÁNTAS botellas, cómo recibe el pedido y, si aplica, la zona (`deliveryZoneId`):
  * nombre, añada, precio, envío, existencias y totales los fija el servidor con la configuración de ahora.
+ * Con la entrega programada activa, el cliente también envía `deliveryDate` ('YYYY-MM-DD') y `deliverySlot` (la franja): se validan
+ * SIEMPRE aquí contra la configuración y el «hoy» de Caracas (`caracasToday()`); en un retiro, o con la programación apagada,
+ * lo que envíe se ignora y el pedido guarda null.
  * Orden de las validaciones: configuración de la tienda ilegible (503) → tienda cerrada (403) → datos → entrega y zona →
- * vinos, precios y tope → existencias (409) → límite de pendientes → crear (subtotal + envío) → rechequeo de existencias
- * por carreras (409). El pedido recuerda con qué regla se cobró el envío (`shippingMode`).
+ * día y franja de entrega (400/409) → vinos, precios y tope → existencias (409) → límite de pendientes → crear (subtotal + envío)
+ * → rechequeo de existencias por carreras (409). El pedido recuerda con qué regla se cobró el envío (`shippingMode`).
  */
 export async function POST(request: Request) {
   try {
@@ -132,6 +160,18 @@ export async function POST(request: Request) {
       // ¿Se permite este modo de entrega y la zona existe? El costo definitivo se calcula abajo, con el subtotal.
       const early = quoteShipping(store, { fulfillment, subtotalUsd: 0, zoneId: deliveryZoneId });
       if (!early.ok) return shippingError(early);
+
+      // Día y franja de entrega (preferencia que se confirma por WhatsApp): solo en la entrega a domicilio y con la programación
+      // activa. Si no, lo que haya enviado el cliente se ignora. Se valida contra la configuración de ahora y el «hoy» de Caracas.
+      let deliveryDate: string | null = null;
+      let deliverySlot: string | null = null;
+      if (fulfillment === "delivery") {
+        const today = caracasToday();
+        const schedule = schedulingCheck(store, { date: text(body.deliveryDate).slice(0, 40), slot: text(body.deliverySlot).slice(0, 120) }, today);
+        if (!schedule.ok) return scheduleError(schedule, store, today);
+        deliveryDate = schedule.date;
+        deliverySlot = schedule.slot;
+      }
 
       // Líneas: solo cuentan wineId y quantity. Los vinos repetidos se fusionan y todos los topes se aplican sobre el total.
       const rawItems = Array.isArray(body.items) ? body.items : [];
@@ -225,6 +265,8 @@ export async function POST(request: Request) {
         fulfillment,
         deliveryAddress: fulfillment === "delivery" ? deliveryAddress : null,
         deliveryNote: deliveryNote || null,
+        deliveryDate,
+        deliverySlot,
         subtotalUsd: subtotal,
         shippingUsd: quote.shippingUsd,
         deliveryZone: quote.zone?.name ?? null,
@@ -269,6 +311,10 @@ export async function POST(request: Request) {
     }
   } catch (error) {
     console.error("[wine-checkout]", error);
+    // Falta ejecutar supabase/v8.sql y el pedido lleva día y franja: no se puede guardar sin perderlos (el detalle queda en el registro).
+    if (isMissingV8Error(error)) {
+      return bad("La entrega con día y franja no está disponible por ahora. Inténtalo más tarde o elige el retiro.", 503, { code: "schedule_unavailable" });
+    }
     return bad("No se pudo crear el pedido. Intenta de nuevo.", 500);
   }
 }

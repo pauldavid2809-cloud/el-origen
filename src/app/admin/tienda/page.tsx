@@ -4,17 +4,24 @@ import React, { useCallback, useEffect, useId, useMemo, useRef, useState } from 
 import { parseMoneyText, round2, WINE_MAX_PER_ORDER_LIMIT } from "@/lib/wineSale";
 import {
   buildWinePolicies,
+  caracasToday,
+  CARACAS_ZONE_SUGGESTIONS,
+  defaultDeliveryScheduling,
+  deliveryDates,
+  formatDeliveryDate,
   normalizeWineStoreConfig,
   quoteShipping,
   WINE_STORE_LIMITS,
   type DeliveryMode,
+  type DeliveryScheduling,
   type PolicyText,
   type WineStoreConfig,
 } from "@/lib/wineStoreRules";
 
 /* Tienda de vinos: todo lo que antes estaba fijo en el código y ahora define el administrador: si la tienda está abierta,
-   retiro, entrega (costo fijo o por zonas), tope de botellas y condiciones de compra. Se guarda con PUT en
-   /api/admin/settings/wine-store (el cuerpo es la configuración completa, igual que en Configuración de pagos). */
+   retiro, entrega (costo fijo o por zonas, día y franja que elige el cliente), tope de botellas y condiciones de compra.
+   Se guarda con PUT en /api/admin/settings/wine-store (el cuerpo es la configuración completa, igual que en Configuración
+   de pagos): el cuerpo lleva SIEMPRE `delivery.scheduling`, porque un PUT sin ese bloque lo reinicia a los valores por defecto. */
 
 /** Largo máximo de lo que se escribe en un campo de monto: los dígitos del mayor valor permitido más separadores, centavos, «$» y «USD». */
 const MONEY_INPUT_MAX = String(WINE_STORE_LIMITS.maxFreeFromUsd).length + 10;
@@ -27,6 +34,22 @@ let keySeq = 0;
 /** Fila de zona del formulario: `id` es el que ya tiene la zona guardada (se reenvía para que no cambie al renombrarla). */
 type ZoneRow = { _k: number; id?: string; name: string; fee: string };
 const zoneRow = (name = "", fee = "", id?: string): ZoneRow => ({ _k: ++keySeq, id, name, fee });
+
+/** Fila de franja horaria del formulario. */
+type SlotRow = { _k: number; text: string };
+const slotRow = (text = ""): SlotRow => ({ _k: ++keySeq, text });
+
+/** Día y franja de entrega tal como se edita: los números son el texto del campo. */
+interface SchedulingForm {
+  enabled: boolean;
+  slots: SlotRow[];
+  /** 0 = domingo … 6 = sábado (los mismos números que usa el servidor). */
+  weekdays: number[];
+  /** Antelación mínima en días (texto del campo). */
+  minLead: string;
+  /** Hasta cuántos días hacia adelante se puede elegir (texto del campo). */
+  horizon: string;
+}
 
 interface FormState {
   enabled: boolean;
@@ -41,6 +64,7 @@ interface FormState {
     /** Texto del campo; vacío = nunca es gratis. */
     freeFrom: string;
     instructions: string;
+    scheduling: SchedulingForm;
   };
   /** Texto del campo. */
   defaultMax: string;
@@ -102,9 +126,118 @@ function termsError(text: string): string | null {
   return null;
 }
 
+/* ─── Día y franja de entrega ─── */
+
+/** Días de la semana en el orden en que se leen aquí (lunes primero); `day` es el número del servidor (0 = domingo). */
+const WEEKDAYS: { day: number; short: string; long: string }[] = [
+  { day: 1, short: "Lun", long: "Lunes" },
+  { day: 2, short: "Mar", long: "Martes" },
+  { day: 3, short: "Mié", long: "Miércoles" },
+  { day: 4, short: "Jue", long: "Jueves" },
+  { day: 5, short: "Vie", long: "Viernes" },
+  { day: 6, short: "Sáb", long: "Sábado" },
+  { day: 0, short: "Dom", long: "Domingo" },
+];
+/** Cuántas fechas de la vista previa se escriben una por una (el resto se cuenta). */
+const PREVIEW_DATES = 10;
+/** Largo máximo de los campos de días (dos dígitos: 14 y 60 son los mayores valores permitidos). */
+const DAYS_INPUT_MAX = Math.max(String(WINE_STORE_LIMITS.maxLeadDays).length, String(WINE_STORE_LIMITS.maxHorizonDays).length);
+
+/** Texto de una franja con los espacios normalizados (así la mide y la compara el servidor). */
+const slotText = (t: string) => t.replace(/\s+/g, " ").trim();
+
+/** Entero entre `min` y `max` escrito en un campo; null si está vacío, no es un entero o queda fuera de rango. */
+function wholeNumber(text: string, min: number, max: number): number | null {
+  const s = text.trim();
+  if (!/^\d+$/.test(s)) return null;
+  const n = Number(s);
+  return n >= min && n <= max ? n : null;
+}
+
+/** «miércoles 21 de octubre» con la primera letra en mayúscula (para las fichas de la vista previa). */
+const dateLabel = (ymd: string) => {
+  const s = formatDeliveryDate(ymd, "es");
+  return s.charAt(0).toUpperCase() + s.slice(1);
+};
+
+/** Franjas escritas y válidas: sin vacías, sin repetir (sin distinguir mayúsculas ni acentos), de hasta 40 caracteres y no más de 6. */
+function cleanSlots(rows: SlotRow[]): string[] {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const r of rows) {
+    const t = slotText(r.text);
+    if (!t || t.length > WINE_STORE_LIMITS.slotLength) continue;
+    const key = nameKey(t);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(t);
+  }
+  return out.slice(0, WINE_STORE_LIMITS.maxSlots);
+}
+
+/**
+ * La programación tal como la entiende el servidor si todo está en orden (al menos un día, números enteros y ventana de al menos
+ * 7 días: horizonte − antelación ≥ 6); null si algo falta. La usan la vista previa de fechas y el cuerpo del PUT. `enabled` va
+ * en true porque la vista previa se calcula también con el interruptor apagado.
+ */
+function draftScheduling(s: SchedulingForm): DeliveryScheduling | null {
+  const lead = wholeNumber(s.minLead, 0, WINE_STORE_LIMITS.maxLeadDays);
+  const horizon = wholeNumber(s.horizon, 1, WINE_STORE_LIMITS.maxHorizonDays);
+  if (!s.weekdays.length || lead === null || horizon === null || horizon - lead < WINE_STORE_LIMITS.minWindowSpanDays) return null;
+  return { enabled: true, slots: cleanSlots(s.slots), weekdays: [...s.weekdays].sort((a, b) => a - b), minLeadDays: lead, horizonDays: horizon };
+}
+
+/**
+ * Errores de la programación (claves: sdays, slead, shorizon, slots, slot:<k>). Son las mismas reglas del servidor, con sus
+ * mismos límites. Solo se aplican con la entrega y la programación activas: apagada, el servidor admite días vacíos y una
+ * ventana corta, y `schedulingPayload` deja lo oculto en orden para que un dato olvidado e invisible no impida guardar.
+ */
+function schedulingErrors(s: SchedulingForm): Record<string, string> {
+  const e: Record<string, string> = {};
+  const L = WINE_STORE_LIMITS;
+  if (!s.weekdays.length) e.sdays = "Elija al menos un día de la semana en que entrega.";
+
+  const lead = wholeNumber(s.minLead, 0, L.maxLeadDays);
+  const horizon = wholeNumber(s.horizon, 1, L.maxHorizonDays);
+  if (lead === null) e.slead = `Escriba un número entero de 0 a ${L.maxLeadDays}.`;
+  if (horizon === null) e.shorizon = `Escriba un número entero de 1 a ${L.maxHorizonDays}.`;
+  else if (lead !== null && horizon - lead < L.minWindowSpanDays) {
+    e.shorizon = `Los días hacia adelante deben superar la antelación mínima en al menos ${L.minWindowSpanDays} (por ejemplo, antelación de 1 día y hasta 14 días), para que siempre haya una fecha disponible.`;
+  }
+
+  const seen = new Set<string>();
+  let named = 0;
+  for (const r of s.slots) {
+    const t = slotText(r.text);
+    if (!t) continue; // fila en blanco: no se guarda
+    named++;
+    const key = nameKey(t);
+    if (t.length > L.slotLength) e[`slot:${r._k}`] = `La franja tiene ${t.length} caracteres: el máximo es ${L.slotLength}.`;
+    else if (seen.has(key)) e[`slot:${r._k}`] = "Ya hay una franja con este texto. Use franjas distintas.";
+    seen.add(key);
+  }
+  if (named > L.maxSlots) e.slots = `Puede definir hasta ${L.maxSlots} franjas horarias.`;
+  return e;
+}
+
+/** Bloque `delivery.scheduling` del PUT. Lo que no sirve se corrige aquí (solo puede estar oculto: lo visible ya se validó). */
+function schedulingPayload(s: SchedulingForm): DeliveryScheduling {
+  const def = defaultDeliveryScheduling();
+  return {
+    // Si el servidor rechazaría la programación activa (sin días o con ventana corta), se envía apagada en vez de impedir guardar.
+    enabled: s.enabled && draftScheduling(s) !== null,
+    slots: cleanSlots(s.slots),
+    weekdays: [...s.weekdays].sort((a, b) => a - b),
+    minLeadDays: wholeNumber(s.minLead, 0, WINE_STORE_LIMITS.maxLeadDays) ?? def.minLeadDays,
+    horizonDays: wholeNumber(s.horizon, 1, WINE_STORE_LIMITS.maxHorizonDays) ?? def.horizonDays,
+  };
+}
+
 /* ─── Formulario ↔ configuración ─── */
 
 function toForm(c: WineStoreConfig): FormState {
+  // Una configuración guardada antes de existir la programación no trae el bloque: se parte de los valores por defecto.
+  const sc = c.delivery.scheduling ?? defaultDeliveryScheduling();
   return {
     enabled: c.enabled,
     closedMessage: c.closedMessage,
@@ -116,6 +249,13 @@ function toForm(c: WineStoreConfig): FormState {
       zones: c.delivery.zones.map((z) => zoneRow(z.name, moneyText(z.feeUsd), z.id)),
       freeFrom: c.delivery.freeFromUsd === null ? "" : moneyText(c.delivery.freeFromUsd),
       instructions: c.delivery.instructions,
+      scheduling: {
+        enabled: sc.enabled,
+        slots: sc.slots.map((t) => slotRow(t)),
+        weekdays: [...sc.weekdays],
+        minLead: String(sc.minLeadDays),
+        horizon: String(sc.horizonDays),
+      },
     },
     defaultMax: String(c.defaultMaxPerOrder),
     termsEs: c.terms.es.join("\n"),
@@ -152,13 +292,15 @@ function toPayload(f: FormState) {
       zones,
       freeFromUsd: moneyValue(d.freeFrom, WINE_STORE_LIMITS.maxFreeFromUsd),
       instructions: d.instructions,
+      // Siempre se envía: un PUT sin este bloque reiniciaría el día y la franja a los valores por defecto (apagados).
+      scheduling: schedulingPayload(d.scheduling),
     },
     defaultMaxPerOrder: Number(f.defaultMax.trim()),
     terms: { es: termLines(f.termsEs), en: termLines(f.termsEn) },
   };
 }
 
-/** Errores por campo (claves: channels, flatFee, freeFrom, zones, zone:<k>:name, zone:<k>:fee, defaultMax, termsEs, termsEn). */
+/** Errores por campo (claves: channels, flatFee, freeFrom, zones, zone:<k>:name, zone:<k>:fee, sdays, slead, shorizon, slots, slot:<k>, defaultMax, termsEs, termsEn). */
 function validate(f: FormState): Record<string, string> {
   const e: Record<string, string> = {};
   const d = f.delivery;
@@ -192,6 +334,7 @@ function validate(f: FormState): Record<string, string> {
     if (named > WINE_STORE_LIMITS.maxZones) e.zones = `Puede definir hasta ${WINE_STORE_LIMITS.maxZones} zonas.`;
     else if (named === 0) e.zones = "Agregue al menos una zona con nombre y costo, o elija otro modo de envío.";
   }
+  if (d.enabled && d.scheduling.enabled) Object.assign(e, schedulingErrors(d.scheduling));
 
   const max = f.defaultMax.trim();
   if (!/^\d+$/.test(max) || Number(max) < 1 || Number(max) > WINE_MAX_PER_ORDER_LIMIT) {
@@ -220,7 +363,7 @@ const removeBtn = "h-11 w-11 flex-shrink-0 inline-flex items-center justify-cent
 const MODES: { id: DeliveryMode; label: string; hint: string }[] = [
   { id: "coordinate", label: "Se coordina por WhatsApp", hint: "El costo no se suma al total: usted lo acuerda con el cliente y se paga aparte." },
   { id: "flat", label: "Costo fijo", hint: "El mismo costo de envío para todos los pedidos." },
-  { id: "zones", label: "Por zonas", hint: "El cliente elige su zona al comprar y paga el costo de esa zona." },
+  { id: "zones", label: "Por zonas", hint: "Solo se entrega en las zonas de su lista: el cliente elige la suya al comprar y paga su costo." },
 ];
 
 /** Texto de la tarjeta «Entrega a domicilio»: lo que pasa con el costo depende del modo elegido. */
@@ -244,6 +387,8 @@ export default function AdminWineStorePage() {
   const [dirty, setDirty] = useState(false);
   /** La configuración guardada ya no es válida (editada a mano o de una versión vieja): se muestran los valores por defecto. */
   const [invalidStored, setInvalidStored] = useState(false);
+  /** Ya se intentó guardar con errores: recién entonces se marcan en rojo los costos de zona que aún están vacíos. */
+  const [attempted, setAttempted] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   /** Subtotal de ejemplo para la vista del costo de envío. */
   const [example, setExample] = useState("40");
@@ -314,6 +459,8 @@ export default function AdminWineStorePage() {
   const setDelivery = (patch: Partial<FormState["delivery"]>) => update((f) => ({ ...f, delivery: { ...f.delivery, ...patch } }));
   const updateZone = (k: number, patch: Partial<ZoneRow>) =>
     update((f) => ({ ...f, delivery: { ...f.delivery, zones: f.delivery.zones.map((z) => (z._k === k ? { ...z, ...patch } : z)) } }));
+  const updateScheduling = (fn: (s: SchedulingForm) => SchedulingForm) =>
+    update((f) => ({ ...f, delivery: { ...f.delivery, scheduling: fn(f.delivery.scheduling) } }));
 
   const errors = useMemo(() => (form ? validate(form) : {}), [form]);
   const errorCount = Object.keys(errors).length;
@@ -345,9 +492,14 @@ export default function AdminWineStorePage() {
     setError(null);
     if (errorCount > 0) {
       // Con un campo marcado el foco va al campo (el navegador lo desplaza a la vista); si no, al aviso de arriba.
-      const bad = errors.channels ? null : document.querySelector<HTMLElement>('[aria-invalid="true"]');
+      // (Los días de la semana son botones: su grupo se marca con `data-invalid` y puede recibir el foco.)
+      setAttempted(true);
+      const find = () => (errors.channels ? null : document.querySelector<HTMLElement>('[aria-invalid="true"], [data-invalid="true"]'));
+      const bad = find();
       showError(errors.channels ? errors.channels : "Hay campos por corregir. Revise los mensajes en rojo y vuelva a guardar.", !bad);
       bad?.focus();
+      // Los costos vacíos de las zonas sugeridas recién se marcan ahora: el foco va al primero cuando ya están pintados.
+      if (!bad) setTimeout(() => find()?.focus(), 0);
       return;
     }
     savingRef.current = true;
@@ -363,6 +515,7 @@ export default function AdminWineStorePage() {
       setForm(toForm(data.config));
       setSavedTerms(data.generatedTerms ?? null);
       setInvalidStored(false);
+      setAttempted(false);
       setDirty(false);
       notify(
         data.config.enabled
@@ -379,7 +532,7 @@ export default function AdminWineStorePage() {
 
   const restoreDefaults = () => {
     if (!defaults) return;
-    if (!confirm("¿Reemplazar el formulario por los valores por defecto (tienda abierta, retiro y entrega a coordinar por WhatsApp, máximo de 12 botellas)? No se guarda hasta que pulse «Guardar».")) return;
+    if (!confirm("¿Reemplazar el formulario por los valores por defecto (tienda abierta, retiro y entrega a coordinar por WhatsApp sin que el cliente elija día ni franja, máximo de 12 botellas)? No se guarda hasta que pulse «Guardar».")) return;
     setForm(toForm(defaults));
     setDirty(true);
   };
@@ -389,6 +542,32 @@ export default function AdminWineStorePage() {
     focusRef.current = id(`z${row._k}-name`);
     setDelivery({ zones: [...(form?.delivery.zones ?? []), row] });
   };
+
+  /**
+   * Agrega una zona sugerida de Caracas con el costo VACÍO (el costo lo decide usted): el cursor va al costo. Si ya hay una fila
+   * en blanco la usa en vez de dejarla vacía; nunca repite un nombre que ya está en la lista.
+   */
+  const addSuggestedZone = (name: string) => {
+    const zones = form?.delivery.zones ?? [];
+    const key = nameKey(name);
+    if (zones.some((z) => nameKey(z.name) === key)) return;
+    const blank = zones.find((z) => !z.name.trim() && !z.fee.trim());
+    if (!blank && zones.length >= WINE_STORE_LIMITS.maxZones) return;
+    const row = blank ? { ...blank, name } : zoneRow(name);
+    focusRef.current = id(`z${row._k}-fee`);
+    setDelivery({ zones: blank ? zones.map((z) => (z._k === blank._k ? row : z)) : [...zones, row] });
+  };
+
+  const addSlot = () => {
+    const row = slotRow();
+    focusRef.current = id(`s${row._k}-text`);
+    updateScheduling((s) => (s.slots.length >= WINE_STORE_LIMITS.maxSlots ? s : { ...s, slots: [...s.slots, row] }));
+  };
+  const toggleDay = (day: number) =>
+    updateScheduling((s) => ({
+      ...s,
+      weekdays: s.weekdays.includes(day) ? s.weekdays.filter((d) => d !== day) : [...s.weekdays, day].sort((a, b) => a - b),
+    }));
 
   const changeMode = (mode: DeliveryMode) => {
     // Al elegir «Por zonas» sin ninguna zona se deja lista una fila para escribir.
@@ -585,13 +764,15 @@ export default function AdminWineStorePage() {
                     <div>
                       <h3 className="text-[13px] font-semibold">Zonas de envío</h3>
                       <p className={`${hintCls} mt-0.5`}>
-                        Cada zona tiene su propio costo. El cliente elige la suya al comprar. Las filas en blanco no se guardan. Máximo{" "}
-                        {WINE_STORE_LIMITS.maxZones} zonas ({form.delivery.zones.length} en la lista).
+                        <strong>Solo se entrega en las zonas de esta lista:</strong> fuera de ellas el cliente no puede pedir entrega a
+                        domicilio. Cada zona tiene su propio costo y el cliente elige la suya al comprar. Las filas en blanco no se guardan.
+                        Máximo {WINE_STORE_LIMITS.maxZones} zonas ({form.delivery.zones.length} en la lista).
                       </p>
                     </div>
                     {form.delivery.zones.map((z, i) => {
                       const nameErr = errors[`zone:${z._k}:name`];
-                      const feeErr = errors[`zone:${z._k}:fee`];
+                      // Un costo recién agregado (zona sugerida) no se marca en rojo hasta que la persona intente guardar.
+                      const feeErr = z.fee.trim() || attempted ? errors[`zone:${z._k}:fee`] : undefined;
                       const rowLabel = i === 0 ? labelCls : `${labelCls} sm:sr-only`;
                       return (
                         <div key={z._k} className="flex gap-1 items-start">
@@ -647,6 +828,12 @@ export default function AdminWineStorePage() {
                       <span className="material-symbols-outlined text-[18px]" aria-hidden="true">add</span>
                       Agregar zona
                     </button>
+                    <ZoneSuggestions
+                      id={id("zone-sugg")}
+                      zones={form.delivery.zones}
+                      full={form.delivery.zones.length >= WINE_STORE_LIMITS.maxZones && !form.delivery.zones.some((z) => !z.name.trim() && !z.fee.trim())}
+                      onAdd={addSuggestedZone}
+                    />
                   </div>
                 )}
 
@@ -665,7 +852,7 @@ export default function AdminWineStorePage() {
                 <Field
                   id={id("dl-instr")}
                   label="Indicaciones de la entrega (opcional)"
-                  hint="Se muestra al cliente. Por ejemplo, los días de entrega."
+                  hint="Se muestra al cliente. Por ejemplo, una aclaración sobre cómo se entrega."
                   value={form.delivery.instructions}
                   onChange={(v) => setDelivery({ instructions: v })}
                   max={WINE_STORE_LIMITS.deliveryInstructions}
@@ -678,6 +865,25 @@ export default function AdminWineStorePage() {
                   config={liveConfig}
                   example={example}
                   onExample={setExample}
+                />
+
+                <p role="note" className="flex items-start gap-2 text-[13px] text-on-surface-variant">
+                  <span className="material-symbols-outlined text-[18px] flex-shrink-0" aria-hidden="true">info</span>
+                  <span>
+                    El cliente siempre ve el aviso «Debe recibir el pedido una persona mayor de 18 años» al elegir la entrega a domicilio,
+                    y también va en su correo y su mensaje de WhatsApp, aunque usted escriba sus propias condiciones de compra.
+                  </span>
+                </p>
+
+                <SchedulingSection
+                  idOf={id}
+                  value={form.delivery.scheduling}
+                  errors={errors}
+                  onChange={(patch) => updateScheduling((s) => ({ ...s, ...patch }))}
+                  onToggleDay={toggleDay}
+                  onSlotText={(k, text) => updateScheduling((s) => ({ ...s, slots: s.slots.map((r) => (r._k === k ? { ...r, text } : r)) }))}
+                  onAddSlot={addSlot}
+                  onRemoveSlot={(k) => updateScheduling((s) => ({ ...s, slots: s.slots.filter((r) => r._k !== k) }))}
                 />
               </>
             )}
@@ -863,6 +1069,250 @@ function MoneyField({
   return (
     <div className="max-w-xs">
       <Field id={id} label={label} hint={hint} value={value} onChange={onChange} error={error} placeholder={placeholder} inputMode="decimal" maxLength={MONEY_INPUT_MAX} />
+    </div>
+  );
+}
+
+/** Zonas de Caracas para agregar con un clic: entran con el costo VACÍO (lo escribe usted) y las que ya están en la lista no se ofrecen. */
+function ZoneSuggestions({ id, zones, full, onAdd }: { id: string; zones: ZoneRow[]; full: boolean; onAdd: (name: string) => void }) {
+  const used = new Set(zones.map((z) => nameKey(z.name)));
+  const left = CARACAS_ZONE_SUGGESTIONS.filter((n) => !used.has(nameKey(n)));
+  return (
+    <div className="rounded-xl border border-outline-variant bg-surface-container-low/50 p-4 space-y-2.5">
+      <div>
+        <h4 id={`${id}-h`} className="text-[13px] font-semibold">Zonas de Caracas sugeridas</h4>
+        <p className={hintCls}>
+          Pulse una zona para agregarla a la lista y escriba cuánto cuesta el envío a esa zona. Después puede cambiarle el nombre o quitarla.
+        </p>
+      </div>
+      {left.length > 0 ? (
+        <ul aria-labelledby={`${id}-h`} className="flex flex-wrap gap-1.5">
+          {left.map((name) => (
+            <li key={name}>
+              <button
+                type="button"
+                disabled={full}
+                onClick={() => onAdd(name)}
+                aria-label={`Agregar la zona ${name}`}
+                className="h-10 px-3 rounded-full border border-outline-variant bg-surface-container-lowest text-[13px] font-semibold inline-flex items-center gap-1 hover:border-primary-container disabled:opacity-50 disabled:hover:border-outline-variant"
+              >
+                <span className="material-symbols-outlined text-[16px]" aria-hidden="true">add</span>
+                {name}
+              </button>
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <p className={hintCls}>Ya agregó todas las zonas sugeridas.</p>
+      )}
+      {full && left.length > 0 && (
+        <p className={hintCls}>La lista ya tiene {WINE_STORE_LIMITS.maxZones} zonas: quite alguna para agregar otra.</p>
+      )}
+    </div>
+  );
+}
+
+/**
+ * «Día y franja de entrega»: el cliente elige al comprar con entrega a domicilio cuándo prefiere recibir su pedido. Es una
+ * preferencia que usted confirma con él por WhatsApp. Con el interruptor apagado solo se ve el interruptor; encendido, se
+ * definen los días de la semana, la antelación, hasta cuándo se puede elegir y las franjas, con una vista previa de las fechas.
+ */
+function SchedulingSection({
+  idOf,
+  value,
+  errors,
+  onChange,
+  onToggleDay,
+  onSlotText,
+  onAddSlot,
+  onRemoveSlot,
+}: {
+  idOf: (name: string) => string;
+  value: SchedulingForm;
+  errors: Record<string, string>;
+  onChange: (patch: Partial<SchedulingForm>) => void;
+  onToggleDay: (day: number) => void;
+  onSlotText: (k: number, text: string) => void;
+  onAddSlot: () => void;
+  onRemoveSlot: (k: number) => void;
+}) {
+  const L = WINE_STORE_LIMITS;
+  const nameCount = value.slots.filter((r) => slotText(r.text)).length;
+  const draft = draftScheduling(value);
+  return (
+    <section aria-labelledby={idOf("sched-h")} className="rounded-xl border border-outline-variant bg-surface-container-low/50 p-4 sm:p-5 space-y-4">
+      <div>
+        <h3 id={idOf("sched-h")} className="font-serif text-lg">Día y franja de entrega</h3>
+        <p className={hintCls}>
+          Opcional. El cliente elige al comprar el día (y la franja horaria) en que prefiere recibir su pedido a domicilio. Es una
+          preferencia: usted la confirma con él por WhatsApp. El retiro en persona no usa esta opción.
+        </p>
+      </div>
+
+      <Toggle
+        checked={value.enabled}
+        onChange={(v) => onChange({ enabled: v })}
+        label="Que el cliente elija el día de la entrega"
+        hint={
+          value.enabled
+            ? "Encendido: al comprar con entrega a domicilio, el cliente debe elegir un día" + (value.slots.length ? " y una franja." : ".")
+            : "Apagado: el cliente no elige día; usted acuerda la fecha con él por WhatsApp."
+        }
+      />
+
+      {value.enabled && (
+        <>
+          <fieldset
+            tabIndex={-1}
+            data-invalid={errors.sdays ? "true" : undefined}
+            aria-describedby={[idOf("days-hint"), errors.sdays ? idOf("days-err") : ""].filter(Boolean).join(" ")}
+            className="focus:outline-none"
+          >
+            <legend className={labelCls}>Días en que entrega</legend>
+            <div className="grid grid-cols-4 min-[480px]:grid-cols-7 gap-1.5">
+              {WEEKDAYS.map((w) => {
+                const on = value.weekdays.includes(w.day);
+                return (
+                  <button
+                    key={w.day}
+                    type="button"
+                    aria-pressed={on}
+                    aria-label={w.long}
+                    onClick={() => onToggleDay(w.day)}
+                    className={`h-11 rounded border text-[13px] font-semibold inline-flex items-center justify-center gap-1 ${
+                      on
+                        ? "border-primary-container bg-primary-container text-white"
+                        : "border-outline-variant bg-surface-container-lowest text-on-surface-variant hover:border-primary-container"
+                    }`}
+                  >
+                    {on && <span className="material-symbols-outlined text-[16px]" aria-hidden="true">check</span>}
+                    {w.short}
+                  </button>
+                );
+              })}
+            </div>
+            <p id={idOf("days-hint")} className={`${hintCls} mt-1.5`}>
+              El cliente solo podrá elegir los días marcados. Los días sin marcar no aparecen como opción.
+            </p>
+            {errors.sdays && <p id={idOf("days-err")} className="text-[12px] text-error mt-1">{errors.sdays}</p>}
+          </fieldset>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-3">
+            <Field
+              id={idOf("sd-lead")}
+              label="Antelación mínima (días)"
+              hint={`De 0 a ${L.maxLeadDays}. Con 0 el cliente puede elegir hoy mismo; con 1, desde mañana.`}
+              value={value.minLead}
+              onChange={(v) => onChange({ minLead: v })}
+              error={errors.slead}
+              inputMode="numeric"
+              maxLength={DAYS_INPUT_MAX}
+            />
+            <Field
+              id={idOf("sd-horizon")}
+              label="Hasta cuántos días puede elegir"
+              hint={`De 1 a ${L.maxHorizonDays}, contados desde hoy. Con 14, el cliente ve las próximas dos semanas.`}
+              value={value.horizon}
+              onChange={(v) => onChange({ horizon: v })}
+              error={errors.shorizon}
+              inputMode="numeric"
+              maxLength={DAYS_INPUT_MAX}
+            />
+          </div>
+
+          <div className="space-y-3">
+            <div>
+              <h4 className="text-[13px] font-semibold">Franjas horarias (opcional)</h4>
+              <p className={`${hintCls} mt-0.5`}>
+                Por ejemplo «9:00 am – 12:00 m» o «2:00 – 6:00 pm». Si no agrega ninguna, el cliente solo elige el día. Máximo {L.maxSlots}{" "}
+                franjas ({nameCount} en la lista); cada una, de hasta {L.slotLength} caracteres. Las filas en blanco no se guardan.
+              </p>
+            </div>
+            {value.slots.map((r, i) => {
+              const err = errors[`slot:${r._k}`];
+              const len = slotText(r.text).length;
+              return (
+                <div key={r._k} className="flex gap-1 items-start">
+                  <div className="flex-1 min-w-0">
+                    <label htmlFor={idOf(`s${r._k}-text`)} className="sr-only">Franja {i + 1}</label>
+                    <input
+                      id={idOf(`s${r._k}-text`)}
+                      value={r.text}
+                      maxLength={L.slotLength}
+                      onChange={(e) => onSlotText(r._k, e.target.value)}
+                      placeholder={i % 2 === 0 ? "Ej.: 9:00 am – 12:00 m" : "Ej.: 2:00 – 6:00 pm"}
+                      aria-invalid={err ? true : undefined}
+                      aria-describedby={[idOf(`s${r._k}-n`), err ? idOf(`s${r._k}-err`) : ""].filter(Boolean).join(" ")}
+                      className={inputCls}
+                    />
+                    <p id={idOf(`s${r._k}-n`)} className={`${hintCls} mt-1 tabular-nums text-right`}>
+                      {len} / {L.slotLength}
+                    </p>
+                    {err && <p id={idOf(`s${r._k}-err`)} className="text-[12px] text-error mt-1">{err}</p>}
+                  </div>
+                  <button type="button" onClick={() => onRemoveSlot(r._k)} className={removeBtn}>
+                    <span className="material-symbols-outlined" aria-hidden="true">delete</span>
+                    <span className="sr-only">Quitar la franja {slotText(r.text) || i + 1}</span>
+                  </button>
+                </div>
+              );
+            })}
+            {value.slots.length === 0 && <p className={hintCls}>Sin franjas: el cliente solo elige el día.</p>}
+            {errors.slots && <p className="text-[13px] text-error">{errors.slots}</p>}
+            <button type="button" onClick={onAddSlot} disabled={value.slots.length >= L.maxSlots} className={smallBtn}>
+              <span className="material-symbols-outlined text-[18px]" aria-hidden="true">add</span>
+              Agregar franja
+            </button>
+          </div>
+
+          <SchedulingPreview draft={draft} />
+        </>
+      )}
+    </section>
+  );
+}
+
+/** Vista previa: las próximas fechas que vería el cliente con lo escrito arriba, calculadas con las mismas funciones del servidor. */
+function SchedulingPreview({ draft }: { draft: DeliveryScheduling | null }) {
+  const today = caracasToday();
+  if (!draft) {
+    return (
+      <div className="rounded-lg border border-outline-variant bg-surface-container-lowest p-3.5 text-[13px] text-on-surface-variant">
+        Corrija los campos marcados en rojo para ver las fechas que tendrá el cliente.
+      </div>
+    );
+  }
+  const dates = deliveryDates(draft, today);
+  const shown = dates.slice(0, PREVIEW_DATES);
+  const more = dates.length - shown.length;
+  return (
+    <div className="rounded-lg border border-outline-variant bg-surface-container-lowest p-3.5 space-y-2.5">
+      <h4 className="text-[13px] font-semibold">Vista previa: fechas que verá el cliente</h4>
+      <p className="text-[13px] text-on-surface-variant">
+        Hoy en Caracas es {formatDeliveryDate(today, "es")}.{" "}
+        {dates.length > 0
+          ? `El cliente podrá elegir entre ${dates.length} ${dates.length === 1 ? "fecha" : "fechas"}, desde el ${formatDeliveryDate(dates[0], "es")} hasta el ${formatDeliveryDate(dates[dates.length - 1], "es")}.`
+          : "Con esta configuración no queda ninguna fecha disponible."}
+      </p>
+      {shown.length > 0 && (
+        <ul aria-label="Próximas fechas disponibles" className="flex flex-wrap gap-1.5">
+          {shown.map((d) => (
+            <li key={d} className="px-2.5 py-1 rounded-full border border-outline-variant bg-surface-container-low text-[12px] tabular-nums">
+              {dateLabel(d)}
+            </li>
+          ))}
+          {more > 0 && <li className="px-1 py-1 text-[12px] text-on-surface-variant">y {more} {more === 1 ? "fecha más" : "fechas más"}</li>}
+        </ul>
+      )}
+      <p className="text-[13px] text-on-surface-variant break-words">
+        {draft.slots.length > 0 ? (
+          <>
+            Franjas a elegir: <strong className="text-on-surface">{draft.slots.join(" · ")}</strong>.
+          </>
+        ) : (
+          "Sin franjas: el cliente solo elige el día."
+        )}
+      </p>
     </div>
   );
 }

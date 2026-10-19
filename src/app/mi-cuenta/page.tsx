@@ -9,6 +9,7 @@ import { useDocumentTitle } from "@/lib/useDocumentTitle";
 import type { Language } from "@/lib/i18n";
 import type { OrderStatus } from "@/lib/orders";
 import { isShippingCoordinated, WINE_PENDING_TTL_HOURS } from "@/lib/wineSale";
+import { formatDeliveryDate } from "@/lib/wineStoreRules";
 import { whatsappLink } from "@/lib/contact";
 import { AuthShell, Panel, Spinner, notifyMemberChange, secondaryButtonClass } from "../ingresar/_components/AuthUI";
 import { ACCOUNT_COPY } from "./copy";
@@ -51,6 +52,14 @@ interface AccountWineOrder {
   shippingUsd?: number;
   shippingMode?: "coordinate" | "flat" | "zones" | null;
   deliveryZone?: string | null;
+  /**
+   * Día ('YYYY-MM-DD') y franja que eligió el cliente al comprar con entrega programada (null/ausentes si no hay), y cuándo salió
+   * («En camino» = aprobado, con `dispatchedAt` y sin `deliveredAt`) y cuándo se entregó.
+   */
+  deliveryDate?: string | null;
+  deliverySlot?: string | null;
+  dispatchedAt?: string | null;
+  deliveredAt?: string | null;
   createdAt: string;
 }
 
@@ -68,6 +77,9 @@ const STATUS_TONE: Record<OrderStatus, string> = {
   rejected: "bg-error-container text-on-error-container",
   cancelled: "bg-surface-container-high text-on-surface-variant",
 };
+
+/** Color de la insignia «En camino» (entre «Confirmado» y «Entregado»). */
+const ON_THE_WAY_TONE = "bg-sky-100 text-sky-900";
 
 const usd = (n: number) => `$${Number.isInteger(n) ? n : n.toFixed(2)} USD`;
 
@@ -310,10 +322,18 @@ function WineOrderCard({ lang, order: o }: { lang: Language; order: AccountWineO
   const expired = o.status === "pending_payment" && Date.parse(o.createdAt) + WINE_PENDING_TTL_HOURS * 3_600_000 < Date.now();
   const action = o.status === "pending_payment" || o.status === "rejected" ? t.payNow : t.viewWineOrder;
   const ship = shippingRow(o);
+  // «En camino»: aprobado, con aviso de salida y sin entregar. Con la fecha de entrega el pedido pasa a «Entregado».
+  const delivered = o.status === "approved" && Boolean(o.deliveredAt);
+  const onTheWay = o.status === "approved" && Boolean(o.dispatchedAt) && !o.deliveredAt;
+  // Día y franja que eligió el cliente (solo en entregas programadas).
+  const preferred = o.fulfillment === "delivery" && o.deliveryDate ? formatDeliveryDate(o.deliveryDate, lang) : "";
+  const preferredText = preferred ? [preferred.charAt(0).toUpperCase() + preferred.slice(1), o.deliverySlot].filter(Boolean).join(" · ") : "";
   return (
     <article className="rounded-xl border border-outline-variant bg-paper/40 p-4 sm:p-5">
       <div className="flex flex-wrap items-center gap-2">
-        <span className={`px-2.5 py-0.5 rounded-full text-[12px] font-semibold ${STATUS_TONE[o.status]}`}>{t.wineStatus[o.status]}</span>
+        <span className={`px-2.5 py-0.5 rounded-full text-[12px] font-semibold ${onTheWay ? ON_THE_WAY_TONE : STATUS_TONE[o.status]}`}>
+          {delivered ? t.wineDelivered : onTheWay ? t.wineOnTheWay : t.wineStatus[o.status]}
+        </span>
         {expired && (
           <span className="px-2.5 py-0.5 rounded-full text-[12px] font-semibold bg-surface-container-high text-on-surface-variant">
             {t.wineExpired}
@@ -329,6 +349,12 @@ function WineOrderCard({ lang, order: o }: { lang: Language; order: AccountWineO
           <dt className="sr-only">{t.bottles(o.bottlesCount)}</dt>
           <dd className="text-on-surface">{t.bottles(o.bottlesCount)}</dd>
         </div>
+        {preferredText && (
+          <div className="flex gap-1.5 min-w-0 basis-full">
+            <dt className="flex-shrink-0 text-on-surface-variant">{t.preferredDelivery}</dt>
+            <dd className="min-w-0 break-words text-on-surface">{preferredText}</dd>
+          </div>
+        )}
         {ship && (
           <div className="flex gap-1.5 min-w-0">
             <dt className="text-on-surface-variant">{o.deliveryZone ? t.shippingWithZone(o.deliveryZone) : t.shipping}</dt>
