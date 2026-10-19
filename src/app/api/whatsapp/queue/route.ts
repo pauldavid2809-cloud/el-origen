@@ -9,7 +9,9 @@ import {
   ticketCheckinUrl,
   ticketLabel,
   ticketWhatsAppPolicies,
+  wineStoreForNotices,
 } from "@/lib/notify";
+import type { PublicWineStore } from "@/lib/wineStoreRules";
 
 export const dynamic = "force-dynamic";
 
@@ -73,12 +75,16 @@ export async function GET(request: Request) {
     .sort((a, b) => timeOf(a.order.updatedAt) - timeOf(b.order.updatedAt))
     .slice(0, QUEUE_LIMIT);
 
+  // Retiro y entrega de los pedidos de vinos salen de la configuración de la tienda: se lee una sola vez por consulta
+  // (y solo si hay pedidos de vinos en esta tanda). Nunca lanza: ante un error usa los valores por defecto.
+  const wineStore = entries.some((e) => e.kind === "text") ? await wineStoreForNotices() : undefined;
+
   // Un elemento que falla (p. ej. al crear sus entradas) se marca como fallido y la cola sigue: no tumba a los demás.
   const queue = (
     await Promise.all(
       entries.map(async (entry) => {
         try {
-          return entry.kind === "text" ? wineItem(entry.order) : await ticketsItem(entry.order);
+          return entry.kind === "text" ? wineItem(entry.order, wineStore) : await ticketsItem(entry.order);
         } catch (err) {
           console.error(`[whatsapp-queue] ${entry.order.code} no se pudo preparar:`, err);
           const mark = entry.kind === "text" ? updateWineOrder(entry.order.id, { whatsappStatus: "failed" }) : updateOrder(entry.order.id, { whatsappStatus: "failed" });
@@ -112,14 +118,14 @@ async function ticketsItem(o: Order) {
   };
 }
 
-function wineItem(o: WineOrder) {
+function wineItem(o: WineOrder, store?: PublicWineStore) {
   return {
     kind: "text" as const,
     orderId: o.id,
     code: o.code,
     name: o.customerName,
     phone: normalizeVePhone(o.customerPhone),
-    message: buildWineWhatsAppMessage(o),
+    message: buildWineWhatsAppMessage(o, store),
     policies: "",
     tickets: [],
     qrData: null,

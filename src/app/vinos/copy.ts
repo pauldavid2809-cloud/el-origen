@@ -54,6 +54,19 @@ const es = {
   limitLines: (n: number) => `Un pedido admite hasta ${n} vinos distintos.`,
   cartLabel: "Carrito",
   cartAria: (n: number) => (n > 0 ? `Ver el carrito: ${n} ${n === 1 ? "botella" : "botellas"}` : "Ver el carrito"),
+
+  // Tienda cerrada (el administrador la cierra en Admin → Tienda de vinos; los precios siguen visibles)
+  closedTitle: "Tienda cerrada por ahora",
+  closedDefault: "Por ahora no estamos tomando pedidos. Puedes ver los vinos y sus precios; vuelve pronto.",
+  openPriced: (name: string, price: string) => `Ver la ficha de ${name}, ${price}`,
+
+  // Existencias
+  soldOut: "Agotado",
+  openSoldOut: (name: string) => `Ver la ficha de ${name}, agotado`,
+  soldOutText: "Este vino está agotado por ahora. Escríbenos por WhatsApp para saber cuándo vuelve a estar disponible.",
+  onlyLeft: (n: number) => (n === 1 ? "Solo queda 1 botella." : `Solo quedan ${n} botellas.`),
+  limitStock: (n: number) =>
+    n === 1 ? "Solo queda 1 botella de este vino y ya está en tu carrito." : `Solo quedan ${n} botellas de este vino y ya las tienes en tu carrito.`,
 };
 
 type WinesCopy = typeof es;
@@ -103,6 +116,17 @@ const en: WinesCopy = {
   limitLines: (n) => `An order allows up to ${n} different wines.`,
   cartLabel: "Cart",
   cartAria: (n) => (n > 0 ? `View cart: ${n} ${n === 1 ? "bottle" : "bottles"}` : "View cart"),
+
+  closedTitle: "Shop closed for now",
+  closedDefault: "We are not taking orders right now. You can browse the wines and their prices; please come back soon.",
+  openPriced: (name, price) => `View the sheet of ${name}, ${price}`,
+
+  soldOut: "Sold out",
+  openSoldOut: (name) => `View the sheet of ${name}, sold out`,
+  soldOutText: "This wine is sold out for now. Message us on WhatsApp to find out when it will be available again.",
+  onlyLeft: (n) => (n === 1 ? "Only 1 bottle left." : `Only ${n} bottles left.`),
+  limitStock: (n) =>
+    n === 1 ? "Only 1 bottle of this wine is left and it is already in your cart." : `Only ${n} bottles of this wine are left and you already have them in your cart.`,
 };
 
 export const WINES_COPY: Record<Language, WinesCopy> = { es, en };

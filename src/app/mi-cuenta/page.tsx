@@ -8,7 +8,7 @@ import { useLang } from "@/lib/useLang";
 import { useDocumentTitle } from "@/lib/useDocumentTitle";
 import type { Language } from "@/lib/i18n";
 import type { OrderStatus } from "@/lib/orders";
-import { WINE_PENDING_TTL_HOURS } from "@/lib/wineSale";
+import { isShippingCoordinated, WINE_PENDING_TTL_HOURS } from "@/lib/wineSale";
 import { whatsappLink } from "@/lib/contact";
 import { AuthShell, Panel, Spinner, notifyMemberChange, secondaryButtonClass } from "../ingresar/_components/AuthUI";
 import { ACCOUNT_COPY } from "./copy";
@@ -43,6 +43,14 @@ interface AccountWineOrder {
   status: OrderStatus;
   totalUsd: number;
   bottlesCount: number;
+  /**
+   * Cómo se recibe y cómo se cobró el envío, tal como quedó guardado en el pedido (si la API no los trae, no se muestra la fila):
+   * `shippingUsd` ya está incluido en `totalUsd`; `shippingMode` null = pedido anterior a la configuración de la tienda.
+   */
+  fulfillment?: "pickup" | "delivery";
+  shippingUsd?: number;
+  shippingMode?: "coordinate" | "flat" | "zones" | null;
+  deliveryZone?: string | null;
   createdAt: string;
 }
 
@@ -285,11 +293,23 @@ function WineOrders({ lang, orders }: { lang: Language; orders: AccountWineOrder
   );
 }
 
+/**
+ * Fila de envío de un pedido de vinos: con costo, gratis o por coordinar; null = no hay fila (retiro, o la API no trae los datos).
+ * Se decide con lo que el pedido guardó al crearse, no con la configuración de ahora.
+ */
+function shippingRow(o: AccountWineOrder): "paid" | "free" | "coordinated" | null {
+  if (o.fulfillment !== "delivery") return null;
+  const shippingUsd = o.shippingUsd ?? 0;
+  if (shippingUsd > 0) return "paid";
+  return isShippingCoordinated({ fulfillment: "delivery", shippingMode: o.shippingMode ?? null, shippingUsd }) ? "coordinated" : "free";
+}
+
 function WineOrderCard({ lang, order: o }: { lang: Language; order: AccountWineOrder }) {
   const t = ACCOUNT_COPY[lang];
   // Vencimiento lógico (igual que en el servidor): pendiente de pago con más de WINE_PENDING_TTL_HOURS desde que se creó.
   const expired = o.status === "pending_payment" && Date.parse(o.createdAt) + WINE_PENDING_TTL_HOURS * 3_600_000 < Date.now();
   const action = o.status === "pending_payment" || o.status === "rejected" ? t.payNow : t.viewWineOrder;
+  const ship = shippingRow(o);
   return (
     <article className="rounded-xl border border-outline-variant bg-paper/40 p-4 sm:p-5">
       <div className="flex flex-wrap items-center gap-2">
@@ -309,6 +329,14 @@ function WineOrderCard({ lang, order: o }: { lang: Language; order: AccountWineO
           <dt className="sr-only">{t.bottles(o.bottlesCount)}</dt>
           <dd className="text-on-surface">{t.bottles(o.bottlesCount)}</dd>
         </div>
+        {ship && (
+          <div className="flex gap-1.5 min-w-0">
+            <dt className="text-on-surface-variant">{o.deliveryZone ? t.shippingWithZone(o.deliveryZone) : t.shipping}</dt>
+            <dd className="text-on-surface">
+              {ship === "paid" ? usd(o.shippingUsd ?? 0) : ship === "free" ? t.shippingFree : t.shippingCoordinated}
+            </dd>
+          </div>
+        )}
         <div className="flex gap-1.5">
           <dt className="text-on-surface-variant">{t.total}</dt>
           <dd className="font-semibold text-on-surface">{usd(o.totalUsd)}</dd>

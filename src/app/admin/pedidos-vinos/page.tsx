@@ -2,10 +2,13 @@
 
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import type { WineOrder } from "@/lib/wineOrders";
-import { WINE_PENDING_TTL_HOURS } from "@/lib/wineSale";
+import type { StockWarning } from "@/lib/wines";
+import { isShippingCoordinated, round2, WINE_PENDING_TTL_HOURS } from "@/lib/wineSale";
 
 /* Pedidos de vinos: revisión de pagos, aprobación (con confirmación por correo y WhatsApp) y entrega.
-   Mismo recorrido que Reservas y pagos, con sus propios textos: aquí no hay cupos, entradas ni QR. */
+   Mismo recorrido que Reservas y pagos, con sus propios textos: aquí no hay cupos, entradas ni QR.
+   El detalle muestra subtotal, envío (y zona) y total; al aprobar, si algún vino con existencias controladas quedó
+   sobrevendido, la respuesta trae `stockWarning` y se avisa (la aprobación nunca se bloquea: el cliente ya pagó). */
 
 type AdminWineOrder = WineOrder & {
   proofUrl: string | null;
@@ -89,6 +92,8 @@ export default function AdminWineOrdersPage() {
   const [reason, setReason] = useState(REJECT_REASONS[0]);
   const [toast, setToast] = useState<{ text: string; ok: boolean } | null>(null);
   const [wa, setWa] = useState<DeliveryInfo | null>(null);
+  /** Aviso persistente de vinos sobrevendidos tras aprobar un pedido (el toast dura 4 s y esto no debe pasar inadvertido). */
+  const [stockAlert, setStockAlert] = useState<{ code: string; items: StockWarning[] } | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -140,6 +145,10 @@ export default function AdminWineOrdersPage() {
         fulfill: `${u.code} marcado como entregado.`,
       };
       notify(msg[action]);
+      if (action === "approve") {
+        const warnings: StockWarning[] = Array.isArray(data.stockWarning) ? data.stockWarning : [];
+        if (warnings.length) setStockAlert({ code: u.code, items: warnings });
+      }
       setRejecting(null);
       await load();
     } catch (err) {
@@ -169,7 +178,7 @@ export default function AdminWineOrdersPage() {
     .filter((o) => {
       const s = q.trim().toLowerCase();
       if (!s) return true;
-      return [o.code, o.customerName, o.customerDocId, o.customerEmail, o.customerPhone, o.paymentReference ?? "", ...o.items.map((i) => i.name)].some((v) =>
+      return [o.code, o.customerName, o.customerDocId, o.customerEmail, o.customerPhone, o.paymentReference ?? "", o.deliveryZone ?? "", ...o.items.map((i) => i.name)].some((v) =>
         v.toLowerCase().includes(s)
       );
     });
@@ -216,13 +225,40 @@ export default function AdminWineOrdersPage() {
       {!persistent && (
         <div className="rounded-lg border border-tertiary/40 bg-tertiary-fixed/60 p-4 text-[14px] text-on-tertiary-fixed-variant">
           <strong>Modo de prueba:</strong> Supabase no está configurado, los pedidos se guardan en memoria y se pierden al reiniciar.
-          Configure <code>NEXT_PUBLIC_SUPABASE_URL</code> y <code>SUPABASE_SERVICE_ROLE_KEY</code> y ejecute <code>supabase/v6.sql</code>.
+          Configure <code>NEXT_PUBLIC_SUPABASE_URL</code> y <code>SUPABASE_SERVICE_ROLE_KEY</code> y ejecute <code>supabase/v6.sql</code> y{" "}
+          <code>supabase/v7.sql</code>.
         </div>
       )}
 
       {loadError && (
         <div role="alert" className="rounded-lg border border-error/40 bg-error-container/50 p-4 text-[14px] text-on-error-container">
           {loadError}
+        </div>
+      )}
+
+      {stockAlert && (
+        <div role="alert" className="rounded-lg border border-tertiary/50 bg-tertiary-fixed/70 p-4 text-[14px] text-on-tertiary-fixed-variant flex gap-3">
+          <span className="material-symbols-outlined flex-shrink-0" aria-hidden="true">warning</span>
+          <div className="space-y-2 min-w-0">
+            <p>
+              <strong>El pedido {stockAlert.code} se aprobó, pero hay más botellas reservadas que existencias.</strong> El cliente ya pagó, por
+              eso no se bloqueó la aprobación:
+            </p>
+            <ul className="list-disc pl-5 space-y-0.5">
+              {stockAlert.items.map((w) => (
+                <li key={w.wineId}>
+                  «{w.name}»: {w.reserved} reservadas y {w.stock} en existencias (faltan {bottles(w.reserved - w.stock)}).
+                </li>
+              ))}
+            </ul>
+            <p>
+              Escriba al cliente para acordar una solución, o suba las existencias en{" "}
+              <a href="/admin/vinos" className="font-semibold underline">Vinos</a> si ya cuenta con más botellas.
+            </p>
+            <button type="button" onClick={() => setStockAlert(null)} className="h-10 px-3 -ml-3 rounded text-[13px] font-semibold underline">
+              Entendido
+            </button>
+          </div>
         </div>
       )}
 
@@ -311,6 +347,7 @@ export default function AdminWineOrdersPage() {
                         </span>
                         <span>
                           <strong className="text-on-surface">{FULFILLMENT_LABEL[o.fulfillment]}</strong>
+                          {o.fulfillment === "delivery" && o.deliveryZone && <> · Zona: {o.deliveryZone}</>}
                           {o.fulfillment === "delivery" && o.deliveryAddress && <> · {o.deliveryAddress}</>}
                           {o.deliveryNote && <> · Nota: {o.deliveryNote}</>}
                         </span>
@@ -580,8 +617,19 @@ function WhatsAppStatus({ wa }: { wa: DeliveryInfo }) {
   );
 }
 
-/** Líneas del pedido: cantidad × vino, precio unitario y subtotal, más el total. */
+/**
+ * Líneas del pedido: cantidad × vino, precio unitario y subtotal. Al pie, el total; en una entrega a domicilio (o si se
+ * cobró envío), el desglose subtotal + envío (con la zona elegida) = total. El envío se lee de lo que el pedido guardó al
+ * crearse (`shippingMode` y `shippingUsd`), no de la configuración de ahora: con costo se muestra el monto; si era «a
+ * coordinar» (también los pedidos anteriores a la configuración de la tienda) no está en el total y se paga aparte; y con
+ * costo fijo o por zonas y envío en cero salió gratis.
+ */
 function ItemsList({ o }: { o: AdminWineOrder }) {
+  const shipping = o.shippingUsd ?? 0;
+  const delivery = o.fulfillment === "delivery";
+  const breakdown = delivery || shipping > 0;
+  const coordinated = isShippingCoordinated({ fulfillment: o.fulfillment, shippingMode: o.shippingMode ?? null, shippingUsd: shipping });
+  const subtotal = o.subtotalUsd ?? round2(o.totalUsd - shipping);
   return (
     <div className="rounded-lg border border-outline-variant">
       <ul className="divide-y divide-outline-variant">
@@ -595,9 +643,28 @@ function ItemsList({ o }: { o: AdminWineOrder }) {
           </li>
         ))}
       </ul>
-      <div className="flex items-baseline justify-between gap-3 border-t border-outline-variant bg-surface-container-low px-3.5 py-2.5 text-[14px]">
-        <span className="text-on-surface-variant">Total · {bottles(o.bottlesCount)}</span>
-        <span className="font-serif text-lg tabular-nums">{usd(o.totalUsd)}</span>
+      <div className="border-t border-outline-variant bg-surface-container-low px-3.5 py-2.5 text-[14px] space-y-1">
+        {breakdown && (
+          <>
+            <div className="flex items-baseline justify-between gap-3">
+              <span className="text-on-surface-variant">Subtotal · {bottles(o.bottlesCount)}</span>
+              <span className="tabular-nums">{price(subtotal)}</span>
+            </div>
+            <div className="flex items-baseline justify-between gap-3">
+              <span className="text-on-surface-variant min-w-0">
+                Envío{o.deliveryZone ? ` · ${o.deliveryZone}` : ""}
+                {coordinated && (
+                  <span className="block text-[12px]">El costo se acuerda con el cliente por WhatsApp y se paga aparte.</span>
+                )}
+              </span>
+              <span className="tabular-nums whitespace-nowrap">{shipping > 0 ? price(shipping) : coordinated ? "No incluido" : "Gratis"}</span>
+            </div>
+          </>
+        )}
+        <div className={`flex items-baseline justify-between gap-3 ${breakdown ? "border-t border-outline-variant pt-1.5" : ""}`}>
+          <span className="text-on-surface-variant">{breakdown ? "Total" : `Total · ${bottles(o.bottlesCount)}`}</span>
+          <span className="font-serif text-lg tabular-nums">{usd(o.totalUsd)}</span>
+        </div>
       </div>
     </div>
   );

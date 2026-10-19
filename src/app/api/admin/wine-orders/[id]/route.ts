@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/auth";
 import type { DeliveryStatus } from "@/lib/orders";
 import { getWineOrderById, transitionWineOrder, updateWineOrder, type WineOrder } from "@/lib/wineOrders";
+import { getStockWarnings } from "@/lib/wines";
 import { sendWineOrderEmail, sendWineRejectionEmail, sendWineWhatsApp } from "@/lib/notify";
 
 export const dynamic = "force-dynamic";
@@ -22,7 +23,8 @@ async function deliverWineOrder(order: WineOrder): Promise<WineOrder> {
 
 /**
  * Acciones del admin sobre un pedido de vinos:
- *  approve → aprueba el pago y envía la confirmación por correo + WhatsApp
+ *  approve → aprueba el pago y envía la confirmación por correo + WhatsApp. Nunca se bloquea por existencias (el cliente
+ *            ya pagó): la respuesta trae `stockWarning` con los vinos que quedaron sobrevendidos (puede ser [])
  *  reject  → pide al cliente volver a reportar el pago (con motivo, por correo)
  *  cancel  → anula el pedido (no se avisa al cliente, igual que en las reservas)
  *  fulfill → marca el pedido aprobado como entregado o retirado
@@ -53,7 +55,8 @@ export async function PATCH(request: Request, { params }: { params: { id: string
         rejectionReason: null,
       });
       if (!approved) return changed();
-      return NextResponse.json({ success: true, order: await deliverWineOrder(approved) });
+      const [delivered, stockWarning] = await Promise.all([deliverWineOrder(approved), getStockWarnings(approved.items.map((i) => i.wineId))]);
+      return NextResponse.json({ success: true, order: delivered, stockWarning });
     }
 
     if (action === "reject") {

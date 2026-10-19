@@ -67,16 +67,36 @@ export async function readFormLimited(request: Request, maxBytes: number): Promi
   }
 }
 
-/** Resumen de un pedido para «Mi cuenta» (GET /api/members/me): lista de inclusión. */
+/**
+ * Resumen de un pedido para «Mi cuenta» (GET /api/members/me): lista de inclusión. Incluye lo necesario para mostrar la fila
+ * de envío sin consultar la configuración de ahora: `shippingUsd` (ya incluido en `totalUsd`), la zona y con qué regla se
+ * cobró (`shippingMode`, null = retiro o pedido anterior a v7; ver `isShippingCoordinated` en wineSale.ts), más
+ * `fulfillment` (retiro o entrega) para saber si hay envío.
+ */
 export interface PublicWineOrderSummary {
   code: string;
   token: string;
   status: WineOrder["status"];
   totalUsd: number;
   bottlesCount: number;
+  fulfillment: WineOrder["fulfillment"];
+  shippingUsd: number;
+  deliveryZone: string | null;
+  shippingMode: WineOrder["shippingMode"];
   createdAt: string;
 }
 
 export function toWineOrderSummary(o: WineOrder): PublicWineOrderSummary {
-  return { code: o.code, token: o.token, status: o.status, totalUsd: o.totalUsd, bottlesCount: o.bottlesCount, createdAt: o.createdAt };
+  return {
+    code: o.code,
+    token: o.token,
+    status: o.status,
+    totalUsd: o.totalUsd,
+    bottlesCount: o.bottlesCount,
+    fulfillment: o.fulfillment,
+    shippingUsd: o.shippingUsd,
+    deliveryZone: o.deliveryZone,
+    shippingMode: o.shippingMode,
+    createdAt: o.createdAt,
+  };
 }

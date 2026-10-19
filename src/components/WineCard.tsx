@@ -13,16 +13,40 @@ import { WINE_TYPE_LABEL, WINES_COPY } from "@/app/vinos/copy";
 export type { PublicWine } from "@/types";
 
 /* Tarjeta de vino: la botella sobre fondo oscuro (como una foto de bodega) y su nombre debajo.
-   Solo los vinos a la venta (publicados, activos y con precio) muestran precio y la etiqueta «Comprar». */
-export function WineCard({ wine, lang, rates }: { wine: PublicWine; lang: Language; rates?: BcvRates | null }) {
+   Solo los vinos a la venta (publicados, activos y con precio) muestran precio y la etiqueta «Comprar».
+   Agotado (`wine.soldOut`, solo en /vinos): la etiqueta pasa a «Agotado». Tienda cerrada (`storeOpen={false}`): se ve el
+   precio pero no hay etiqueta «Comprar». La portada no manda `soldOut` (va en caché) y, con la tienda cerrada, sus vinos
+   llegan sin venta activa (sin precio). */
+export function WineCard({
+  wine,
+  lang,
+  rates,
+  storeOpen = true,
+}: {
+  wine: PublicWine;
+  lang: Language;
+  rates?: BcvRates | null;
+  /** false = la tienda está cerrada: se muestra el precio, sin «Comprar». */
+  storeOpen?: boolean;
+}) {
   const t = WINES_COPY[lang];
   const priceUsd = isWineForSale(wine) ? wine.priceUsd : null;
+  const soldOut = priceUsd !== null && wine.soldOut === true;
+  const canBuy = priceUsd !== null && storeOpen && !soldOut;
   const rate = rates?.USD ?? null;
   const priceBs = priceUsd !== null && rate ? round2(priceUsd * rate) : null;
   return (
     <Link
       href={`/vinos/${wine.slug}`}
-      aria-label={priceUsd !== null ? t.openForSale(wine.name, formatUsd(priceUsd)) : t.open(wine.name)}
+      aria-label={
+        priceUsd === null
+          ? t.open(wine.name)
+          : soldOut
+            ? t.openSoldOut(wine.name)
+            : canBuy
+              ? t.openForSale(wine.name, formatUsd(priceUsd))
+              : t.openPriced(wine.name, formatUsd(priceUsd))
+      }
       className="group block"
     >
       <div className="relative aspect-[3/4] overflow-hidden rounded-lg bg-ink">
@@ -34,7 +58,7 @@ export function WineCard({ wine, lang, rates }: { wine: PublicWine; lang: Langua
             alt={t.imageAlt(wine.name)}
             loading="lazy"
             decoding="async"
-            className="absolute inset-0 w-full h-full object-contain p-6 transition-transform duration-700 group-hover:scale-[1.04]"
+            className={`absolute inset-0 w-full h-full object-contain p-6 transition-transform duration-700 group-hover:scale-[1.04] ${soldOut ? "opacity-60" : ""}`}
           />
         ) : (
           <span className="absolute inset-0 flex items-center justify-center text-paper/25" aria-hidden="true">
@@ -58,13 +82,21 @@ export function WineCard({ wine, lang, rates }: { wine: PublicWine; lang: Langua
             </p>
           )}
           {/* Etiqueta no interactiva: la tarjeta completa ya es el enlace (no se anidan botones). */}
-          <span
-            aria-hidden="true"
-            className="mt-3 inline-flex items-center gap-1.5 h-9 px-3.5 rounded bg-primary-container group-hover:bg-primary text-white text-[12px] font-semibold uppercase tracking-[0.12em] transition-colors"
-          >
-            <span className="material-symbols-outlined text-[16px]">shopping_bag</span>
-            {t.buy}
-          </span>
+          {canBuy && (
+            <span
+              aria-hidden="true"
+              className="mt-3 inline-flex items-center gap-1.5 h-9 px-3.5 rounded bg-primary-container group-hover:bg-primary text-white text-[12px] font-semibold uppercase tracking-[0.12em] transition-colors"
+            >
+              <span className="material-symbols-outlined text-[16px]">shopping_bag</span>
+              {t.buy}
+            </span>
+          )}
+          {soldOut && (
+            <span className="mt-3 inline-flex items-center gap-1.5 h-9 px-3.5 rounded bg-surface-container-high text-on-surface-variant text-[12px] font-semibold uppercase tracking-[0.12em]">
+              <span className="material-symbols-outlined text-[16px]" aria-hidden="true">remove_shopping_cart</span>
+              {t.soldOut}
+            </span>
+          )}
         </div>
       )}
     </Link>

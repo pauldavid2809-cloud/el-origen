@@ -9,7 +9,8 @@ import { PayAndReport, Panel, type RateInfo } from "@/components/PayAndReport";
 import { formatBs, formatUsd } from "@/components/PaymentDetails";
 import { CONTACT, whatsappLink } from "@/lib/contact";
 import { useLang } from "@/lib/useLang";
-import { WINE_POLICIES, round2 } from "@/lib/wineSale";
+import { isShippingCoordinated, round2 } from "@/lib/wineSale";
+import type { PublicWineStore } from "@/lib/wineStoreRules";
 import type { Language } from "@/lib/i18n";
 import type { PublicWineOrder } from "@/lib/wineOrders";
 import type { PaymentConfig } from "@/lib/settings";
@@ -37,6 +38,8 @@ export default function WineOrderPage() {
   const [lang, setLang] = useLang();
   const t = PEDIDO_COPY[lang];
   const [order, setOrder] = useState<PublicWineOrder | null>(null);
+  /** Configuración de la tienda de ahora (retiro, entrega, condiciones): la define el administrador. */
+  const [store, setStore] = useState<PublicWineStore | null>(null);
   const [rate, setRate] = useState<RateInfo | null>(null);
   const [payment, setPayment] = useState<PaymentConfig | null>(null);
   /** Métodos que acepta la tienda (los envía el servidor). */
@@ -54,6 +57,7 @@ export default function WineOrderPage() {
         return;
       }
       setOrder(data.order);
+      setStore(data.store ?? null);
       setRate(data.rate ?? null);
       setPayment(data.payment ?? null);
       setMethods(Array.isArray(data.methods) ? data.methods : null);
@@ -118,7 +122,7 @@ export default function WineOrderPage() {
 
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12 items-start">
               <div className="lg:col-span-7 space-y-6 min-w-0">
-                {order.status === "approved" && <Approved order={order} lang={lang} />}
+                {order.status === "approved" && <Approved order={order} store={store} lang={lang} />}
                 {order.status === "in_review" && <InReview order={order} lang={lang} />}
                 {(order.status === "pending_payment" || order.status === "rejected") && (
                   <PayAndReport
@@ -140,11 +144,11 @@ export default function WineOrderPage() {
                     <p className="text-on-surface-variant mt-2">{t.cancelledText(order.code)}</p>
                   </Panel>
                 )}
-                {order.status !== "cancelled" && <Policies lang={lang} />}
+                {order.status !== "cancelled" && store && <Policies store={store} lang={lang} />}
               </div>
 
               <aside className="lg:col-span-5 lg:sticky lg:top-28 min-w-0">
-                <Summary order={order} lang={lang} />
+                <Summary order={order} store={store} lang={lang} />
               </aside>
             </div>
           </>
@@ -157,14 +161,31 @@ export default function WineOrderPage() {
 
 /* ─── Resumen ─── */
 
-function Summary({ order, lang }: { order: PublicWineOrder; lang: Language }) {
+/**
+ * Cómo se muestra el envío de un pedido con entrega: con costo, gratis, o por coordinar. Sale de lo que el pedido guardó
+ * al crearse (`shippingMode` y `shippingUsd`), nunca de la configuración de ahora: si el administrador cambia luego el
+ * modo de envío, los pedidos ya hechos siguen diciendo lo que se le cobró (o se le dijo) a ese cliente. Los pedidos
+ * anteriores a la configuración de la tienda (sin modo) eran todos «a coordinar».
+ */
+function shippingState(order: PublicWineOrder): "none" | "paid" | "free" | "coordinated" {
+  if (order.fulfillment !== "delivery") return "none";
+  if (order.shippingUsd > 0) return "paid";
+  return isShippingCoordinated(order) ? "coordinated" : "free";
+}
+
+function Summary({ order, store, lang }: { order: PublicWineOrder; store: PublicWineStore | null; lang: Language }) {
   const t = PEDIDO_COPY[lang];
+  const ship = shippingState(order);
   const rows: [string, string][] = [
     [t.holder, order.customerName],
     [t.fulfillment, order.fulfillment === "delivery" ? t.delivery : t.pickup],
   ];
   if (order.fulfillment === "delivery" && order.deliveryAddress) rows.push([t.address, order.deliveryAddress]);
+  if (order.fulfillment === "pickup" && store?.pickup.place) rows.push([t.pickupPlace, store.pickup.place]);
+  if (order.fulfillment === "pickup" && store?.pickup.hours) rows.push([t.pickupHours, store.pickup.hours]);
   if (order.deliveryNote) rows.push([t.deliveryNote, order.deliveryNote]);
+  // Indicaciones del administrador para quien recibe (retiro o entrega).
+  const instructions = (order.fulfillment === "delivery" ? store?.delivery.instructions : store?.pickup.instructions) ?? "";
   return (
     <Panel className="!p-0 overflow-hidden">
       <div className="bg-primary-container text-paper px-6 py-5">
@@ -191,17 +212,24 @@ function Summary({ order, lang }: { order: PublicWineOrder; lang: Language }) {
             <dd className="text-right font-medium text-on-surface break-words min-w-0">{v}</dd>
           </div>
         ))}
-        {order.subtotalUsd !== order.totalUsd && (
+        {(order.subtotalUsd !== order.totalUsd || ship === "free") && (
           <div className="flex justify-between gap-4 text-on-surface-variant">
             <dt>{t.subtotal}</dt>
             <dd className="font-medium tabular-nums">{formatUsd(order.subtotalUsd)}</dd>
+          </div>
+        )}
+        {(ship === "paid" || ship === "free") && (
+          <div className="flex justify-between gap-4 text-on-surface-variant">
+            <dt className="min-w-0 break-words">{order.deliveryZone ? t.shippingWithZone(order.deliveryZone) : t.shipping}</dt>
+            <dd className="font-medium tabular-nums text-right">{ship === "paid" ? formatUsd(order.shippingUsd) : t.shippingFree}</dd>
           </div>
         )}
         <div className="flex justify-between items-baseline gap-4 border-t border-outline-variant pt-4">
           <dt className="font-semibold text-on-surface">{t.total}</dt>
           <dd className="font-serif text-2xl text-primary-container">{formatUsd(order.totalUsd)}</dd>
         </div>
-        <p className="text-[12px] text-on-surface-variant leading-relaxed">{t.shippingNote}</p>
+        {ship === "coordinated" && <p className="text-[12px] text-on-surface-variant leading-relaxed">{t.shippingNoteCoordinated}</p>}
+        {instructions && <p className="text-[12px] text-on-surface-variant leading-relaxed break-words">{instructions}</p>}
       </dl>
     </Panel>
   );
@@ -209,14 +237,15 @@ function Summary({ order, lang }: { order: PublicWineOrder; lang: Language }) {
 
 /* ─── Condiciones de compra (pie del pedido) ─── */
 
-function Policies({ lang }: { lang: Language }) {
-  const policies = WINE_POLICIES[lang];
+function Policies({ store, lang }: { store: PublicWineStore; lang: Language }) {
+  // Las condiciones que escribió el administrador o, si no escribió, las generadas con su configuración.
+  const policies = store.policies[lang];
   return (
     <section aria-label={policies.title} className="rounded-2xl border border-outline-variant bg-surface-container-lowest p-5 sm:p-6">
       <h2 className="font-serif text-xl text-on-surface">{policies.title}</h2>
-      <ul className="mt-4 space-y-2.5 list-disc pl-5 text-[13.5px] leading-relaxed text-on-surface-variant">
-        {policies.items.map((item) => (
-          <li key={item}>{item}</li>
+      <ul className="mt-4 space-y-2.5 list-disc pl-5 text-[13.5px] leading-relaxed text-on-surface-variant break-words">
+        {policies.items.map((item, i) => (
+          <li key={`${i}-${item}`}>{item}</li>
         ))}
       </ul>
     </section>
@@ -278,9 +307,11 @@ function InReview({ order, lang }: { order: PublicWineOrder; lang: Language }) {
 
 /* ─── Confirmado: pago verificado y estado de la entrega ─── */
 
-function Approved({ order, lang }: { order: PublicWineOrder; lang: Language }) {
+function Approved({ order, store, lang }: { order: PublicWineOrder; store: PublicWineStore | null; lang: Language }) {
   const t = PEDIDO_COPY[lang];
   const delivered = Boolean(order.deliveredAt);
+  const place = store?.pickup.place ?? "";
+  const hours = store?.pickup.hours ?? "";
   return (
     <div className="space-y-4">
       <Panel>
@@ -305,7 +336,9 @@ function Approved({ order, lang }: { order: PublicWineOrder; lang: Language }) {
                 ? t.deliveredOn(formatDate(order.deliveredAt, lang))
                 : order.fulfillment === "delivery"
                   ? t.toDeliverDelivery
-                  : t.toDeliverPickup}
+                  : place || hours
+                    ? t.toDeliverPickupAt(place, hours)
+                    : t.toDeliverPickup}
             </p>
           </div>
         </div>

@@ -1,16 +1,19 @@
 "use client";
 
-import React, { useCallback, useEffect, useId, useState } from "react";
+import React, { useCallback, useEffect, useId, useRef, useState } from "react";
 import { shrinkImage } from "@/lib/shrinkImage";
 import { WINE_TYPES, type Tasting, type Wine, type WineSpec, type WineStatus, type WineType } from "@/types";
 import { WINE_TYPE_LABEL } from "@/app/vinos/copy";
-import { isWineForSale, WINE_DEFAULT_MAX_PER_ORDER, WINE_MAX_PER_ORDER_LIMIT } from "@/lib/wineSale";
+import { availableOf, isWineForSale, WINE_MAX_PER_ORDER_LIMIT } from "@/lib/wineSale";
 
 /* Vinos: catálogo de los productos degustados en las catas. Se publican en /vinos con su ficha técnica.
    Cada vino puede además estar «Activo para la venta» (precio + interruptor, aparte de Publicado/Borrador):
-   solo los vinos a la venta muestran precio y botón Comprar en el sitio. */
+   solo los vinos a la venta muestran precio y botón Comprar en el sitio. El precio se edita en la propia tarjeta
+   y, opcionalmente, el vino controla sus existencias (botellas a la venta menos las reservadas por pedidos). */
 
 const MAX_IMAGE_BYTES = 6 * 1024 * 1024;
+/** Mismo tope que acepta el servidor para las existencias de un vino. */
+const STOCK_MAX = 100_000;
 /** Filas habituales de la ficha técnica (un clic las agrega). */
 const SPEC_SUGGESTIONS = ["Procedencia", "Viticultura", "Crianza", "Graduación", "Temperatura de servicio", "Notas de cata", "Maridaje"];
 
@@ -37,6 +40,8 @@ interface FormState {
   saleActive: boolean;
   /** Texto del campo; vacío = el tope por defecto del sitio. */
   maxPerOrder: string;
+  /** Texto del campo; vacío = sin control de existencias. */
+  stock: string;
 }
 
 function toForm(w: Wine | null): FormState {
@@ -55,6 +60,7 @@ function toForm(w: Wine | null): FormState {
     priceUsd: w?.priceUsd != null ? String(w.priceUsd) : "",
     saleActive: w?.saleActive ?? false,
     maxPerOrder: w?.maxPerOrder != null ? String(w.maxPerOrder) : "",
+    stock: w?.stock != null ? String(w.stock) : "",
   };
 }
 
@@ -76,6 +82,36 @@ function saleBadge(w: Wine): { label: string; cls: string; title?: string } {
   return { label: "Sin venta", cls: "bg-surface-container-high text-on-surface-variant" };
 }
 
+const reservedText = (n: number) => `${n} ${n === 1 ? "reservada" : "reservadas"}`;
+
+/**
+ * Insignia de existencias de la tarjeta: «Quedan N de M · X reservadas» / «Agotado». Sin control de existencias no hay insignia.
+ * `held` son las botellas reservadas por pedidos vigentes; si no se pudieron leer (`null`) solo se muestra el total.
+ */
+function stockBadge(w: Wine, held: number | null): { label: string; cls: string; title?: string } | null {
+  if (w.stock === null) return null;
+  if (held === null) {
+    return {
+      label: `${w.stock} en existencias · reservas sin leer`,
+      cls: "bg-tertiary-fixed text-on-tertiary-fixed-variant",
+      title: "No se pudieron leer las botellas reservadas por los pedidos. Actualice la página.",
+    };
+  }
+  const left = availableOf(w.stock, held) ?? 0;
+  if (left === 0) {
+    return {
+      label: held > 0 ? `Agotado · ${reservedText(held)} de ${w.stock}` : "Agotado",
+      cls: "bg-error-container text-on-error-container",
+      title: held > w.stock ? "Hay más botellas reservadas que existencias: revise los pedidos o suba las existencias." : undefined,
+    };
+  }
+  return {
+    label: `${left === 1 ? "Queda" : "Quedan"} ${left} de ${w.stock} · ${reservedText(held)}`,
+    cls: left <= 3 ? "bg-tertiary-fixed text-on-tertiary-fixed-variant" : "bg-surface-container-high text-on-surface-variant",
+    title: "Quedan = existencias menos las botellas reservadas por pedidos en revisión, aprobados o por pagar vigentes.",
+  };
+}
+
 const inputCls =
   "w-full h-11 rounded border border-outline-variant bg-surface-container-lowest px-3 text-[14px] focus:border-primary-container focus:outline-none";
 const textareaCls =
@@ -87,6 +123,10 @@ const actionBtn =
 
 export default function AdminWinesPage() {
   const [wines, setWines] = useState<Wine[]>([]);
+  /** Botellas reservadas por pedido vigente, por vino (solo de los vinos que controlan existencias). */
+  const [holds, setHolds] = useState<Record<string, number>>({});
+  /** El servidor no pudo leer las reservas: se muestran las existencias sin descontarlas. */
+  const [holdsError, setHoldsError] = useState(false);
   const [catas, setCatas] = useState<CataOption[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -110,6 +150,8 @@ export default function AdminWinesPage() {
       ]);
       if (!w.success) throw new Error(w.message);
       setWines(w.wines);
+      setHolds(w.holds ?? {});
+      setHoldsError(Boolean(w.holdsError));
       if (c.success) {
         setCatas(
           (c.tastings as Tasting[])
@@ -202,6 +244,11 @@ export default function AdminWinesPage() {
             y en la portada. {wines.length > 0 && `${published} de ${wines.length} publicados · ${forSale} en venta.`}
             <span className="block mt-0.5">
               Active la venta de un vino para que muestre su precio y el botón Comprar; un vino en Borrador no se muestra aunque tenga la venta activa.
+              El precio se cambia en la propia tarjeta.
+            </span>
+            <span className="block mt-0.5">
+              Para abrir o cerrar la tienda, definir el envío o las condiciones de compra, vaya a{" "}
+              <a href="/admin/tienda" className="font-semibold text-primary-container hover:underline">Tienda de vinos</a>.
             </span>
           </p>
         </div>
@@ -235,6 +282,7 @@ export default function AdminWinesPage() {
         <ul className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {wines.map((w) => {
             const badge = saleBadge(w);
+            const stock = stockBadge(w, holdsError ? null : holds[w.id] ?? 0);
             return (
               <li key={w.id} className="rounded-xl border border-outline-variant bg-surface-container-lowest overflow-hidden flex flex-col">
                 <div className="relative aspect-[4/3] bg-ink flex items-center justify-center">
@@ -266,7 +314,25 @@ export default function AdminWinesPage() {
                     <span title={badge.title} className={`text-[11px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-full ${badge.cls}`}>
                       {badge.label}
                     </span>
+                    {stock && (
+                      <span title={stock.title} className={`text-[11px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-full ${stock.cls}`}>
+                        {stock.label}
+                      </span>
+                    )}
                   </div>
+                  <QuickPrice
+                    key={`${w.id}:${w.priceUsd ?? ""}`}
+                    wine={w}
+                    disabled={busy === w.id}
+                    onSaved={(updated) => {
+                      setWines((list) => list.map((x) => (x.id === updated.id ? updated : x)));
+                      notify(
+                        updated.priceUsd != null
+                          ? `Precio de «${updated.name}» actualizado: ${usd(updated.priceUsd)}.`
+                          : `Se quitó el precio de «${updated.name}».`
+                      );
+                    }}
+                  />
                 </div>
                 <div className="flex flex-wrap gap-2 border-t border-outline-variant bg-surface-container-low/60 px-4 py-3">
                   <button type="button" disabled={busy === w.id} onClick={() => setEditing({ wine: w })} className={actionBtn}>
@@ -304,6 +370,7 @@ export default function AdminWinesPage() {
           wine={editing.wine}
           notice={editing.notice}
           activateSale={editing.activateSale}
+          held={editing.wine && !holdsError ? holds[editing.wine.id] ?? 0 : null}
           catas={catas}
           onClose={() => setEditing(null)}
           onSaved={async (message) => {
@@ -317,10 +384,88 @@ export default function AdminWinesPage() {
   );
 }
 
+/**
+ * Edición rápida del precio en la tarjeta (PATCH { priceUsd }): no toca ningún otro campo ni el interruptor de la venta.
+ * Acepta coma o punto; el servidor valida el número y rechaza quitar el precio de un vino activo para la venta.
+ */
+function QuickPrice({ wine, disabled, onSaved }: { wine: Wine; disabled: boolean; onSaved: (wine: Wine) => void }) {
+  const uid = useId();
+  const initial = wine.priceUsd != null ? String(wine.priceUsd) : "";
+  const [value, setValue] = useState(initial);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const savingRef = useRef(false);
+  const unchanged = value.trim() === initial;
+
+  const save = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (savingRef.current || unchanged) return;
+    savingRef.current = true;
+    setSaving(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/admin/wines/${wine.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ priceUsd: value.trim() }),
+      });
+      const data = await res.json().catch(() => null);
+      if (!data?.success) throw new Error(data?.message);
+      const saved: Wine = data.wine;
+      // Muestra el precio tal como quedó guardado ("18,5" → "18.5") para que «Guardar» vuelva a quedar apagado.
+      setValue(saved.priceUsd != null ? String(saved.priceUsd) : "");
+      onSaved(saved);
+    } catch (err) {
+      setError((err as Error).message || "No se pudo guardar el precio.");
+    } finally {
+      savingRef.current = false;
+      setSaving(false);
+    }
+  };
+
+  return (
+    <form onSubmit={save} noValidate className="mt-3">
+      <label htmlFor={`${uid}-price`} className="block text-[12px] font-semibold mb-1">Precio (USD)</label>
+      <div className="flex gap-2">
+        <input
+          id={`${uid}-price`}
+          inputMode="decimal"
+          maxLength={12}
+          value={value}
+          onChange={(e) => {
+            setValue(e.target.value);
+            setError(null);
+          }}
+          placeholder="Sin precio"
+          aria-label={`Precio (USD) de ${wine.name}`}
+          aria-invalid={error ? true : undefined}
+          aria-describedby={error ? `${uid}-price-err` : undefined}
+          className={`${inputCls} min-w-0 tabular-nums aria-[invalid=true]:border-error`}
+        />
+        <button
+          type="submit"
+          disabled={disabled || saving || unchanged}
+          aria-label={`Guardar el precio de ${wine.name}`}
+          className="h-11 px-3 rounded border border-outline-variant text-[13px] font-semibold inline-flex items-center gap-1.5 hover:border-primary-container disabled:opacity-50 disabled:hover:border-outline-variant flex-shrink-0"
+        >
+          {saving && <span className="material-symbols-outlined animate-spin text-[18px]" aria-hidden="true">progress_activity</span>}
+          Guardar
+        </button>
+      </div>
+      {error && (
+        <p id={`${uid}-price-err`} role="alert" className="mt-1 text-[12px] text-error">
+          {error}
+        </p>
+      )}
+    </form>
+  );
+}
+
 function WineForm({
   wine,
   notice,
   activateSale,
+  held,
   catas,
   onClose,
   onSaved,
@@ -328,6 +473,8 @@ function WineForm({
   wine: Wine | null;
   notice?: string;
   activateSale?: boolean;
+  /** Botellas de este vino reservadas ahora por pedidos vigentes; null = no se conocen (vino nuevo o no se pudieron leer). */
+  held: number | null;
   catas: CataOption[];
   onClose: () => void;
   onSaved: (message: string) => void;
@@ -403,6 +550,8 @@ function WineForm({
         // El servidor interpreta el texto ("12,5" o "12.50") y valida el rango; vacío = sin precio / tope por defecto.
         priceUsd: s.priceUsd.trim(),
         maxPerOrder: s.maxPerOrder.trim(),
+        // Vacío = sin control de existencias (el servidor lo guarda como null y valida el entero).
+        stock: s.stock.trim(),
       };
       const res = await fetch(wine ? `/api/admin/wines/${wine.id}` : "/api/admin/wines", {
         method: wine ? "PATCH" : "POST",
@@ -418,6 +567,9 @@ function WineForm({
       setSaving(false);
     }
   };
+
+  /** Existencias escritas en el campo (null si está vacío o no es un entero), para mostrar cuántas quedarían disponibles. */
+  const stockNum = /^\d+$/.test(s.stock.trim()) ? Number(s.stock.trim()) : null;
 
   const missingSuggestions = SPEC_SUGGESTIONS.filter((label) => !s.specs.some((row) => row.label.trim().toLowerCase() === label.toLowerCase()));
 
@@ -618,11 +770,38 @@ function WineForm({
                   step={1}
                   value={s.maxPerOrder}
                   onChange={(e) => set("maxPerOrder", e.target.value)}
-                  placeholder={`${WINE_DEFAULT_MAX_PER_ORDER} (por defecto)`}
+                  placeholder="Máximo general"
                   aria-describedby={id("max-hint")}
                   className={inputCls}
                 />
-                <p id={id("max-hint")} className={hintCls}>Botellas de este vino en un mismo pedido (de 1 a {WINE_MAX_PER_ORDER_LIMIT}).</p>
+                <p id={id("max-hint")} className={hintCls}>
+                  Botellas de este vino en un mismo pedido (de 1 a {WINE_MAX_PER_ORDER_LIMIT}). Vacío: el máximo general de{" "}
+                  <a href="/admin/tienda" target="_blank" rel="noopener noreferrer" className="font-semibold text-primary-container hover:underline">Tienda de vinos</a>.
+                </p>
+              </div>
+              <div>
+                <label htmlFor={id("stock")} className={labelCls}>Existencias (opcional)</label>
+                <input
+                  id={id("stock")}
+                  type="number"
+                  min={0}
+                  max={STOCK_MAX}
+                  step={1}
+                  value={s.stock}
+                  onChange={(e) => set("stock", e.target.value)}
+                  placeholder="Sin control"
+                  aria-describedby={id("stock-hint")}
+                  className={inputCls}
+                />
+                <p id={id("stock-hint")} className={hintCls}>
+                  Botellas que pone a la venta en total. Cuando los pedidos las reservan todas, el vino aparece como agotado. Para reponer,
+                  suba el número. Déjelo vacío para no controlar las existencias.
+                  {stockNum !== null && held !== null && (
+                    <span className="block mt-0.5 font-semibold text-on-surface">
+                      Reservadas ahora: {held} · Disponibles con este número: {availableOf(stockNum, held)}
+                    </span>
+                  )}
+                </p>
               </div>
             </div>
             <div>
@@ -636,7 +815,7 @@ function WineForm({
                 <span>
                   <span className="block font-semibold">Activo para la venta</span>
                   <span className="block text-[12px] text-on-surface-variant">
-                    Apáguelo cuando se agote el vino: no hay control de existencias.
+                    Si define las existencias, el vino se marca como agotado solo; si no, apáguelo cuando se agote.
                   </span>
                 </span>
               </label>

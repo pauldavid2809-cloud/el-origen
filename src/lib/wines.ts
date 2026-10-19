@@ -1,17 +1,19 @@
 import "server-only";
 import crypto from "crypto";
-import { unstable_noStore as noStore } from "next/cache";
+import { revalidatePath, revalidateTag, unstable_noStore as noStore } from "next/cache";
 import { WINE_TYPES, type PublicWine, type Wine, type WineSpec, type WineStatus, type WineType } from "@/types";
 import { getAdminClient } from "./orders";
-import { isWineForSale, WINE_MAX_PER_ORDER_LIMIT } from "./wineSale";
-import { wineHasOrders } from "./wineOrders";
-import { parseAmount } from "./proofs";
+import { availableOf, isWineForSale, parseMoneyText, WINE_MAX_PER_ORDER_LIMIT } from "./wineSale";
+import { getWineHolds, getWineHoldsCached, wineHasOrders } from "./wineOrders";
+import { getWineStoreConfig } from "./wineStore";
+import { normalizeWineStoreConfig } from "./wineStoreRules";
 
 /* ─────────────────────────────────────────────────────────────
    Vinos (tabla public.wines): catálogo de los productos degustados en las catas,
    con foto de la botella y ficha técnica. Se cargan desde el panel (Admin → Vinos)
    y se publican en /vinos. Sin Supabase se guardan en memoria (solo pruebas locales).
-   Cada vino puede además estar «Activo para la venta» (precio + saleActive, aparte de Publicado/Borrador).
+   Cada vino puede además estar «Activo para la venta» (precio + saleActive, aparte de Publicado/Borrador)
+   y, opcionalmente, controlar sus existencias (`stock`, supabase/v7.sql).
    ───────────────────────────────────────────────────────────── */
 
 export type WineInput = Omit<Wine, "id" | "slug" | "createdAt" | "updatedAt">;
@@ -45,7 +47,7 @@ function imageUrl(v: unknown): string {
 
 /**
  * Precio en USD: número o texto escrito por una persona ("12,5", "12.50", "$1.234,50"); vacío o null = sin precio.
- * El texto se interpreta con las mismas reglas que los montos de los comprobantes (`parseAmount`).
+ * El texto se interpreta con `parseMoneyText` (estricto: "5.5.5" o "," no son un precio).
  */
 function parsePriceUsd(v: unknown): number | null {
   if (v === null || v === undefined) return null;
@@ -53,10 +55,7 @@ function parsePriceUsd(v: unknown): number | null {
   if (typeof v === "number") n = v;
   else if (typeof v === "string") {
     if (!v.trim()) return null;
-    // parseAmount descarta cualquier carácter que no sea dígito, punto o coma ("1e9" sería 19, "-5" sería 5):
-    // solo se admiten números con separadores, con "$" o "USD" opcionales.
-    const clean = v.replace(/usd|\$|\s/gi, "");
-    n = /^[\d.,]+$/.test(clean) ? parseAmount(clean) : NaN;
+    n = parseMoneyText(v);
   } else n = NaN;
   if (!Number.isFinite(n) || n < 0 || n > 100_000) throw new WineInputError("El precio no es válido.");
   return Math.round(n * 100) / 100;
@@ -68,6 +67,17 @@ function parseMaxPerOrder(v: unknown): number | null {
   const n = typeof v === "number" ? v : typeof v === "string" ? Number(v.trim()) : NaN;
   if (!Number.isInteger(n) || n < 1 || n > WINE_MAX_PER_ORDER_LIMIT) {
     throw new WineInputError(`El máximo por pedido debe ser un número entero de 1 a ${WINE_MAX_PER_ORDER_LIMIT}.`);
+  }
+  return n;
+}
+
+/** Existencias: entero de 0 en adelante; vacío o null = sin control de existencias. */
+const STOCK_MAX = 100_000;
+function parseStock(v: unknown): number | null {
+  if (v === null || v === undefined || (typeof v === "string" && v.trim() === "")) return null;
+  const n = typeof v === "number" ? v : typeof v === "string" ? Number(v.trim()) : NaN;
+  if (!Number.isInteger(n) || n < 0 || n > STOCK_MAX) {
+    throw new WineInputError(`Las existencias deben ser un número entero de 0 a ${STOCK_MAX} (déjelas vacías para no controlarlas).`);
   }
   return n;
 }
@@ -96,6 +106,16 @@ function assertSaleConsistent(patch: Partial<WineInput>, current: Pick<Wine, "sa
 /** La base rechazó la combinación venta/precio (check wines_sale_needs_price_chk de v6.sql): se avisa como error de validación. */
 function saleCheckError(error: { code?: string; message: string }): WineInputError | null {
   return error.code === "23514" && error.message.includes("wines_sale_needs_price_chk") ? new WineInputError(NEEDS_PRICE_MESSAGE) : null;
+}
+
+/** La base no tiene la columna `stock` (supabase/v7.sql sin ejecutar): PostgREST (PGRST204) o Postgres (42703). */
+function isMissingStockColumn(error: { code?: string; message: string }): boolean {
+  return (error.code === "PGRST204" || error.code === "42703") && error.message.includes("stock");
+}
+
+/** Guardar existencias exige v7.sql: se avisa como error de validación con el paso que falta. */
+function stockColumnError(error: { code?: string; message: string }): WineInputError | null {
+  return isMissingStockColumn(error) ? new WineInputError("Falta ejecutar supabase/v7.sql en Supabase para guardar existencias.") : null;
 }
 
 /** Normaliza los campos presentes en `input`. Con `requireAll` exige los obligatorios (crear). */
@@ -137,6 +157,7 @@ function normalize(input: unknown, requireAll: boolean): Partial<WineInput> {
     out.saleActive = r.saleActive;
   }
   if (has("maxPerOrder")) out.maxPerOrder = parseMaxPerOrder(r.maxPerOrder);
+  if (has("stock")) out.stock = parseStock(r.stock);
   return out;
 }
 
@@ -154,6 +175,7 @@ const DEFAULTS: Omit<WineInput, "name"> = {
   priceUsd: null,
   saleActive: false,
   maxPerOrder: null,
+  stock: null,
 };
 
 /* ─── Filas ─── */
@@ -178,6 +200,8 @@ function fromRow(row: Row): Wine {
     priceUsd: row.price_usd === null || row.price_usd === undefined ? null : Number(row.price_usd),
     saleActive: row.sale_active === true,
     maxPerOrder: row.max_per_order === null || row.max_per_order === undefined ? null : Number(row.max_per_order),
+    // Sin la columna (v7.sql sin ejecutar) o sin valor: el vino no controla existencias.
+    stock: row.stock === null || row.stock === undefined || !Number.isFinite(Number(row.stock)) ? null : Math.max(0, Math.floor(Number(row.stock))),
     createdAt: String(row.created_at ?? ""),
     updatedAt: String(row.updated_at ?? row.created_at ?? ""),
   };
@@ -186,7 +210,7 @@ function fromRow(row: Row): Wine {
 const COLUMNS: Record<keyof WineInput, string> = {
   name: "name", winery: "winery", region: "region", type: "wine_type", grapes: "grapes", vintage: "vintage",
   description: "description", imageUrl: "image_url", specs: "specs", tastingIds: "tasting_ids", status: "status",
-  priceUsd: "price_usd", saleActive: "sale_active", maxPerOrder: "max_per_order",
+  priceUsd: "price_usd", saleActive: "sale_active", maxPerOrder: "max_per_order", stock: "stock",
 };
 
 function toRow(patch: Partial<WineInput>): Row {
@@ -269,8 +293,11 @@ export async function createWine(input: unknown): Promise<Wine> {
     memWines.set(wine.id, wine);
     return wine;
   }
-  const { data, error } = await sb.from("wines").insert({ ...toRow(clean), id: wine.id, slug: wine.slug }).select().single();
-  if (error) throw saleCheckError(error) ?? new Error(`No se pudo guardar el vino: ${error.message}`);
+  // Sin control de existencias no se envía la columna: la base la deja en null, y así crear vinos no depende de v7.sql.
+  const row = toRow(clean);
+  if (row.stock === null) delete row.stock;
+  const { data, error } = await sb.from("wines").insert({ ...row, id: wine.id, slug: wine.slug }).select().single();
+  if (error) throw saleCheckError(error) ?? stockColumnError(error) ?? new Error(`No se pudo guardar el vino: ${error.message}`);
   return fromRow(data);
 }
 
@@ -292,8 +319,15 @@ export async function updateWine(id: string, input: unknown): Promise<Wine | nul
   const current = partialSalePatch(patch) ? await getWine(id) : null;
   if (partialSalePatch(patch) && !current) return null;
   assertSaleConsistent(patch, current);
-  const { data, error } = await sb.from("wines").update(row).eq("id", id).select().maybeSingle();
-  if (error) throw saleCheckError(error) ?? new Error(`No se pudo actualizar el vino: ${error.message}`);
+  let result = await sb.from("wines").update(row).eq("id", id).select().maybeSingle();
+  if (result.error && isMissingStockColumn(result.error) && row.stock === null) {
+    // v7.sql sin ejecutar: quitar el control de existencias no cambia nada (nunca existió), se guarda el resto.
+    delete row.stock;
+    if (!Object.keys(row).length) return getWine(id);
+    result = await sb.from("wines").update(row).eq("id", id).select().maybeSingle();
+  }
+  const { data, error } = result;
+  if (error) throw saleCheckError(error) ?? stockColumnError(error) ?? new Error(`No se pudo actualizar el vino: ${error.message}`);
   return data ? fromRow(data) : null;
 }
 
@@ -308,9 +342,74 @@ export async function deleteWine(id: string): Promise<boolean> {
   return Boolean(data && data.length);
 }
 
-/** Lo que necesitan las tarjetas públicas (sin catas ni ficha). */
+/**
+ * Lo que necesitan las tarjetas públicas (sin catas ni ficha). Nunca incluye `stock`; `soldOut` queda sin definir
+ * (ver `withSoldOut` para los listados dinámicos).
+ */
 export function toPublicWine({ id, slug, name, winery, region, type, vintage, imageUrl, status, priceUsd, saleActive, maxPerOrder }: Wine): PublicWine {
   return { id, slug, name, winery, region, type, vintage, imageUrl, status, priceUsd, saleActive, maxPerOrder };
+}
+
+/**
+ * Reservadas por vino de los que controlan existencias, SOLO para mostrar (agotado, «quedan N»): usa la caché corta de
+ * reservas (`getWineHoldsCached`, ~10 s, vaciada al crear o cambiar un pedido en esta instancia) para no releer todos los
+ * pedidos en cada visita. Si la consulta falla se sigue sin ellas (el checkout vuelve a comprobar con datos frescos).
+ */
+async function holdsOf(wines: Wine[]): Promise<Map<string, number>> {
+  const controlled = wines.filter((w) => w.stock !== null).map((w) => w.id);
+  if (!controlled.length) return new Map();
+  try {
+    return await getWineHoldsCached(controlled);
+  } catch (err) {
+    console.error("[wines] No se pudieron leer las botellas reservadas:", err);
+    return new Map();
+  }
+}
+
+/** Agotado: controla existencias y no queda ninguna disponible. */
+const isSoldOut = (w: Wine, holds: Map<string, number>): boolean => {
+  const available = availableOf(w.stock, holds.get(w.id) ?? 0);
+  return available !== null && available <= 0;
+};
+
+/**
+ * Tarjetas públicas con `soldOut` calculado en vivo (una consulta de reservas, solo si algún vino controla existencias).
+ * Para /vinos y /vinos/[slug] (páginas dinámicas); la portada, con caché, usa `toPublicWine` y no muestra agotados.
+ */
+export async function withSoldOut(wines: Wine[]): Promise<PublicWine[]> {
+  const holds = await holdsOf(wines);
+  return wines.map((w) => ({ ...toPublicWine(w), soldOut: isSoldOut(w, holds) }));
+}
+
+/** Ficha completa para el público: todo el vino salvo `stock` (las existencias exactas no se publican) y con `soldOut`. */
+export type PublicWineDetail = Omit<Wine, "stock"> & { soldOut: boolean };
+
+export async function toPublicWineDetail(wine: Wine): Promise<PublicWineDetail> {
+  const { stock: _stock, ...rest } = wine;
+  return { ...rest, soldOut: isSoldOut(wine, await holdsOf([wine])) };
+}
+
+/** Un vino que quedó sobrevendido (más reservadas que existencias): se avisa al administrador al aprobar un pedido. */
+export type StockWarning = { wineId: string; name: string; stock: number; reserved: number };
+
+/**
+ * Vinos de `wineIds` con control de existencias cuyas reservadas superan lo puesto a la venta. Nunca lanza (ante un error, []).
+ * Es un aviso para el administrador al aprobar un pedido: lee las reservas SIEMPRE frescas (`getWineHolds`), sin caché.
+ */
+export async function getStockWarnings(wineIds: string[]): Promise<StockWarning[]> {
+  try {
+    const wines = (await Promise.all(Array.from(new Set(wineIds)).map((id) => getWine(id)))).filter(
+      (w): w is Wine => w !== null && w.stock !== null
+    );
+    if (!wines.length) return [];
+    const holds = await getWineHolds(wines.map((w) => w.id));
+    return wines
+      .map((w) => ({ wineId: w.id, name: w.name, stock: w.stock ?? 0, reserved: holds.get(w.id) ?? 0 }))
+      .filter((w) => w.reserved > w.stock);
+  } catch (err) {
+    console.error("[wines] No se pudo comprobar la sobreventa:", err);
+    return [];
+  }
 }
 
 /** Un vino tal como lo necesita el carrito (público, sin sesión): precio actual y si se puede comprar ahora. */
@@ -325,6 +424,10 @@ export type SaleWine = {
   priceUsd: number | null;
   maxPerOrder: number | null;
   forSale: boolean;
+  /** Botellas que se pueden pedir ahora (existencias menos reservadas); null = sin control (ilimitado). */
+  available: number | null;
+  /** Controla existencias y no queda ninguna. */
+  soldOut: boolean;
 };
 
 /** Máximo de ids que se consultan de una vez (igual al máximo de líneas de un pedido). */
@@ -347,6 +450,7 @@ export async function getSaleWinesByIds(ids: string[]): Promise<SaleWine[]> {
     found = (data ?? []).map(fromRow);
   }
   const byId = new Map(found.filter((w) => w.status === "published").map((w) => [w.id, w]));
+  const holds = await holdsOf(Array.from(byId.values()));
   return wanted
     .map((id) => byId.get(id))
     .filter((w): w is Wine => Boolean(w))
@@ -361,6 +465,8 @@ export async function getSaleWinesByIds(ids: string[]): Promise<SaleWine[]> {
       priceUsd: w.priceUsd,
       maxPerOrder: w.maxPerOrder,
       forSale: isWineForSale(w),
+      available: availableOf(w.stock, holds.get(w.id) ?? 0),
+      soldOut: isSoldOut(w, holds),
     }));
 }
 
@@ -368,8 +474,39 @@ export async function getSaleWinesByIds(ids: string[]): Promise<SaleWine[]> {
 export const WINES_TAG = "wines";
 
 /**
+ * Invalida lo que se ve de los vinos y de la configuración de la tienda: la caché de datos de la portada
+ * (etiqueta de los vinos) y las páginas /inicio y /vinos. Llamar tras guardar un vino, sus existencias o la configuración.
+ */
+export function revalidateWines(): void {
+  revalidateTag(WINES_TAG);
+  revalidatePath("/");
+  revalidatePath("/vinos");
+}
+
+/** ¿La tienda está abierta? Para la portada: lectura con la misma caché y etiqueta que los vinos; ante un error, abierta. */
+async function fetchStoreOpenCached(url: string, key: string): Promise<boolean> {
+  try {
+    const res = await fetch(`${url}/rest/v1/app_settings?key=eq.wine_store&select=value`, {
+      headers: { apikey: key, Authorization: `Bearer ${key}` },
+      next: { tags: [WINES_TAG], revalidate: 600 },
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const rows = (await res.json()) as { value?: unknown }[];
+    return rows[0]?.value ? normalizeWineStoreConfig(rows[0].value).enabled : true;
+  } catch (err) {
+    console.error("[wines] No se pudo leer el estado de la tienda para la portada:", err);
+    return true;
+  }
+}
+
+/** Con la tienda cerrada la portada no ofrece comprar: los vinos se muestran como no disponibles para la venta. */
+const withStoreState = (wines: PublicWine[], open: boolean): PublicWine[] => (open ? wines : wines.map((w) => ({ ...w, saleActive: false })));
+
+/**
  * Vinos publicados para la portada, con caché de datos de Next (como la publicidad): el inicio sigue
- * siendo estático y se actualiza cuando el panel guarda un vino. Si la tabla aún no existe, no muestra nada.
+ * siendo estático y se actualiza cuando el panel guarda un vino o la configuración de la tienda (`revalidateWines`).
+ * Si la tienda está cerrada, los vinos salen con `saleActive: false` (sin precio ni «Comprar»). No incluye agotados.
+ * Si la tabla aún no existe, no muestra nada.
  */
 export async function getHomeWines(limit = 12): Promise<PublicWine[]> {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -377,15 +514,19 @@ export async function getHomeWines(limit = 12): Promise<PublicWine[]> {
   if (!url || !key || url.includes("placeholder")) {
     // Sin Supabase (pruebas locales) los vinos viven en memoria: se leen en cada visita.
     noStore();
-    return (await listWines({ publishedOnly: true })).slice(0, limit).map(toPublicWine);
+    const [wines, store] = await Promise.all([listWines({ publishedOnly: true }), getWineStoreConfig()]);
+    return withStoreState(wines.slice(0, limit).map(toPublicWine), store.enabled);
   }
   try {
-    const res = await fetch(`${url}/rest/v1/wines?status=eq.published&select=*&order=created_at.desc&limit=${limit}`, {
-      headers: { apikey: key, Authorization: `Bearer ${key}` },
-      next: { tags: [WINES_TAG], revalidate: 600 },
-    });
+    const [res, open] = await Promise.all([
+      fetch(`${url}/rest/v1/wines?status=eq.published&select=*&order=created_at.desc&limit=${limit}`, {
+        headers: { apikey: key, Authorization: `Bearer ${key}` },
+        next: { tags: [WINES_TAG], revalidate: 600 },
+      }),
+      fetchStoreOpenCached(url, key),
+    ]);
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    return ((await res.json()) as Row[]).map(fromRow).map(toPublicWine);
+    return withStoreState(((await res.json()) as Row[]).map(fromRow).map(toPublicWine), open);
   } catch (err) {
     console.error("[wines] No se pudieron leer los vinos de la portada:", err);
     return [];
