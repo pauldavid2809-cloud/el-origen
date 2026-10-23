@@ -357,6 +357,32 @@ export async function deleteOrdersByTasting(tastingId: string): Promise<number> 
   return data?.length ?? 0;
 }
 
+/**
+ * Borra una orden con sus entradas (en Supabase, `tickets` se borra en cascada) y su comprobante.
+ * Devuelve false si la orden no existe. Lo usa el botón «Eliminar» del panel.
+ */
+export async function deleteOrder(id: string): Promise<boolean> {
+  const sb = getAdminClient();
+  if (!sb) {
+    const order = memOrders.get(id);
+    if (!order) return false;
+    memTickets.forEach((t, key) => {
+      if (t.orderId === id) memTickets.delete(key);
+    });
+    if (order.proofPath) memProofs.delete(order.proofPath);
+    memOrders.delete(id);
+    return true;
+  }
+  const { data, error } = await sb.from("orders").delete().eq("id", id).select("id, proof_path").maybeSingle();
+  if (error) throw new Error(`No se pudo eliminar la orden: ${error.message}`);
+  if (!data) return false;
+  if (typeof data.proof_path === "string" && data.proof_path) {
+    const { error: storageError } = await sb.storage.from(PROOF_BUCKET).remove([data.proof_path]);
+    if (storageError) console.error("[orders] No se pudo borrar el comprobante:", storageError.message);
+  }
+  return true;
+}
+
 export async function getOrderByToken(token: string): Promise<Order | null> {
   if (!token) return null;
   const sb = getAdminClient();

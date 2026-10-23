@@ -411,6 +411,29 @@ export async function updateWineOrder(id: string, patch: Partial<WineOrder>): Pr
   }
 }
 
+/** Borra el pedido (y su comprobante). Devuelve false si no existe. Lo usa el botón «Eliminar» del panel. */
+export async function deleteWineOrder(id: string): Promise<boolean> {
+  const sb = getAdminClient();
+  if (!sb) {
+    const existed = memWineOrders.delete(id);
+    if (existed) invalidateHoldsCache();
+    return existed;
+  }
+  if (!UUID_RE.test(id)) return false;
+  try {
+    const { data, error } = await sb.from("wine_orders").delete().eq("id", id).select("id, proof_path").maybeSingle();
+    if (error) throw new Error(`No se pudo eliminar el pedido: ${error.message}`);
+    if (!data) return false;
+    if (typeof data.proof_path === "string" && data.proof_path) {
+      const { error: storageError } = await sb.storage.from("comprobantes").remove([data.proof_path]);
+      if (storageError) console.error("[wineOrders] No se pudo borrar el comprobante:", storageError.message);
+    }
+    return true;
+  } finally {
+    invalidateHoldsCache();
+  }
+}
+
 /**
  * Cambio de estado condicionado: aplica `patch` solo si el pedido sigue en uno de los estados `from`
  * (compare-and-set). Devuelve null si otra petición lo cambió antes (o si no existe), para responder 409

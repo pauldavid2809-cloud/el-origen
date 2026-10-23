@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/auth";
 import { tastingWithAvailability } from "@/lib/availability";
-import { ensureTickets, getOrderById, holdExpired, transitionOrder, updateOrder, type Order } from "@/lib/orders";
+import { deleteOrder, ensureTickets, getOrderById, holdExpired, transitionOrder, updateOrder, type Order } from "@/lib/orders";
 import { sendRejectionEmail, sendTicketEmail, sendTicketWhatsApp } from "@/lib/notify";
 
 export const dynamic = "force-dynamic";
@@ -96,5 +96,18 @@ export async function PATCH(request: Request, { params }: { params: { id: string
   } catch (error) {
     console.error("[admin/orders]", error);
     return fail("No se pudo completar la acción. Intente de nuevo.", 500);
+  }
+}
+
+/** Elimina la orden definitivamente (con sus entradas y comprobante). No se puede deshacer. */
+export async function DELETE(_request: Request, { params }: { params: { id: string } }) {
+  const denied = requireAdmin();
+  if (denied) return denied;
+  try {
+    if (!(await deleteOrder(params.id))) return fail("Orden no encontrada.", 404);
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    console.error("[admin/orders]", error);
+    return fail("No se pudo eliminar la orden. Intente de nuevo.", 500);
   }
 }

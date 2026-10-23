@@ -92,6 +92,21 @@ export default function AdminReservationsPage() {
     setTimeout(() => setToast(null), 4000);
   };
 
+  const remove = async (o: AdminOrder) => {
+    setBusy(o.id);
+    try {
+      const res = await fetch(`/api/admin/orders/${o.id}`, { method: "DELETE" });
+      const data = await res.json();
+      if (!data.success) throw new Error(data.message);
+      notify(`Eliminada ${o.code}.`);
+      await load();
+    } catch (err) {
+      notify((err as Error).message || "No se pudo eliminar la reserva.", false);
+    } finally {
+      setBusy(null);
+    }
+  };
+
   const act = async (o: AdminOrder, action: "approve" | "reject" | "resend" | "cancel", why?: string) => {
     setBusy(o.id);
     try {
@@ -436,6 +451,19 @@ export default function AdminReservationsPage() {
                       Anular
                     </button>
                   )}
+                  <button
+                    disabled={busy === o.id}
+                    onClick={() =>
+                      confirm(`¿Eliminar definitivamente la reserva ${o.code}? Se borran la orden, sus entradas y el comprobante. No se puede deshacer.`) &&
+                      remove(o)
+                    }
+                    className={`h-10 px-3 rounded text-[13px] font-semibold text-error hover:underline inline-flex items-center gap-1 ${
+                      o.status !== "cancelled" && !o.checkedInAt ? "" : "ml-auto"
+                    }`}
+                  >
+                    <span className="material-symbols-outlined text-[18px]" aria-hidden="true">delete</span>
+                    Eliminar
+                  </button>
                 </div>
               </li>
             );

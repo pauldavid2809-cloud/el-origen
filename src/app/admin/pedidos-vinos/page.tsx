@@ -122,6 +122,21 @@ export default function AdminWineOrdersPage() {
     setTimeout(() => setToast(null), 4000);
   };
 
+  const remove = async (o: AdminWineOrder) => {
+    setBusy(o.id);
+    try {
+      const res = await fetch(`/api/admin/wine-orders/${o.id}`, { method: "DELETE" });
+      const data = await res.json();
+      if (!data.success) throw new Error(data.message);
+      notify(`Eliminado ${o.code}.`);
+      await load();
+    } catch (err) {
+      notify((err as Error).message || "No se pudo eliminar el pedido.", false);
+    } finally {
+      setBusy(null);
+    }
+  };
+
   const act = async (o: AdminWineOrder, action: Action, why?: string) => {
     setBusy(o.id);
     try {
@@ -483,6 +498,20 @@ export default function AdminWineOrdersPage() {
                       Anular
                     </button>
                   )}
+                  <button
+                    type="button"
+                    disabled={busy === o.id}
+                    onClick={() =>
+                      confirm(`¿Eliminar definitivamente el pedido ${o.code}? Se borran el pedido y su comprobante. No se puede deshacer.`) &&
+                      remove(o)
+                    }
+                    className={`h-10 px-3 rounded text-[13px] font-semibold text-error hover:underline inline-flex items-center gap-1 ${
+                      o.status !== "cancelled" && !o.deliveredAt ? "" : "ml-auto"
+                    }`}
+                  >
+                    <span className="material-symbols-outlined text-[18px]" aria-hidden="true">delete</span>
+                    Eliminar
+                  </button>
                 </div>
               </li>
             );

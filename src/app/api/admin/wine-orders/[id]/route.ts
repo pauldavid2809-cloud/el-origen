@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/auth";
 import type { DeliveryStatus } from "@/lib/orders";
-import { getWineOrderById, transitionWineOrder, updateWineOrder, type WineOrder } from "@/lib/wineOrders";
+import { deleteWineOrder, getWineOrderById, transitionWineOrder, updateWineOrder, type WineOrder } from "@/lib/wineOrders";
 import { getStockWarnings } from "@/lib/wines";
 import { sendWineOrderEmail, sendWineRejectionEmail, sendWineWhatsApp } from "@/lib/notify";
 
@@ -109,5 +109,18 @@ export async function PATCH(request: Request, { params }: { params: { id: string
       return fail("Esa referencia de pago ya está registrada en otra reserva o pedido en revisión o aprobado. Revise cuál es el pago real antes de aprobar.", 409);
     }
     return fail("No se pudo completar la acción. Intente de nuevo.", 500);
+  }
+}
+
+/** Elimina el pedido definitivamente (con su comprobante). No se puede deshacer. */
+export async function DELETE(_request: Request, { params }: { params: { id: string } }) {
+  const denied = requireAdmin();
+  if (denied) return denied;
+  try {
+    if (!(await deleteWineOrder(params.id))) return fail("Pedido no encontrado.", 404);
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    console.error("[admin/wine-orders]", error);
+    return fail("No se pudo eliminar el pedido. Intente de nuevo.", 500);
   }
 }
