@@ -97,7 +97,7 @@ export async function sendMail(msg: MailMessage): Promise<MailResult> {
   if (resend) {
     try {
       const { error } = await resend.emails.send({
-        from: process.env.RESEND_FROM_EMAIL || "El Origen <onboarding@resend.dev>",
+        from: process.env.RESEND_FROM_EMAIL || "El Origen <entradas@elorigenvzla.com>",
         to,
         subject: msg.subject,
         html: msg.html,
