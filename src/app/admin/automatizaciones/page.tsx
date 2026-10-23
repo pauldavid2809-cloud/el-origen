@@ -3,7 +3,7 @@
 import React, { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 
-/* Estado de los envíos automáticos: correo (Gmail/Resend) y WhatsApp (bot o API de Meta). Datos de /api/admin/whatsapp.
+/* Estado de los envíos automáticos: correo (Resend) y WhatsApp (bot o API de Meta). Datos de /api/admin/whatsapp.
    Sirven a las dos ventas: las entradas con QR de las catas y la confirmación de los pedidos de vinos. */
 
 interface DeliveryInfo {
@@ -13,11 +13,11 @@ interface DeliveryInfo {
   queued: number;
   /** De `queued`, los que son pedidos de vinos. */
   wineQueued?: number;
-  mail: "gmail" | "resend" | "none";
+  mail: "resend" | "none";
 }
 
 const REFRESH_MS = 15_000;
-const MAIL_LABEL: Record<DeliveryInfo["mail"], string> = { gmail: "Gmail", resend: "Resend", none: "Sin configurar" };
+const MAIL_LABEL: Record<DeliveryInfo["mail"], string> = { resend: "Resend", none: "Sin configurar" };
 
 const when = (iso: string) =>
   new Date(iso).toLocaleString("es-VE", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit", second: "2-digit" });
@@ -192,8 +192,7 @@ function MailCard({ mail }: { mail: DeliveryInfo["mail"] }) {
     return (
       <StatusCard tone="off" icon="mail" title="Correo sin configurar">
         <p>
-          Defina <code>GMAIL_USER</code> y <code>GMAIL_APP_PASSWORD</code> (contraseña de aplicación de Google, con la verificación en dos pasos
-          activa) para enviar las entradas, las confirmaciones de pedidos, los avisos de rechazo y las alertas de comprobantes.
+          Defina <code>RESEND_API_KEY</code> (con el dominio verificado en Resend) para enviar las entradas, las confirmaciones de pedidos, los avisos de rechazo y las alertas de comprobantes.
         </p>
       </StatusCard>
     );

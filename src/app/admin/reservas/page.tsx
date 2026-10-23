@@ -38,7 +38,7 @@ const METHOD_LABEL: Record<string, string> = {
 
 const RATE_SUFFIX: Record<string, string> = { EUR: " (tasa BCV euro)", BINANCE: " (tasa Binance)" };
 
-const MAIL_LABEL: Record<string, string> = { gmail: "Gmail", resend: "Resend" };
+const MAIL_LABEL: Record<string, string> = { resend: "Resend" };
 
 const DELIVERY: Record<string, { label: string; cls: string }> = {
   sent: { label: "enviado", cls: "bg-emerald-100 text-emerald-900" },
@@ -515,7 +515,7 @@ type DeliveryInfo = {
   provider: "meta" | "bot" | "none";
   bot: { phone: string | null; running: boolean; online: boolean; lastSeen: string } | null;
   queued: number;
-  mail: "gmail" | "resend" | "none";
+  mail: "resend" | "none";
 };
 
 function DeliveryStatus({ wa }: { wa: DeliveryInfo }) {
@@ -523,8 +523,8 @@ function DeliveryStatus({ wa }: { wa: DeliveryInfo }) {
     <div className="space-y-2">
       {wa.mail === "none" ? (
         <div className="rounded-lg border border-outline-variant bg-surface-container-low p-4 text-[14px] text-on-surface-variant">
-          <strong className="text-on-surface">Correo sin configurar.</strong> Defina <code>GMAIL_USER</code> y <code>GMAIL_APP_PASSWORD</code>{" "}
-          (contraseña de aplicación de Google) para enviar las entradas y los avisos por correo.
+          <strong className="text-on-surface">Correo sin configurar.</strong> Defina <code>RESEND_API_KEY</code>{" "}
+          (y verifique el dominio en Resend) para enviar las entradas y los avisos por correo.
         </div>
       ) : (
         <p className="text-[14px] text-on-surface-variant flex items-center gap-2">

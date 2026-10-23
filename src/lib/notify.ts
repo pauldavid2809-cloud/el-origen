@@ -17,7 +17,7 @@ import {
   type WineStoreConfig,
 } from "./wineStoreRules";
 
-/* Notificaciones al cliente: correo (Gmail SMTP o Resend, vía mailer.ts) y WhatsApp
+/* Notificaciones al cliente: correo (Resend, vía mailer.ts) y WhatsApp
    (API de Meta o cola del bot propio). Cada persona recibe su propia entrada con QR.
    Los pedidos de vinos (wine_orders) tienen sus propias funciones al final del archivo: resumen del pedido,
    sin QR, sin adjuntos y sin las políticas de las catas. */
